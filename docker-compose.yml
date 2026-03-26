@@ -8,11 +8,17 @@ services:
         condition: service_healthy
     environment:
       DATABASE_URL: postgresql://datapulse:datapulse_dev@postgres:5432/datapulse
+      DBT_HOST: postgres
+      DBT_PROFILES_DIR: /app/dbt
+      POSTGRES_USER: ${POSTGRES_USER:-datapulse}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-datapulse_dev}
+      POSTGRES_DB: ${POSTGRES_DB:-datapulse}
     volumes:
       - ./src:/app/src
       - ./tests:/app/tests
       - ./data:/app/data
       - ./notebooks:/app/notebooks
+      - ./dbt:/app/dbt
 
   postgres:
     image: postgres:16-alpine

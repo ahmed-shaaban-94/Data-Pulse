@@ -18,6 +18,8 @@ dependencies = [
     "sqlalchemy>=2.0",
     "psycopg2-binary>=2.9",
     "structlog>=24.1",
+    "dbt-core>=1.8",
+    "dbt-postgres>=1.8",
 ]
 
 [project.optional-dependencies]

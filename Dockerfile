@@ -4,7 +4,7 @@ WORKDIR /app
 
 # Install system dependencies for psycopg2
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    libpq-dev gcc \
+    libpq-dev gcc git \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy project files and install

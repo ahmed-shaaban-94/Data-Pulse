@@ -1,0 +1,22 @@
+name: datapulse
+version: '0.1.0'
+
+profile: datapulse
+
+model-paths: ["models"]
+test-paths: ["tests"]
+macro-paths: ["macros"]
+seed-paths: ["seeds"]
+
+clean-targets:
+  - target
+  - dbt_packages
+
+models:
+  datapulse:
+    staging:
+      +materialized: view
+      +schema: staging
+    marts:
+      +materialized: table
+      +schema: marts
