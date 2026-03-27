@@ -13,7 +13,7 @@ cd SAAS
 cp .env.example .env
 
 # Start all services
-docker compose up -d --build
+make up
 ```
 
 ## Code Standards
