@@ -85,7 +85,8 @@ dbt/
 migrations/                      # SQL migrations (tracked via schema_migrations)
 ├── 000_create_schema_migrations.sql  # Migration tracking bootstrap
 ├── 001_create_bronze_schema.sql      # Bronze schema + tables
-└── 002_add_rls_and_roles.sql         # RLS + read-only role
+├── 002_add_rls_and_roles.sql         # RLS + read-only role
+└── 003_add_tenant_id.sql            # Tenant-scoped RLS (tenant_id col, bronze.tenants table)
 
 tests/
 ├── conftest.py
@@ -123,7 +124,8 @@ docker compose up -d --build
 
 | Table/View | Schema | Rows | Purpose |
 |-------|--------|------|---------|
-| `bronze.sales` | bronze | 1,134,799 | Raw sales data (Q1.2023–Q4.2025, 46 columns) |
+| `bronze.tenants` | bronze | 1 | Tenant registry (tenant_id, tenant_name) |
+| `bronze.sales` | bronze | 1,134,799 | Raw sales data (Q1.2023–Q4.2025, 47 columns incl. tenant_id) |
 | `public_staging.stg_sales` | staging | ~1.1M (deduped) | Cleaned sales (35 cols, EN billing, normalized status, flags, 7 dbt tests) |
 | `marts.dim_date` | marts | ~1,096 | Calendar dimension (2023-01-01 to 2025-12-31) |
 | `marts.dim_customer` | marts | distinct | Customer dimension (name, latest site) |
@@ -180,7 +182,9 @@ docker exec -it datapulse-app python -m datapulse.bronze.loader --source /app/da
 ### Security
 - All credentials via `.env` file (never hardcoded in source)
 - Docker ports bound to `127.0.0.1` only
-- RLS enabled on `bronze.sales` with owner + reader policies
+- Tenant-scoped RLS on `bronze.sales`, all marts tables, and silver view (`security_invoker=on`)
+- Session variable pattern: `SET LOCAL app.tenant_id = '<id>'` — reader sees only their tenant's rows
+- `FORCE ROW LEVEL SECURITY` on all RLS-enabled tables (owner bypass prevented)
 - SQL column whitelist before INSERT (prevents injection)
 - Financial columns use `NUMERIC(18,4)` (not floating-point)
 
@@ -193,6 +197,7 @@ docker exec -it datapulse-app python -m datapulse.bronze.loader --source /app/da
 
 - **Phase 1.3**: Data Cleaning (silver layer via dbt) [DONE]
 - **Phase 1.3.5**: Security hardening, gold layer recovery, QC [DONE]
+- **Phase 1.5 prep**: Tenant-scoped RLS across all layers [DONE]
 - **Phase 1.4**: Data Analysis (gold layer aggregations, statistics)
 - **Phase 1.5**: Dashboard & Visualization (Next.js frontend)
 - **Phase 2**: Automation via n8n workflows
