@@ -7,30 +7,22 @@ import polars as pl
 from datapulse.import_pipeline.models import ColumnInfo, DetectedType
 
 
-_POLARS_TYPE_MAP: dict[type, DetectedType] = {
-    pl.Utf8: DetectedType.STRING,
-    pl.String: DetectedType.STRING,
-    pl.Int8: DetectedType.INTEGER,
-    pl.Int16: DetectedType.INTEGER,
-    pl.Int32: DetectedType.INTEGER,
-    pl.Int64: DetectedType.INTEGER,
-    pl.UInt8: DetectedType.INTEGER,
-    pl.UInt16: DetectedType.INTEGER,
-    pl.UInt32: DetectedType.INTEGER,
-    pl.UInt64: DetectedType.INTEGER,
-    pl.Float32: DetectedType.FLOAT,
-    pl.Float64: DetectedType.FLOAT,
-    pl.Boolean: DetectedType.BOOLEAN,
-    pl.Date: DetectedType.DATE,
-    pl.Datetime: DetectedType.DATE,
-}
-
-
 def _map_polars_type(dtype: pl.DataType) -> DetectedType:
-    """Map a Polars dtype to our DetectedType enum."""
-    for polars_type, detected in _POLARS_TYPE_MAP.items():
-        if isinstance(dtype, polars_type):
-            return detected
+    """Map a Polars dtype to our DetectedType enum.
+
+    Uses direct equality checks instead of isinstance so the mapping is
+    stable across Polars versions that restructure the type class hierarchy.
+    """
+    if dtype in (pl.Int8, pl.Int16, pl.Int32, pl.Int64, pl.UInt8, pl.UInt16, pl.UInt32, pl.UInt64):
+        return DetectedType.INTEGER
+    if dtype in (pl.Float32, pl.Float64):
+        return DetectedType.FLOAT
+    if dtype == pl.Boolean:
+        return DetectedType.BOOLEAN
+    if dtype in (pl.Date, pl.Datetime):
+        return DetectedType.DATE
+    if dtype in (pl.Utf8, pl.String):
+        return DetectedType.STRING
     return DetectedType.UNKNOWN
 
 
@@ -38,6 +30,7 @@ def detect_column_types(
     df: pl.DataFrame,
     sample_size: int = 100,
     sample_values_count: int = 5,
+    include_samples: bool = True,
 ) -> list[ColumnInfo]:
     """Analyze a DataFrame and return column metadata.
 
@@ -45,6 +38,8 @@ def detect_column_types(
         df: The DataFrame to analyze.
         sample_size: Number of rows to sample for analysis.
         sample_values_count: Number of sample values to include per column.
+        include_samples: When False, sample_values is always an empty list.
+            Set to False to avoid storing PII from sensitive columns.
 
     Returns:
         List of ColumnInfo with detected types and statistics.
@@ -58,9 +53,12 @@ def detect_column_types(
 
         detected_type = _map_polars_type(col.dtype)
 
-        # Get sample values as strings
-        non_null = sampled_col.drop_nulls()
-        samples = [str(v) for v in non_null.head(sample_values_count).to_list()]
+        # Get sample values as strings (omitted when include_samples is False)
+        if include_samples:
+            non_null = sampled_col.drop_nulls()
+            samples = [str(v) for v in non_null.head(sample_values_count).to_list()]
+        else:
+            samples = []
 
         result.append(
             ColumnInfo(

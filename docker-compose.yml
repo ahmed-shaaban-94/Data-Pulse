@@ -9,11 +9,11 @@ services:
     ports:
       - "8888:8888"
     environment:
-      DATABASE_URL: postgresql://datapulse:datapulse_dev@postgres:5432/datapulse
+      DATABASE_URL: postgresql://${POSTGRES_USER:-datapulse}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@postgres:5432/${POSTGRES_DB:-datapulse}
       DBT_HOST: postgres
       DBT_PROFILES_DIR: /app/dbt
       POSTGRES_USER: ${POSTGRES_USER:-datapulse}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-datapulse_dev}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
       POSTGRES_DB: ${POSTGRES_DB:-datapulse}
     volumes:
       - ./src:/app/src
@@ -29,10 +29,10 @@ services:
     container_name: datapulse-db
     restart: unless-stopped
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-datapulse}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-datapulse_dev}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
       POSTGRES_DB: ${POSTGRES_DB:-datapulse}
     volumes:
       - pgdata:/var/lib/postgresql/data
@@ -50,10 +50,10 @@ services:
       postgres:
         condition: service_healthy
     ports:
-      - "5050:80"
+      - "127.0.0.1:5050:80"
     environment:
       PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@datapulse.dev}
-      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:?PGADMIN_PASSWORD must be set}
       PGADMIN_CONFIG_SERVER_MODE: "False"
     volumes:
       - pgadmin_data:/var/lib/pgadmin

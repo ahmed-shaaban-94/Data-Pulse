@@ -126,7 +126,7 @@ All settings via environment variables or `.env` file (Pydantic Settings):
 
 | Setting | Default | Description |
 |---------|---------|-------------|
-| `DATABASE_URL` | `postgresql://datapulse:datapulse_dev@localhost:5432/datapulse` | PostgreSQL connection |
+| `DATABASE_URL` | `postgresql://datapulse:<password>@localhost:5432/datapulse` | PostgreSQL connection (set in .env) |
 | `MAX_FILE_SIZE_MB` | 500 | Max upload file size |
 | `MAX_ROWS` | 10,000,000 | Max rows per dataset |
 | `MAX_COLUMNS` | 200 | Max columns per dataset |

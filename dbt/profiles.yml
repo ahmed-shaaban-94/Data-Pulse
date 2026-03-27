@@ -6,7 +6,7 @@ datapulse:
       host: "{{ env_var('DBT_HOST', 'postgres') }}"
       port: 5432
       user: "{{ env_var('POSTGRES_USER', 'datapulse') }}"
-      pass: "{{ env_var('POSTGRES_PASSWORD', 'datapulse_dev') }}"
+      pass: "{{ env_var('POSTGRES_PASSWORD') }}"
       dbname: "{{ env_var('POSTGRES_DB', 'datapulse') }}"
       schema: public
       threads: 4

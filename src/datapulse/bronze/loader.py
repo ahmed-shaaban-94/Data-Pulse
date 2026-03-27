@@ -14,13 +14,32 @@ from pathlib import Path
 import polars as pl
 import pyarrow as pa
 import pyarrow.parquet as pq
-from sqlalchemy import create_engine, text
+from sqlalchemy import Engine, create_engine, text
 
 from datapulse.bronze.column_map import COLUMN_MAP
-from datapulse.config import settings
+from datapulse.config import get_settings
 from datapulse.utils.logging import get_logger
 
 log = get_logger(__name__)
+
+# Whitelist of columns allowed in INSERT statements — derived from COLUMN_MAP
+# plus the two lineage columns added at read time.
+ALLOWED_COLUMNS: frozenset[str] = frozenset(COLUMN_MAP.values()) | {
+    "source_file",
+    "source_quarter",
+}
+
+
+def _validate_columns(columns: list[str]) -> None:
+    """Raise ValueError if any column name is not in ALLOWED_COLUMNS.
+
+    Prevents SQL injection through f-string column name interpolation.
+    """
+    unknown = [c for c in columns if c not in ALLOWED_COLUMNS]
+    if unknown:
+        raise ValueError(
+            f"Column name(s) not in whitelist and cannot be used in SQL: {unknown}"
+        )
 
 
 def discover_files(source_dir: Path) -> list[Path]:
@@ -91,13 +110,23 @@ def save_parquet(df: pl.DataFrame, output_path: Path) -> Path:
     return output_path
 
 
-def load_to_postgres(df: pl.DataFrame, database_url: str, batch_size: int) -> int:
-    """Load DataFrame into bronze.sales table using batched inserts via PyArrow."""
-    engine = create_engine(database_url)
+def load_to_postgres(df: pl.DataFrame, engine: Engine, batch_size: int) -> int:
+    """Load DataFrame into bronze.sales table using batched inserts via PyArrow.
 
-    # Get the DB column names (excluding id, loaded_at which are auto-generated)
+    Args:
+        df: DataFrame with columns already renamed to DB names.
+        engine: Shared SQLAlchemy engine (created and disposed by caller).
+        batch_size: Number of rows per insert batch.
+
+    Returns:
+        Total number of rows inserted.
+    """
+    # Exclude auto-generated columns
     db_columns = [col for col in df.columns if col not in ("id", "loaded_at")]
     df_to_load = df.select(db_columns)
+
+    # Reject any column not in the whitelist before touching SQL
+    _validate_columns(db_columns)
 
     total_rows = df_to_load.shape[0]
     loaded = 0
@@ -108,7 +137,6 @@ def load_to_postgres(df: pl.DataFrame, database_url: str, batch_size: int) -> in
         for offset in range(0, total_rows, batch_size):
             batch = df_to_load.slice(offset, batch_size)
 
-            # Convert to list of dicts for executemany
             cols = batch.columns
             placeholders = ", ".join(f":{c}" for c in cols)
             col_names = ", ".join(cols)
@@ -129,20 +157,73 @@ def load_to_postgres(df: pl.DataFrame, database_url: str, batch_size: int) -> in
     return loaded
 
 
-def run_migration(database_url: str) -> None:
-    """Run the bronze schema migration."""
-    migration_path = Path(__file__).parent.parent.parent.parent / "migrations" / "001_create_bronze_schema.sql"
-    if not migration_path.exists():
-        log.warning("migration_not_found", path=str(migration_path))
+def run_migrations(engine: Engine) -> None:
+    """Run all pending SQL migrations in sorted order.
+
+    Ensures the schema_migrations tracking table exists first (via 000 bootstrap),
+    then executes each .sql file in the migrations/ directory that has not yet
+    been recorded in public.schema_migrations.
+
+    Args:
+        engine: Shared SQLAlchemy engine (created and disposed by caller).
+    """
+    migrations_dir = Path(__file__).parent.parent.parent.parent / "migrations"
+    if not migrations_dir.is_dir():
+        log.warning("migrations_dir_not_found", path=str(migrations_dir))
         return
 
-    engine = create_engine(database_url)
-    sql = migration_path.read_text(encoding="utf-8")
+    # --- Step 1: Bootstrap the tracking table (000) ---
+    bootstrap = migrations_dir / "000_create_schema_migrations.sql"
+    if bootstrap.exists():
+        try:
+            with engine.begin() as conn:
+                conn.execute(text(bootstrap.read_text(encoding="utf-8")))
+        except Exception:
+            log.exception("migration_failed", file=bootstrap.name)
+            raise
 
-    with engine.begin() as conn:
-        conn.execute(text(sql))
+    # --- Step 2: Discover and run pending migrations ---
+    migration_files = sorted(migrations_dir.glob("*.sql"))
 
-    log.info("migration_applied", file=migration_path.name)
+    for mig in migration_files:
+        try:
+            with engine.begin() as conn:
+                # Check if already applied
+                result = conn.execute(
+                    text("SELECT 1 FROM public.schema_migrations WHERE filename = :fn"),
+                    {"fn": mig.name},
+                )
+                if result.fetchone() is not None:
+                    log.info("migration_skipped", file=mig.name, reason="already applied")
+                    continue
+
+                # Execute the migration
+                sql = mig.read_text(encoding="utf-8")
+                conn.execute(text(sql))
+
+                # Record it
+                conn.execute(
+                    text(
+                        "INSERT INTO public.schema_migrations (filename) VALUES (:fn)"
+                    ),
+                    {"fn": mig.name},
+                )
+        except Exception:
+            log.exception("migration_failed", file=mig.name)
+            raise
+
+        log.info("migration_applied", file=mig.name)
+
+
+def _create_engine(database_url: str) -> Engine:
+    """Create a SQLAlchemy engine with safe pool and timeout settings."""
+    return create_engine(
+        database_url,
+        pool_size=2,
+        max_overflow=0,
+        pool_timeout=30,
+        connect_args={"options": "-c statement_timeout=300000"},
+    )
 
 
 def run(
@@ -164,9 +245,9 @@ def run(
     Returns:
         The concatenated DataFrame.
     """
-    db_url = database_url or settings.database_url
-    pq_path = parquet_path or settings.parquet_dir / "bronze_sales.parquet"
-    bs = batch_size or settings.bronze_batch_size
+    db_url = database_url or get_settings().database_url
+    pq_path = parquet_path or get_settings().parquet_dir / "bronze_sales.parquet"
+    bs = batch_size or get_settings().bronze_batch_size
 
     t0 = time.perf_counter()
 
@@ -180,10 +261,14 @@ def run(
     # 3. Save Parquet
     save_parquet(df, pq_path)
 
-    # 4. Load to PostgreSQL
+    # 4. Load to PostgreSQL — single engine, disposed after both operations
     if not skip_db:
-        run_migration(db_url)
-        load_to_postgres(df, db_url, bs)
+        engine = _create_engine(db_url)
+        try:
+            run_migrations(engine)
+            load_to_postgres(df, engine, bs)
+        finally:
+            engine.dispose()
 
     elapsed = time.perf_counter() - t0
     log.info("pipeline_complete", rows=df.shape[0], elapsed_seconds=round(elapsed, 1))

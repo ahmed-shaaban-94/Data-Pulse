@@ -52,16 +52,16 @@ CREATE TABLE IF NOT EXISTS bronze.sales (
     area_mg         TEXT,
 
     -- Financials
-    quantity        DOUBLE PRECISION,
-    net_sales       DOUBLE PRECISION,
-    gross_sales     DOUBLE PRECISION,
-    sales_not_tax   DOUBLE PRECISION,
-    dis_tax         DOUBLE PRECISION,
-    tax             DOUBLE PRECISION,
-    paid            BIGINT,
-    kzwi1           DOUBLE PRECISION,
-    subtotal5_discount DOUBLE PRECISION,
-    add_dis         BIGINT,
+    quantity        NUMERIC(18,4),
+    net_sales       NUMERIC(18,4),
+    gross_sales     NUMERIC(18,4),
+    sales_not_tax   NUMERIC(18,4),
+    dis_tax         NUMERIC(18,4),
+    tax             NUMERIC(18,4),
+    paid            NUMERIC(18,4),
+    kzwi1           NUMERIC(18,4),
+    subtotal5_discount NUMERIC(18,4),
+    add_dis         NUMERIC(18,4),
 
     -- Insurance
     insurance_tel   TEXT,
@@ -70,6 +70,7 @@ CREATE TABLE IF NOT EXISTS bronze.sales (
     -- Other
     certification   TEXT,
     assignment      TEXT,
+    -- ref_return_date kept as TEXT: source data format varies, cleaned in silver layer
     ref_return_date TEXT,
     ref_return      TEXT
 );
@@ -82,6 +83,8 @@ CREATE INDEX IF NOT EXISTS idx_bronze_sales_material ON bronze.sales (material);
 CREATE INDEX IF NOT EXISTS idx_bronze_sales_category ON bronze.sales (category);
 CREATE INDEX IF NOT EXISTS idx_bronze_sales_brand ON bronze.sales (brand);
 CREATE INDEX IF NOT EXISTS idx_bronze_sales_site ON bronze.sales (site);
+
+CREATE INDEX IF NOT EXISTS idx_bronze_sales_loaded_at ON bronze.sales (loaded_at);
 
 COMMENT ON TABLE bronze.sales IS 'Bronze layer — raw sales data imported from quarterly Excel files';
 COMMENT ON COLUMN bronze.sales.source_file IS 'Original Excel filename (e.g. Q1.2023.xlsx)';

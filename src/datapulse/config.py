@@ -1,5 +1,6 @@
 """Application settings loaded from environment variables."""
 
+from functools import lru_cache
 from pathlib import Path
 
 from pydantic_settings import BaseSettings
@@ -9,7 +10,7 @@ class Settings(BaseSettings):
     """DataPulse configuration — reads from .env file."""
 
     # Database
-    database_url: str = "postgresql://datapulse:datapulse_dev@localhost:5432/datapulse"
+    database_url: str = "postgresql://datapulse:CHANGEME@localhost:5432/datapulse"
 
     # Paths
     raw_data_dir: Path = Path("data/raw")
@@ -31,4 +32,7 @@ class Settings(BaseSettings):
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 
 
-settings = Settings()
+@lru_cache(maxsize=1)
+def get_settings() -> Settings:
+    """Return the cached application settings singleton."""
+    return Settings()
