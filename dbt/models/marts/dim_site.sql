@@ -16,6 +16,7 @@
 -- Site/location dimension
 -- SCD Type 1: latest attribute wins
 -- Includes area_manager (site-level geographic grouping)
+-- key = -1 reserved for Unknown/Unassigned
 
 WITH ranked AS (
     SELECT
@@ -39,3 +40,11 @@ SELECT
     area_manager
 FROM ranked
 WHERE rn = 1
+
+UNION ALL
+
+SELECT
+    -1                 AS site_key,
+    '__UNKNOWN__'      AS site_code,
+    'Unknown'          AS site_name,
+    'Unknown'          AS area_manager
