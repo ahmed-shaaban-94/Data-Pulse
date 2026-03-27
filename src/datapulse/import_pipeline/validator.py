@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from datapulse.config import settings
+from datapulse.config import get_settings
 from datapulse.import_pipeline.models import FileFormat
 
 
@@ -34,10 +34,10 @@ def validate_file(path: Path) -> FileFormat:
     if file_size == 0:
         raise ValidationError(f"File is empty: {path}")
 
-    if file_size > settings.max_file_size_bytes:
+    if file_size > get_settings().max_file_size_bytes:
         size_mb = file_size / (1024 * 1024)
         raise ValidationError(
-            f"File too large: {size_mb:.1f}MB (max {settings.max_file_size_mb}MB)"
+            f"File too large: {size_mb:.1f}MB (max {get_settings().max_file_size_mb}MB)"
         )
 
     format_map = {".csv": FileFormat.CSV, ".xlsx": FileFormat.XLSX, ".xls": FileFormat.XLS}

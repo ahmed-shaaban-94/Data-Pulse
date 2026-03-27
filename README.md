@@ -58,8 +58,8 @@ docker compose up -d --build
 
 | Service | URL | Credentials |
 |---------|-----|-------------|
-| PostgreSQL | `localhost:5432` | datapulse / datapulse_dev |
-| pgAdmin | `localhost:5050` | admin@datapulse.dev / admin |
+| PostgreSQL | `localhost:5432` | datapulse / (set in .env) |
+| pgAdmin | `localhost:5050` | admin@datapulse.dev / (set in .env) |
 | JupyterLab | `localhost:8888` | -- |
 
 ### Load Sales Data

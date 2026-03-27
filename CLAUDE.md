@@ -73,14 +73,28 @@ dbt/
     ├── staging/                 # Silver layer (cleaning + renaming)
     │   ├── _staging__sources.yml
     │   └── stg_sales.sql        # Cleaned: 30 cols, dedup, billing EN, derived fields
-    └── marts/                   # Gold layer (planned)
+    └── marts/                   # Gold layer (dimension + fact tables)
+        ├── _marts__models.yml   # Schema, docs, 29 dbt tests
+        ├── dim_date.sql         # Calendar dimension (2023-2025)
+        ├── dim_customer.sql     # Customer dimension
+        ├── dim_product.sql      # Product/drug dimension
+        ├── dim_site.sql         # Site/location dimension
+        ├── dim_staff.sql        # Staff/personnel dimension
+        └── fct_sales.sql        # Sales fact table (joins all dims)
 
-migrations/                      # SQL migrations (run by bronze loader)
-├── 001_create_bronze_schema.sql
+migrations/                      # SQL migrations (tracked via schema_migrations)
+├── 000_create_schema_migrations.sql  # Migration tracking bootstrap
+├── 001_create_bronze_schema.sql      # Bronze schema + tables
+└── 002_add_rls_and_roles.sql         # RLS + read-only role
 
 tests/
+├── conftest.py
 ├── test_reader.py
-└── test_type_detector.py
+├── test_type_detector.py
+├── test_config.py
+├── test_validator.py
+├── test_loader.py
+└── test_coverage_gaps.py
 ```
 
 ## Docker Services
@@ -103,7 +117,7 @@ docker compose up -d --build
 |--------|---------|-------------|
 | `bronze` | Raw data, as-is from source | Python bronze loader |
 | `public_staging` / `silver` | Cleaned, transformed | dbt staging models |
-| `marts` / `gold` | Aggregated, business-ready | dbt models (planned) |
+| `marts` / `gold` | Aggregated, business-ready | dbt marts models (5 dims + 1 fact) |
 
 ### Current Tables/Views
 
@@ -111,6 +125,12 @@ docker compose up -d --build
 |-------|--------|------|---------|
 | `bronze.sales` | bronze | 1,134,799 | Raw sales data (Q1.2023–Q4.2025, 46 columns) |
 | `public_staging.stg_sales` | staging | ~1.1M (deduped) | Cleaned sales (35 cols, EN billing, normalized status, flags, 7 dbt tests) |
+| `marts.dim_date` | marts | ~1,096 | Calendar dimension (2023-01-01 to 2025-12-31) |
+| `marts.dim_customer` | marts | distinct | Customer dimension (name, latest site) |
+| `marts.dim_product` | marts | distinct | Product dimension (drug_code, brand, category) |
+| `marts.dim_site` | marts | distinct | Site dimension (name, area_manager) |
+| `marts.dim_staff` | marts | distinct | Staff dimension (name, position) |
+| `marts.fct_sales` | marts | ~1.1M | Fact table (FK to all dims, 4 financial measures) |
 
 ### Bronze Sales Columns (Key)
 
@@ -126,7 +146,7 @@ All settings via environment variables or `.env` file (Pydantic Settings):
 
 | Setting | Default | Description |
 |---------|---------|-------------|
-| `DATABASE_URL` | `postgresql://datapulse:datapulse_dev@localhost:5432/datapulse` | PostgreSQL connection |
+| `DATABASE_URL` | `postgresql://datapulse:<password>@localhost:5432/datapulse` | PostgreSQL connection (set in .env) |
 | `MAX_FILE_SIZE_MB` | 500 | Max upload file size |
 | `MAX_ROWS` | 10,000,000 | Max rows per dataset |
 | `MAX_COLUMNS` | 200 | Max columns per dataset |
@@ -157,14 +177,23 @@ docker exec -it datapulse-app python -m datapulse.bronze.loader --source /app/da
 - Code and docs: English
 - Inline comments: Arabic where helpful for clarity (mixed)
 
+### Security
+- All credentials via `.env` file (never hardcoded in source)
+- Docker ports bound to `127.0.0.1` only
+- RLS enabled on `bronze.sales` with owner + reader policies
+- SQL column whitelist before INSERT (prevents injection)
+- Financial columns use `NUMERIC(18,4)` (not floating-point)
+
 ### Testing
 - pytest + pytest-cov
-- Target: 80%+ coverage on `src/datapulse/`
+- Current coverage: 95%+ on `src/datapulse/`
+- Target: 80%+ minimum
 
 ## Future Phases
 
 - **Phase 1.3**: Data Cleaning (silver layer via dbt) [DONE]
-- **Phase 1.4**: Data Analysis (gold layer, aggregations, statistics)
+- **Phase 1.3.5**: Security hardening, gold layer recovery, QC [DONE]
+- **Phase 1.4**: Data Analysis (gold layer aggregations, statistics)
 - **Phase 1.5**: Dashboard & Visualization (Next.js frontend)
 - **Phase 2**: Automation via n8n workflows
 - **Phase 3**: AI-powered analysis via LangGraph

@@ -6,7 +6,7 @@ from pathlib import Path
 
 import polars as pl
 
-from datapulse.config import settings
+from datapulse.config import get_settings
 from datapulse.import_pipeline.models import FileFormat, ImportConfig, ImportResult
 from datapulse.import_pipeline.type_detector import detect_column_types
 from datapulse.import_pipeline.validator import validate_file, ValidationError
@@ -31,7 +31,7 @@ def read_csv(
             infer_schema_length=1000,
             try_parse_dates=True,
         )
-    except Exception as e:
+    except (pl.exceptions.ComputeError, UnicodeDecodeError) as e:
         # Retry with latin-1 if utf-8 fails
         if encoding == "utf-8":
             log.warning("utf8_failed_retrying_latin1", path=str(path), error=str(e))
@@ -58,9 +58,11 @@ def read_excel(
     Uses openpyxl for .xlsx and xlrd for .xls files.
     """
     suffix = path.suffix.lower()
-    engine = "calamine" if suffix == ".xlsx" else "calamine"
+    if suffix == ".xls":
+        raise ValidationError(".xls format is not supported. Please convert to .xlsx or .csv.")
+    engine = "calamine"
 
-    kwargs: dict = {"source": path, "engine": engine}
+    kwargs: dict[str, object] = {"source": path, "engine": engine}
     if sheet_name is not None:
         kwargs["sheet_name"] = sheet_name
 
@@ -100,13 +102,13 @@ def read_file(
         df = read_excel(path, sheet_name=config.sheet_name)
 
     # Enforce limits
-    if df.shape[0] > settings.max_rows:
+    if df.shape[0] > get_settings().max_rows:
         raise ValidationError(
-            f"Too many rows: {df.shape[0]:,} (max {settings.max_rows:,})"
+            f"Too many rows: {df.shape[0]:,} (max {get_settings().max_rows:,})"
         )
-    if df.shape[1] > settings.max_columns:
+    if df.shape[1] > get_settings().max_columns:
         raise ValidationError(
-            f"Too many columns: {df.shape[1]} (max {settings.max_columns})"
+            f"Too many columns: {df.shape[1]} (max {get_settings().max_columns})"
         )
 
     columns = detect_column_types(df, sample_size=config.sample_rows)

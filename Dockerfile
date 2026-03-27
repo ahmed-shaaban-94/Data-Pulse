@@ -1,17 +1,22 @@
-FROM python:3.12-slim
+FROM python:3.12-slim-bookworm
 
 WORKDIR /app
 
-# Install system dependencies for psycopg2
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    libpq-dev gcc git \
+# git needed for dbt package resolution
+RUN apt-get update && apt-get install -y --no-install-recommends git \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy project files and install
+# Upgrade pip to fix known CVEs
+RUN pip install --no-cache-dir --upgrade pip
+
+# Copy project files and install (runtime deps only, no dev tools)
 COPY pyproject.toml .
 COPY src/ src/
 
-RUN pip install --no-cache-dir -e ".[dev]" jupyterlab
+RUN pip install --no-cache-dir -e "." jupyterlab
+
+RUN useradd -m -u 1000 appuser
+USER appuser
 
 EXPOSE 8888
 

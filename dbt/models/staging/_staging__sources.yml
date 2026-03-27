@@ -19,8 +19,9 @@ models:
       # -- Transaction --
       - name: invoice_id
         description: "Sales invoice reference number (from reference_no)"
-        tests:
-          - not_null
+        # No not_null test: produced by NULLIF(TRIM(reference_no), ''), so empty
+        # strings in the source intentionally become NULL. Flagging these as
+        # failures would reject legitimate data.
       - name: invoice_date
         description: "Invoice date"
         tests:

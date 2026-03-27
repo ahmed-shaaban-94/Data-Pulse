@@ -2,4 +2,13 @@
 
 from datapulse.bronze.loader import main
 
-main()
+if __name__ == "__main__":
+    try:
+        main()
+    except KeyboardInterrupt:
+        pass
+    except Exception as e:
+        import sys
+
+        print(f"Pipeline failed: {e}", file=sys.stderr)
+        sys.exit(1)

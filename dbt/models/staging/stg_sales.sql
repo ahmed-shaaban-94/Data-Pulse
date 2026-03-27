@@ -18,7 +18,47 @@
 -- Dropped from silver (4): id (surrogate), sales_not_tax, paid, net_sales
 
 WITH source AS (
-    SELECT * FROM {{ source('bronze', 'sales') }}
+    SELECT
+        -- Metadata
+        id,
+        source_file,
+        source_quarter,
+        loaded_at,
+        -- Transaction
+        reference_no,
+        date,
+        billing_type,
+        billing_type2,
+        -- Product
+        material,
+        material_desc,
+        brand,
+        item_cluster,
+        item_status,
+        -- Classification
+        category,
+        subcategory,
+        division,
+        segment,
+        -- Customer / Site
+        customer,
+        customer_name,
+        site,
+        site_name,
+        buyer,
+        -- Personnel
+        personel_number,
+        person_name,
+        position,
+        area_mg,
+        -- Financial
+        quantity,
+        gross_sales,
+        subtotal5_discount,
+        -- Insurance
+        insurance_tel,
+        insurance_no
+    FROM {{ source('bronze', 'sales') }}
 ),
 
 deduplicated AS (

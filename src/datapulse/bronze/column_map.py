@@ -24,7 +24,7 @@ COLUMN_MAP: dict[str, str] = {
     "Billing Type": "billing_type",
     "Certification": "certification",
     "Assignment": "assignment",
-    "Salse Not TAX": "sales_not_tax",
+    "Salse Not TAX": "sales_not_tax",  # Typo in source Excel headers — do not correct
     "Fi Document No.": "fi_document_no",
     "Insurance Tel": "insurance_tel",
     "Insurance No": "insurance_no",
