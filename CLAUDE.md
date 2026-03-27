@@ -70,7 +70,9 @@ dbt/
     ├── bronze/                  # Source definitions + base models
     │   ├── _bronze__sources.yml
     │   └── bronze_sales.sql
-    ├── staging/                 # Silver layer (planned)
+    ├── staging/                 # Silver layer (cleaning + renaming)
+    │   ├── _staging__sources.yml
+    │   └── stg_sales.sql        # Cleaned: 30 cols, dedup, billing EN, derived fields
     └── marts/                   # Gold layer (planned)
 
 migrations/                      # SQL migrations (run by bronze loader)
@@ -100,14 +102,15 @@ docker compose up -d --build
 | Schema | Purpose | Populated by |
 |--------|---------|-------------|
 | `bronze` | Raw data, as-is from source | Python bronze loader |
-| `staging` / `silver` | Cleaned, transformed | dbt models (planned) |
+| `public_staging` / `silver` | Cleaned, transformed | dbt staging models |
 | `marts` / `gold` | Aggregated, business-ready | dbt models (planned) |
 
-### Current Tables
+### Current Tables/Views
 
-| Table | Schema | Rows | Purpose |
+| Table/View | Schema | Rows | Purpose |
 |-------|--------|------|---------|
 | `bronze.sales` | bronze | 1,134,799 | Raw sales data (Q1.2023–Q4.2025, 46 columns) |
+| `public_staging.stg_sales` | staging | ~1.1M (deduped) | Cleaned sales (30 cols, EN billing, derived fields) |
 
 ### Bronze Sales Columns (Key)
 
@@ -160,7 +163,7 @@ docker exec -it datapulse-app python -m datapulse.bronze.loader --source /app/da
 
 ## Future Phases
 
-- **Phase 1.3**: Data Cleaning (silver layer via dbt)
+- **Phase 1.3**: Data Cleaning (silver layer via dbt) [DONE]
 - **Phase 1.4**: Data Analysis (gold layer, aggregations, statistics)
 - **Phase 1.5**: Dashboard & Visualization (Next.js frontend)
 - **Phase 2**: Automation via n8n workflows

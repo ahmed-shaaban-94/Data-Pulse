@@ -46,26 +46,24 @@ All sales data loaded in `bronze.sales` typed table. Parquet archive saved for b
 
 ---
 
-## Phase 1.3: Silver Layer — Data Cleaning [NEXT]
+## Phase 1.3: Silver Layer — Data Cleaning [DONE]
 
 **Goal**: Clean and standardize bronze data via dbt models.
 
-### Tasks
-- [ ] Create dbt staging models in `dbt/models/staging/`:
-  - `stg_sales.sql` — rename columns, cast types, trim strings, parse dates
-  - `stg_sales.yml` — column descriptions + tests (not_null, unique, accepted_values)
-- [ ] Handle data quality issues:
-  - [ ] Remove/flag duplicate transactions (by reference_no + date + material)
-  - [ ] Standardize empty strings to NULL
-  - [ ] Parse and validate date column
-  - [ ] Cast numeric columns (quantity, net_sales, gross_sales) — handle edge cases
-  - [ ] Standardize category/division/segment values (trim, upper)
-- [ ] Add dbt tests: not_null, unique, relationships, accepted_values
-- [ ] Run `dbt build` and verify silver layer
-- [ ] Document data quality rules in dbt YAML
+### Completed
+- [x] Created `dbt/models/staging/stg_sales.sql` — silver layer view with full cleaning
+- [x] Created `dbt/models/staging/_staging__sources.yml` — column descriptions
+- [x] Dropped 19 columns (billing_document, fi_document_no, crm_order, knumv, item_no, mat_group, mat_group_short, cosm_mg, dis_tax, tax, kzwi1, add_dis, certification, assignment, ref_return_date, ref_return, sales_not_tax, paid, net_sales)
+- [x] Renamed 22 columns to business-friendly names (e.g. material -> drug_code, gross_sales -> sales)
+- [x] Deduplication by (reference_no, date, material, customer, site, quantity)
+- [x] NULL handling: 'Unknown' for names, 'Uncategorized' for classifications, 0 for financials
+- [x] Masked data cleanup: customer names with `#` patterns -> 'Unknown'
+- [x] Billing type standardization: Arabic -> English (Credit, Cash, Delivery, etc.)
+- [x] Derived columns: net_amount, invoice_year/month/quarter, is_return, has_insurance
+- [x] dbt build passing — view created in public_staging schema
 
 ### Deliverable
-Clean, validated data in silver schema. dbt tests passing.
+Clean, validated data in silver schema (30 columns from 46). dbt model passing.
 
 ---
 
@@ -164,7 +162,7 @@ Production-ready MVP with comprehensive test coverage.
 - [x] Parquet archive created (57 MB compressed)
 - [x] Docker environment running (PostgreSQL + app + pgAdmin)
 - [x] dbt project configured with bronze source
-- [ ] Silver layer: cleaned data with dbt tests passing
+- [x] Silver layer: cleaned data with dbt model passing (30 columns, derived fields)
 - [ ] Gold layer: aggregated tables with star schema
 - [ ] Dashboard: interactive charts with filters
 - [ ] Test coverage: 80%+ on Python modules

@@ -1,0 +1,113 @@
+{{
+    config(
+        materialized='view',
+        schema='staging'
+    )
+}}
+
+-- Silver layer: cleaned sales data
+-- Drops 19 columns from bronze, deduplicates, trims text, renames for clarity
+-- Cleans NULLs and masked values (#) per column type
+--
+-- Dropped from bronze (16):
+--   billing_document, fi_document_no, crm_order, knumv, item_no,
+--   mat_group, mat_group_short, cosm_mg,
+--   dis_tax, tax, kzwi1, add_dis,
+--   certification, assignment, ref_return_date, ref_return
+--
+-- Dropped from silver (4): id (surrogate), sales_not_tax, paid, net_sales
+
+WITH source AS (
+    SELECT * FROM {{ source('bronze', 'sales') }}
+),
+
+deduplicated AS (
+    SELECT
+        *,
+        ROW_NUMBER() OVER (
+            PARTITION BY reference_no, date, material, customer, site, quantity
+            ORDER BY id
+        ) AS row_num
+    FROM source
+)
+
+SELECT
+    -- Metadata
+    source_file,
+    source_quarter,
+    loaded_at,
+
+    -- Transaction (IDs: keep NULL)
+    NULLIF(TRIM(reference_no), '')      AS invoice_id,
+    date                                AS invoice_date,
+    CASE billing_type
+        WHEN 'اجل' THEN 'Credit'
+        WHEN 'فورى' THEN 'Cash'
+        WHEN 'توصيل' THEN 'Delivery'
+        WHEN 'مرتجع توصيل' THEN 'Delivery Return'
+        WHEN 'مرتجع اجل' THEN 'Credit Return'
+        WHEN 'مرتجع فورى' THEN 'Cash Return'
+        WHEN 'Pick-Up Order' THEN 'Pick-Up'
+        WHEN 'Pick-Up Order Return' THEN 'Pick-Up Return'
+        WHEN 'توصيل - اجل' THEN 'Delivery Credit'
+        WHEN 'مرتجع توصيل - اجل' THEN 'Delivery Credit Return'
+        ELSE TRIM(billing_type)
+    END                                 AS billing_way,
+    NULLIF(TRIM(billing_type2), '')     AS billing_id,
+
+    -- Product (codes: keep NULL, names: Unknown)
+    NULLIF(TRIM(material), '')          AS drug_code,
+    COALESCE(NULLIF(TRIM(material_desc), ''), 'Unknown')  AS drug_name,
+    COALESCE(NULLIF(TRIM(brand), ''), 'Unknown')          AS drug_brand,
+    COALESCE(NULLIF(TRIM(item_cluster), ''), 'Uncategorized')  AS drug_cluster,
+    COALESCE(NULLIF(TRIM(item_status), ''), 'Unknown')    AS drug_status,
+
+    -- Classification (Uncategorized for NULLs)
+    COALESCE(NULLIF(TRIM(category), ''), 'Uncategorized')       AS drug_category,
+    COALESCE(NULLIF(TRIM(subcategory), ''), 'Uncategorized')    AS drug_subcategory,
+    COALESCE(NULLIF(TRIM(division), ''), 'Uncategorized')       AS drug_division,
+    COALESCE(NULLIF(TRIM(segment), ''), 'Uncategorized')        AS drug_segment,
+
+    -- Customer / Site (names: Unknown + # cleanup, IDs: keep NULL)
+    NULLIF(TRIM(customer), '')          AS customer_id,
+    CASE
+        WHEN customer_name IS NULL OR TRIM(customer_name) = '' THEN 'Unknown'
+        WHEN customer_name ~ '^[#\s\*\.]+$' THEN 'Unknown'
+        WHEN customer_name ~ '#' THEN REGEXP_REPLACE(customer_name, '[#]+', '', 'g')
+        ELSE TRIM(customer_name)
+    END                                 AS customer_name,
+    NULLIF(TRIM(site), '')              AS site_code,
+    COALESCE(NULLIF(TRIM(site_name), ''), 'Unknown')      AS site_name,
+    COALESCE(NULLIF(TRIM(buyer), ''), 'Unknown')           AS buyer,
+
+    -- Personnel (names: Unknown, IDs: keep NULL)
+    NULLIF(TRIM(personel_number), '')   AS staff_id,
+    COALESCE(NULLIF(TRIM(person_name), ''), 'Unknown')     AS staff_name,
+    COALESCE(NULLIF(TRIM(position), ''), 'Unknown')        AS staff_position,
+    COALESCE(NULLIF(TRIM(area_mg), ''), 'Unknown')         AS area_manager,
+
+    -- Financial (0 for NULLs)
+    COALESCE(quantity, 0)               AS quantity,
+    COALESCE(gross_sales, 0)            AS sales,
+    COALESCE(subtotal5_discount, 0)     AS discount,
+    COALESCE(gross_sales, 0) - COALESCE(subtotal5_discount, 0)  AS net_amount,
+
+    -- Derived: date parts (faster grouping in dashboards)
+    EXTRACT(YEAR FROM date)::INT        AS invoice_year,
+    EXTRACT(MONTH FROM date)::INT       AS invoice_month,
+    EXTRACT(QUARTER FROM date)::INT     AS invoice_quarter,
+
+    -- Derived: flags
+    CASE
+        WHEN billing_type IN ('مرتجع توصيل', 'مرتجع اجل', 'مرتجع فورى',
+                              'Pick-Up Order Return', 'مرتجع توصيل - اجل')
+        THEN TRUE ELSE FALSE
+    END                                 AS is_return,
+    (insurance_no IS NOT NULL AND TRIM(insurance_no) <> '')  AS has_insurance,
+
+    -- Insurance (keep NULL — optional fields)
+    NULLIF(TRIM(insurance_tel), '')     AS insurance_tel,
+    NULLIF(TRIM(insurance_no), '')      AS insurance_no
+
+FROM deduplicated
+WHERE row_num = 1

@@ -1,0 +1,98 @@
+version: 2
+
+models:
+  - name: stg_sales
+    description: >
+      Silver layer: cleaned sales data.
+      Drops 19 columns from bronze (16 initial + sale_id, sales_not_tax, paid, net_sales),
+      deduplicates rows, trims text, renames columns for business clarity.
+    columns:
+      # -- Metadata --
+      - name: source_file
+        description: "Original Excel filename"
+      - name: source_quarter
+        description: "Quarter identifier (e.g. Q1.2023)"
+      - name: loaded_at
+        description: "Timestamp when row was loaded into bronze"
+
+      # -- Transaction --
+      - name: invoice_id
+        description: "Sales invoice reference number (from reference_no)"
+      - name: invoice_date
+        description: "Invoice date"
+      - name: billing_way
+        description: "Billing method/type"
+      - name: billing_id
+        description: "Secondary billing identifier"
+
+      # -- Product --
+      - name: drug_code
+        description: "Drug/material code"
+      - name: drug_name
+        description: "Drug/material description"
+      - name: drug_brand
+        description: "Drug brand"
+      - name: drug_cluster
+        description: "Drug item cluster"
+      - name: drug_status
+        description: "Drug item status"
+
+      # -- Classification --
+      - name: drug_category
+        description: "Drug category"
+      - name: drug_subcategory
+        description: "Drug subcategory"
+      - name: drug_division
+        description: "Business division"
+      - name: drug_segment
+        description: "Business segment"
+
+      # -- Customer / Site --
+      - name: customer_id
+        description: "Customer code"
+      - name: customer_name
+        description: "Customer name"
+      - name: site_code
+        description: "Site code"
+      - name: site_name
+        description: "Site name"
+      - name: buyer
+        description: "Buyer identifier"
+
+      # -- Personnel --
+      - name: staff_id
+        description: "Staff personnel number"
+      - name: staff_name
+        description: "Staff name"
+      - name: staff_position
+        description: "Staff job position"
+      - name: area_manager
+        description: "Area manager"
+
+      # -- Financial --
+      - name: quantity
+        description: "Quantity sold"
+      - name: sales
+        description: "Gross sales amount"
+      - name: discount
+        description: "Discount amount (subtotal5)"
+      - name: net_amount
+        description: "Net amount (sales - discount)"
+
+      # -- Derived --
+      - name: invoice_year
+        description: "Year extracted from invoice_date"
+      - name: invoice_month
+        description: "Month extracted from invoice_date"
+      - name: invoice_quarter
+        description: "Quarter extracted from invoice_date"
+      - name: is_return
+        description: "True if this is a return transaction"
+      - name: has_insurance
+        description: "True if insurance_no is present"
+
+      # -- Insurance --
+      - name: insurance_tel
+        description: "Insurance telephone"
+      - name: insurance_no
+        description: "Insurance number"
