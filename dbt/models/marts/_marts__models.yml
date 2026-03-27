@@ -120,7 +120,7 @@ models:
         description: "Business owner of the product relationship"
 
   - name: dim_site
-    description: "Site/location dimension (SCD Type 1). Includes area_manager for geographic grouping. Unknown member at key=-1."
+    description: "Site/location dimension (SCD Type 1). Includes area_manager for geographic grouping and governorate (EN/AR) for Power BI Egypt shape map. Unknown member at key=-1."
     columns:
       - name: site_key
         description: "Surrogate key (INT). -1 = Unknown."
@@ -138,6 +138,14 @@ models:
           - not_null
       - name: area_manager
         description: "Geographic area manager for this site"
+      - name: governorate
+        description: "Egyptian governorate (English name) for Power BI shape map. Derived from site_name/area_manager patterns via CASE mapping. Default: Cairo."
+        tests:
+          - not_null
+      - name: governorate_ar
+        description: "Egyptian governorate (Arabic name) for Power BI shape map. Mirrors governorate column. Default: القاهرة."
+        tests:
+          - not_null
 
   - name: dim_staff
     description: "Staff/personnel dimension (SCD Type 1). Unknown member at key=-1."
