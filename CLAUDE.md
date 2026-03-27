@@ -134,30 +134,30 @@ docker compose up -d --build
 |--------|---------|-------------|
 | `bronze` | Raw data, as-is from source | Python bronze loader |
 | `public_staging` / `silver` | Cleaned, transformed | dbt staging models |
-| `marts` / `gold` | Aggregated, business-ready | dbt marts models (6 dims + 1 fact) |
+| `public_marts` / `gold` | Aggregated, business-ready | dbt marts models (6 dims + 1 fact + 8 aggs) |
 
 ### Current Tables/Views
 
 | Table/View | Schema | Rows | Purpose |
 |-------|--------|------|---------|
 | `bronze.tenants` | bronze | 1 | Tenant registry (tenant_id, tenant_name) |
-| `bronze.sales` | bronze | 1,134,799 | Raw sales data (Q1.2023–Q4.2025, 47 columns incl. tenant_id) |
+| `bronze.sales` | bronze | 2,269,598 | Raw sales data (Q1.2023–Q4.2025, 47 columns incl. tenant_id) |
 | `public_staging.stg_sales` | staging | ~1.1M (deduped) | Cleaned sales (35 cols, EN billing, normalized status, flags, 7 dbt tests) |
-| `marts.dim_date` | marts | ~1,096 | Calendar dimension (2023-2025, week/quarter columns) |
-| `marts.dim_billing` | marts | 11 | Billing dimension (10 types + Unknown, 5 groups) |
-| `marts.dim_customer` | marts | distinct+1 | Customer dimension (name, unknown member at -1) |
-| `marts.dim_product` | marts | distinct+1 | Product dimension (drug_code, brand, category, unknown at -1) |
-| `marts.dim_site` | marts | distinct+1 | Site dimension (name, area_manager, unknown at -1) |
-| `marts.dim_staff` | marts | distinct+1 | Staff dimension (name, position, unknown at -1) |
-| `marts.fct_sales` | marts | ~1.1M | Fact table (6 FKs COALESCE to -1, 4 financial measures) |
-| `marts.agg_sales_daily` | marts | varies | Daily sales aggregation |
-| `marts.agg_sales_monthly` | marts | varies | Monthly sales with MoM/YoY growth |
-| `marts.agg_sales_by_product` | marts | ~612K | Product performance by month |
-| `marts.agg_sales_by_customer` | marts | varies | Customer analytics by month |
-| `marts.agg_sales_by_site` | marts | varies | Site performance by month |
-| `marts.agg_sales_by_staff` | marts | ~44K | Staff performance by month |
-| `marts.agg_returns` | marts | varies | Return analysis by product/customer |
-| `marts.metrics_summary` | marts | ~1,096 | Daily KPI with MTD/YTD running totals |
+| `public_marts.dim_date` | marts | 1,096 | Calendar dimension (2023-2025, week/quarter columns) |
+| `public_marts.dim_billing` | marts | 11 | Billing dimension (10 types + Unknown, 5 groups) |
+| `public_marts.dim_customer` | marts | 24,801 | Customer dimension (name, unknown member at -1) |
+| `public_marts.dim_product` | marts | 17,803 | Product dimension (drug_code, brand, category, unknown at -1) |
+| `public_marts.dim_site` | marts | 2 | Site dimension (name, area_manager, unknown at -1) |
+| `public_marts.dim_staff` | marts | 1,226 | Staff dimension (name, position, unknown at -1) |
+| `public_marts.fct_sales` | marts | 1,134,073 | Fact table (6 FKs COALESCE to -1, 4 financial measures) |
+| `public_marts.agg_sales_daily` | marts | 9,004 | Daily sales aggregation |
+| `public_marts.agg_sales_monthly` | marts | 36 | Monthly sales with MoM/YoY growth |
+| `public_marts.agg_sales_by_product` | marts | 161,703 | Product performance by month |
+| `public_marts.agg_sales_by_customer` | marts | 43,674 | Customer analytics by month |
+| `public_marts.agg_sales_by_site` | marts | 36 | Site performance by month |
+| `public_marts.agg_sales_by_staff` | marts | 3,123 | Staff performance by month |
+| `public_marts.agg_returns` | marts | 91,536 | Return analysis by product/customer |
+| `public_marts.metrics_summary` | marts | 1,094 | Daily KPI with MTD/YTD running totals |
 
 ### Bronze Sales Columns (Key)
 
@@ -224,6 +224,7 @@ docker exec -it datapulse-app python -m datapulse.bronze.loader --source /app/da
 - **Phase 1.3.5**: Security hardening, gold layer recovery, QC [DONE]
 - **Phase 1.5 prep**: Tenant-scoped RLS across all layers [DONE]
 - **Phase 1.4**: Data Analysis (analytics module, aggregations, FastAPI API, Power BI 99 measures + calc group) [DONE]
+- **Phase 1.4.1**: Schema fixes, dbt agg models built, migrations applied, RLS active, API live [DONE]
 - **Phase 1.5**: Dashboard & Visualization (Next.js frontend)
 - **Phase 2**: Automation via n8n workflows
 - **Phase 3**: AI-powered analysis via LangGraph
