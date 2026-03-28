@@ -30,6 +30,11 @@ from datapulse.logging import get_logger
 log = get_logger(__name__)
 
 
+def _sanitize_for_prompt(text: str, max_len: int = 100) -> str:
+    """Strip control chars and truncate user-controlled text for LLM prompts."""
+    return text.replace("\n", " ").replace("\r", "")[:max_len]
+
+
 class AILightService:
     """Generates AI-powered insights from analytics data."""
 
@@ -54,11 +59,11 @@ class AILightService:
         )
 
         products_text = "\n".join(
-            f"  {i.rank}. {i.name}: {i.value:,.0f} EGP ({i.pct_of_total:.1f}%)"
+            f"  {i.rank}. {_sanitize_for_prompt(i.name)}: {i.value:,.0f} EGP ({i.pct_of_total:.1f}%)"
             for i in top_products.items
         )
         customers_text = "\n".join(
-            f"  {i.rank}. {i.name}: {i.value:,.0f} EGP ({i.pct_of_total:.1f}%)"
+            f"  {i.rank}. {_sanitize_for_prompt(i.name)}: {i.value:,.0f} EGP ({i.pct_of_total:.1f}%)"
             for i in top_customers.items
         )
 

@@ -9,8 +9,8 @@ from pydantic_settings import BaseSettings
 class Settings(BaseSettings):
     """DataPulse configuration — reads from .env file."""
 
-    # Database
-    database_url: str = "postgresql://datapulse:CHANGEME@localhost:5432/datapulse"
+    # Database (must be set via DATABASE_URL env var)
+    database_url: str = ""
 
     # Paths
     raw_data_dir: Path = Path("data/raw")

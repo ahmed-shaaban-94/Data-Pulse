@@ -39,8 +39,8 @@ class AnalyticsQueryParams(BaseModel):
 
     start_date: date | None = None
     end_date: date | None = None
-    category: str | None = None
-    brand: str | None = None
+    category: Annotated[str | None, Field(max_length=100)] = None
+    brand: Annotated[str | None, Field(max_length=100)] = None
     site_key: int | None = None
     staff_key: int | None = None
     limit: int = Field(default=10, ge=1, le=100)

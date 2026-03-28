@@ -29,7 +29,7 @@ def create_app() -> FastAPI:
         allow_origins=get_settings().cors_origins,
         allow_credentials=True,
         allow_methods=["GET", "POST", "PATCH"],
-        allow_headers=["*"],
+        allow_headers=["Content-Type", "Authorization", "X-Webhook-Secret"],
     )
 
     # Global exception handler

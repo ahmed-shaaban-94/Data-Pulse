@@ -134,14 +134,13 @@ def load_to_postgres(df: pl.DataFrame, engine: Engine, batch_size: int) -> int:
     log.info("loading_to_postgres", total_rows=total_rows, batch_size=batch_size)
 
     with engine.begin() as conn:
+        # Pre-compute INSERT template from validated columns (not per-batch)
+        placeholders = ", ".join(f":{c}" for c in db_columns)
+        col_names = ", ".join(db_columns)
+        insert_sql = text(f"INSERT INTO bronze.sales ({col_names}) VALUES ({placeholders})")
+
         for offset in range(0, total_rows, batch_size):
             batch = df_to_load.slice(offset, batch_size)
-
-            cols = batch.columns
-            placeholders = ", ".join(f":{c}" for c in cols)
-            col_names = ", ".join(cols)
-            insert_sql = text(f"INSERT INTO bronze.sales ({col_names}) VALUES ({placeholders})")
-
             rows_dicts = batch.to_dicts()
             conn.execute(insert_sql, rows_dicts)
 

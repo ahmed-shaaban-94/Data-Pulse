@@ -5,6 +5,22 @@ import os
 import structlog
 
 
+_SENSITIVE_KEYS = frozenset({
+    "api_key", "password", "token", "secret", "credential",
+    "database_url", "connection_string", "authorization",
+})
+
+
+def _mask_sensitive_fields(
+    logger: object, method_name: str, event_dict: dict
+) -> dict:
+    """Redact values of sensitive keys in log records."""
+    for key in _SENSITIVE_KEYS:
+        if key in event_dict:
+            event_dict[key] = "***REDACTED***"
+    return event_dict
+
+
 def setup_logging(log_level: str = "INFO") -> None:
     """Configure structlog for the application."""
     renderer = (
@@ -16,6 +32,7 @@ def setup_logging(log_level: str = "INFO") -> None:
     structlog.configure(
         processors=[
             structlog.contextvars.merge_contextvars,
+            _mask_sensitive_fields,
             structlog.processors.add_log_level,
             structlog.processors.TimeStamper(fmt="iso"),
             renderer,

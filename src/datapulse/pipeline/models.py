@@ -89,15 +89,15 @@ class TriggerRequest(BaseModel):
     @classmethod
     def _jail_source_dir(cls, v: str) -> str:
         """Prevent path traversal — source_dir must be inside /app/data."""
-        from pathlib import PurePosixPath
+        from pathlib import Path as _Path
 
-        normalized = PurePosixPath(v)
-        if ".." in normalized.parts:
-            raise ValueError("source_dir must not contain '..'")
-        allowed_root = PurePosixPath("/app/data")
-        if not str(normalized).startswith(str(allowed_root)):
-            raise ValueError(f"source_dir must be inside {allowed_root}")
-        return str(normalized)
+        try:
+            resolved = _Path(v).resolve()
+            allowed_root = _Path("/app/data").resolve()
+            resolved.relative_to(allowed_root)
+        except ValueError:
+            raise ValueError("source_dir must be inside /app/data")
+        return str(resolved)
 
 
 class TriggerResponse(BaseModel):
@@ -122,15 +122,15 @@ class ExecuteRequest(BaseModel):
     @classmethod
     def _jail_source_dir(cls, v: str) -> str:
         """Prevent path traversal — source_dir must be inside /app/data."""
-        from pathlib import PurePosixPath
+        from pathlib import Path as _Path
 
-        normalized = PurePosixPath(v)
-        if ".." in normalized.parts:
-            raise ValueError("source_dir must not contain '..'")
-        allowed_root = PurePosixPath("/app/data")
-        if not str(normalized).startswith(str(allowed_root)):
-            raise ValueError(f"source_dir must be inside {allowed_root}")
-        return str(normalized)
+        try:
+            resolved = _Path(v).resolve()
+            allowed_root = _Path("/app/data").resolve()
+            resolved.relative_to(allowed_root)
+        except ValueError:
+            raise ValueError("source_dir must be inside /app/data")
+        return str(resolved)
 
 
 class ExecutionResult(BaseModel):
