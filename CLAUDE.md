@@ -65,12 +65,15 @@ src/datapulse/
 │   ├── models.py                # Pydantic models (KPISummary, TrendResult, RankingResult, etc.)
 │   ├── repository.py            # SQLAlchemy read-only queries against marts schema
 │   └── service.py               # Business logic layer with default filters
-├── pipeline/                    # Pipeline status tracking + execution (Phase 2.2-2.3)
+├── pipeline/                    # Pipeline status tracking + execution + quality (Phase 2.2-2.5)
 │   ├── __init__.py
 │   ├── models.py                # Pydantic models (PipelineRunCreate/Update/Response/List, Trigger*, Execute*, ExecutionResult)
 │   ├── repository.py            # SQLAlchemy CRUD for pipeline_runs table
 │   ├── service.py               # Business logic (start/complete/fail runs)
-│   └── executor.py              # Pipeline stage execution (bronze loader, dbt subprocess)
+│   ├── executor.py              # Pipeline stage execution (bronze loader, dbt subprocess)
+│   ├── quality.py               # Quality gate models + 7 check functions (row_count, null_rate, schema_drift, etc.)
+│   ├── quality_repository.py    # SQLAlchemy CRUD for quality_checks table
+│   └── quality_service.py       # Quality gate orchestration (run checks, persist, gate logic)
 ├── api/                         # FastAPI REST API
 │   ├── __init__.py
 │   ├── app.py                   # App factory (CORS, logging, routers)
@@ -79,7 +82,7 @@ src/datapulse/
 │       ├── __init__.py
 │       ├── health.py            # GET /health
 │       ├── analytics.py         # 10 analytics endpoints under /api/v1/analytics/
-│       └── pipeline.py          # 9 pipeline endpoints under /api/v1/pipeline/ (5 CRUD + trigger + 3 execute)
+│       └── pipeline.py          # 11 pipeline endpoints under /api/v1/pipeline/ (5 CRUD + trigger + 3 execute + 2 quality)
 ├── logging.py                   # structlog configuration
 └── py.typed                     # PEP 561 typed package marker
 
@@ -121,12 +124,18 @@ migrations/                      # SQL migrations (tracked via schema_migrations
 ├── 001_create_bronze_schema.sql      # Bronze schema + tables
 ├── 002_add_rls_and_roles.sql         # RLS + read-only role
 ├── 003_add_tenant_id.sql            # Tenant-scoped RLS (tenant_id col, bronze.tenants table)
-└── 004_create_n8n_schema.sql        # n8n workflow engine schema + grants
+├── 004_create_n8n_schema.sql        # n8n workflow engine schema + grants
+├── 005_create_pipeline_runs.sql     # Pipeline run tracking table + RLS
+└── 007_create_quality_checks.sql    # Quality check results table + RLS
 
 n8n/                                 # n8n workflow automation (Phase 2)
 └── workflows/
     ├── 2.1.1_health_check.json      # API health check every 5 min
-    └── 2.3.1_full_pipeline_webhook.json  # Webhook -> Bronze -> dbt Staging -> dbt Marts
+    ├── 2.3.1_full_pipeline_webhook.json  # Webhook -> Bronze -> QC -> Staging -> QC -> Marts -> QC -> Success
+    ├── 2.6.1_success_notification.json   # Sub-workflow: Slack success message
+    ├── 2.6.2_failure_alert.json          # Sub-workflow: Slack @channel failure alert
+    ├── 2.6.3_quality_digest.json         # Cron daily 18:00: quality summary digest
+    └── 2.6.4_global_error_handler.json   # Global n8n error handler
 
 frontend/                            # Next.js 14 dashboard (Phase 1.5)
 ├── Dockerfile                       # Multi-stage: dev + builder + production
@@ -134,12 +143,13 @@ frontend/                            # Next.js 14 dashboard (Phase 1.5)
 ├── package.json                     # Next.js 14, SWR, Recharts, Tailwind, Playwright
 ├── playwright.config.ts             # Playwright E2E config (Chromium)
 ├── tailwind.config.ts               # midnight-pharma color tokens + animations
-├── e2e/                             # Playwright E2E tests (14 specs)
+├── e2e/                             # Playwright E2E tests (18 specs)
 │   ├── dashboard.spec.ts            # KPI cards, trend charts, filter bar
 │   ├── navigation.spec.ts           # Sidebar nav, active highlight, root redirect
 │   ├── filters.spec.ts              # Date preset clicks
 │   ├── pages.spec.ts                # All 5 analytics pages load
-│   └── health.spec.ts               # API health indicator
+│   ├── health.spec.ts               # API health indicator
+│   └── pipeline.spec.ts             # Pipeline dashboard: title, trigger, overview, nav
 ├── src/
 │   ├── app/
 │   │   ├── layout.tsx               # Root layout: responsive sidebar + providers
@@ -269,6 +279,7 @@ docker compose up -d --build
 | `public_marts.agg_returns` | marts | 91,536 | Return analysis by product/customer |
 | `public_marts.metrics_summary` | marts | 1,094 | Daily KPI with MTD/YTD running totals |
 | `public.pipeline_runs` | public | — | Pipeline execution tracking (UUID PK, RLS, JSONB metadata) |
+| `public.quality_checks` | public | — | Quality gate results per pipeline stage (SERIAL PK, RLS, JSONB details) |
 
 ### Bronze Sales Columns (Key)
 
@@ -355,6 +366,11 @@ docker exec -it datapulse-app python -m datapulse.bronze.loader --source /app/da
 - **Phase 2.1**: n8n + Redis Docker infrastructure, health check workflow [DONE]
 - **Phase 2.2**: Pipeline status tracking — pipeline_runs table + RLS, pipeline module (models/repo/service), 5 API endpoints, 53 tests [DONE]
 - **Phase 2.3**: Webhook trigger & pipeline execution — executor module, 4 API endpoints (trigger + execute/*), n8n workflow, 15 tests [DONE]
-- **Phase 2.4-2.8**: File watcher, quality gates, notifications, scheduling, AI-Light
-- **Phase 3**: AI-powered analysis via LangGraph
+- **Phase 2.5**: Data quality gates — quality_checks table + RLS, quality module (models/checks/repo/service), 2 API endpoints (GET quality + POST quality-check), 7 check functions, n8n quality gate nodes in pipeline workflow, 79 tests [DONE]
+- **Phase 2.6**: Notifications — 4 n8n sub-workflows (success/failure/digest/global error), Slack webhook integration, docker-compose SLACK_WEBHOOK_URL [DONE]
+- **Phase 2.7**: Pipeline dashboard — /pipeline page, 5 components (overview/history/status-badge/quality-details/trigger), 3 SWR hooks, postAPI function, E2E tests [DONE]
+- **Phase 2.4**: File watcher (directory watcher service)
+- **Phase 2.5**: Data quality gates (prerequisite for AI — data trust layer)
+- **Phase 2.8**: AI-Light (OpenRouter free tier) — AI summaries, anomaly detection, change narratives via n8n + OpenRouter free models
+- **Phase 3**: ~~AI-powered analysis via LangGraph~~ **CANCELLED** — replaced by Phase 2.8 AI-Light. LangGraph/Agent SDK not needed: OpenRouter free tier can't support agent loops reliably, and n8n + pre-computed dbt aggregations + simple LLM narration covers 80% of AI value at $0 cost. Conversational analytics deferred until paid API budget is available.
 - **Phase 4**: Public website / landing page

@@ -61,4 +61,19 @@ export async function fetchAPI<T>(
   return parseDecimals(json) as T;
 }
 
+export async function postAPI<T>(path: string, body?: unknown): Promise<T> {
+  const url = `${API_BASE_URL}${path}`;
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "Unknown error");
+    throw new ApiError(res.status, `API error ${res.status}: ${text}`);
+  }
+  const json = await res.json();
+  return parseDecimals(json) as T;
+}
+
 export { ApiError };

@@ -6,14 +6,16 @@ from collections.abc import Generator
 from typing import Annotated
 
 import structlog
-from fastapi import Depends, Header, HTTPException
-from sqlalchemy import create_engine, text
+from fastapi import Depends
+from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
 from datapulse.analytics.repository import AnalyticsRepository
 from datapulse.analytics.service import AnalyticsService
 from datapulse.config import get_settings
 from datapulse.pipeline.executor import PipelineExecutor
+from datapulse.pipeline.quality_repository import QualityRepository
+from datapulse.pipeline.quality_service import QualityService
 from datapulse.pipeline.repository import PipelineRepository
 from datapulse.pipeline.service import PipelineService
 
@@ -66,3 +68,11 @@ def get_pipeline_service(
 def get_pipeline_executor() -> PipelineExecutor:
     settings = get_settings()
     return PipelineExecutor(settings=settings)
+
+
+def get_quality_service(
+    session: Annotated[Session, Depends(get_db_session)],
+) -> QualityService:
+    repo = QualityRepository(session)
+    settings = get_settings()
+    return QualityService(repo, session, settings)

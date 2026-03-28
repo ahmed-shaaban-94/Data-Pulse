@@ -701,6 +701,39 @@ Each sub-phase uses **parallel sub-agents** for maximum speed:
 
 ---
 
+---
+
+## Phase 3 Decision: LangGraph CANCELLED
+
+**Decision date:** 2026-03-28
+
+**Original plan:** Phase 3 was "AI-powered analysis via LangGraph" — conversational analytics, multi-step reasoning, self-correcting SQL queries.
+
+**Decision:** Phase 3 is cancelled. Phase 2.8 (AI-Light) replaces it entirely.
+
+**Reasons:**
+1. **No budget for paid AI APIs** — OpenRouter free tier only (~50 req/day, rate-limited). LangGraph and Claude Agent SDK both require reliable, fast, paid APIs with strong tool_use support. Free models have inconsistent tool calling and can't handle agent loops.
+2. **n8n + OpenRouter free covers 80% of value** — dbt aggregations already compute MoM growth, YoY trends, rankings. The AI model just narrates pre-computed numbers, not discovers them.
+3. **Architecture: "smart narrator, not smart analyst"** — AI summaries are generated once per pipeline run and stored in `pipeline_runs.metadata`. No real-time queries, no conversational memory needed.
+4. **Fewer dependencies** — no LangChain/LangGraph dependency tree. Just HTTP calls from n8n to OpenRouter.
+5. **Graceful degradation** — if OpenRouter fails or rate-limits, pipeline completes normally with fallback text.
+
+**What's preserved:**
+- AI pipeline summary (2.8.1)
+- AI anomaly detection (2.8.2)
+- AI change narrative (2.8.3)
+- All stored in `pipeline_runs.metadata` JSONB
+- Displayed in frontend `ai-summary-card.tsx`
+
+**What's deferred (if paid API becomes available later):**
+- Conversational "ask questions about my data"
+- Multi-step investigation chains
+- Self-correcting SQL generation
+- Dynamic tool selection
+- If needed, use Claude Agent SDK (not LangGraph) — simpler, fewer dependencies
+
+---
+
 ## Verification Plan
 
 After each sub-phase:

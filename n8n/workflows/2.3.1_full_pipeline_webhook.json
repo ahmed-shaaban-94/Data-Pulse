@@ -6,7 +6,14 @@
         "httpMethod": "POST",
         "path": "pipeline-trigger",
         "responseMode": "immediately",
-        "options": {}
+        "options": {
+          "rawBody": false
+        },
+        "authentication": "headerAuth",
+        "headerAuth": {
+          "name": "X-Pipeline-Token",
+          "value": "={{ $env.PIPELINE_WEBHOOK_SECRET }}"
+        }
       },
       "id": "webhook-trigger",
       "name": "Webhook Pipeline Trigger",
@@ -69,6 +76,51 @@
     {
       "parameters": {
         "method": "POST",
+        "url": "http://api:8000/api/v1/pipeline/execute/quality-check",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={ \"run_id\": \"{{ $('Webhook Pipeline Trigger').item.json.body.run_id }}\", \"stage\": \"bronze\", \"tenant_id\": {{ $('Webhook Pipeline Trigger').item.json.body.tenant_id }} }",
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "id": "qc-bronze",
+      "name": "Quality Check Bronze",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1080, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": ""
+          },
+          "conditions": [
+            {
+              "id": "gate-bronze-cond",
+              "leftValue": "={{ $json.gate_passed }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "gate-bronze",
+      "name": "Bronze Quality Gate",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1200, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
         "url": "http://api:8000/api/v1/pipeline/execute/dbt-staging",
         "sendBody": true,
         "specifyBody": "json",
@@ -81,7 +133,7 @@
       "name": "Execute dbt Staging",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1200, 300]
+      "position": [1320, 300]
     },
     {
       "parameters": {
@@ -98,7 +150,52 @@
       "name": "Set Status Silver Complete",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1440, 300]
+      "position": [1560, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://api:8000/api/v1/pipeline/execute/quality-check",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={ \"run_id\": \"{{ $('Webhook Pipeline Trigger').item.json.body.run_id }}\", \"stage\": \"silver\", \"tenant_id\": {{ $('Webhook Pipeline Trigger').item.json.body.tenant_id }} }",
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "id": "qc-silver",
+      "name": "Quality Check Silver",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1680, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": ""
+          },
+          "conditions": [
+            {
+              "id": "gate-silver-cond",
+              "leftValue": "={{ $json.gate_passed }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "gate-silver",
+      "name": "Silver Quality Gate",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1800, 300]
     },
     {
       "parameters": {
@@ -115,7 +212,7 @@
       "name": "Execute dbt Marts",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1680, 300]
+      "position": [1920, 300]
     },
     {
       "parameters": {
@@ -132,7 +229,52 @@
       "name": "Set Status Gold Complete",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1920, 300]
+      "position": [2160, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://api:8000/api/v1/pipeline/execute/quality-check",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={ \"run_id\": \"{{ $('Webhook Pipeline Trigger').item.json.body.run_id }}\", \"stage\": \"gold\", \"tenant_id\": {{ $('Webhook Pipeline Trigger').item.json.body.tenant_id }} }",
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "id": "qc-gold",
+      "name": "Quality Check Gold",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2280, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": ""
+          },
+          "conditions": [
+            {
+              "id": "gate-gold-cond",
+              "leftValue": "={{ $json.gate_passed }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "gate-gold",
+      "name": "Gold Quality Gate",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [2400, 300]
     },
     {
       "parameters": {
@@ -149,7 +291,58 @@
       "name": "Set Status Success",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [2160, 300]
+      "position": [2520, 300]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=http://api:8000/api/v1/pipeline/runs/{{ $('Webhook Pipeline Trigger').item.json.body.run_id }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={ \"status\": \"failed\", \"error_message\": \"Quality gate failed at bronze stage\" }",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "set-status-failed-bronze-quality",
+      "name": "Failed Bronze Quality",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1200, 560]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=http://api:8000/api/v1/pipeline/runs/{{ $('Webhook Pipeline Trigger').item.json.body.run_id }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={ \"status\": \"failed\", \"error_message\": \"Quality gate failed at silver stage\" }",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "set-status-failed-silver-quality",
+      "name": "Failed Silver Quality",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1800, 560]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=http://api:8000/api/v1/pipeline/runs/{{ $('Webhook Pipeline Trigger').item.json.body.run_id }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={ \"status\": \"failed\", \"error_message\": \"Quality gate failed at gold stage\" }",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "set-status-failed-gold-quality",
+      "name": "Failed Gold Quality",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2400, 560]
     },
     {
       "parameters": {},
@@ -215,7 +408,36 @@
       "main": [
         [
           {
+            "node": "Quality Check Bronze",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Quality Check Bronze": {
+      "main": [
+        [
+          {
+            "node": "Bronze Quality Gate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Bronze Quality Gate": {
+      "main": [
+        [
+          {
             "node": "Execute dbt Staging",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Failed Bronze Quality",
             "type": "main",
             "index": 0
           }
@@ -237,7 +459,36 @@
       "main": [
         [
           {
+            "node": "Quality Check Silver",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Quality Check Silver": {
+      "main": [
+        [
+          {
+            "node": "Silver Quality Gate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Silver Quality Gate": {
+      "main": [
+        [
+          {
             "node": "Execute dbt Marts",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Failed Silver Quality",
             "type": "main",
             "index": 0
           }
@@ -259,7 +510,36 @@
       "main": [
         [
           {
+            "node": "Quality Check Gold",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Quality Check Gold": {
+      "main": [
+        [
+          {
+            "node": "Gold Quality Gate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gold Quality Gate": {
+      "main": [
+        [
+          {
             "node": "Set Status Success",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Failed Gold Quality",
             "type": "main",
             "index": 0
           }
@@ -279,14 +559,23 @@
     }
   },
   "settings": {
-    "executionOrder": "v1"
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": ""
   },
   "meta": {
     "instanceId": "datapulse-local"
   },
   "tags": [
     {
+      "name": "datapulse"
+    },
+    {
       "name": "phase-2.3"
+    },
+    {
+      "name": "phase-2.5"
     }
   ],
   "active": false

@@ -13,7 +13,7 @@ from uuid import UUID
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from datapulse.api.deps import get_pipeline_executor, get_pipeline_service
+from datapulse.api.deps import get_pipeline_executor, get_pipeline_service, get_quality_service
 from datapulse.config import get_settings
 from datapulse.logging import get_logger
 from datapulse.pipeline.executor import PipelineExecutor
@@ -28,6 +28,13 @@ from datapulse.pipeline.models import (
     TriggerRequest,
     TriggerResponse,
 )
+from datapulse.pipeline.quality import (
+    VALID_STAGES,
+    QualityCheckList,
+    QualityCheckRequest,
+    QualityReport,
+)
+from datapulse.pipeline.quality_service import QualityService
 from datapulse.pipeline.service import PipelineService
 
 log = get_logger(__name__)
@@ -36,6 +43,7 @@ router = APIRouter(prefix="/pipeline", tags=["pipeline"])
 
 ServiceDep = Annotated[PipelineService, Depends(get_pipeline_service)]
 ExecutorDep = Annotated[PipelineExecutor, Depends(get_pipeline_executor)]
+QualityServiceDep = Annotated[QualityService, Depends(get_quality_service)]
 
 
 @router.get("/runs", response_model=PipelineRunList)
@@ -134,6 +142,9 @@ def trigger_pipeline(
 
     # 2. Notify n8n (best-effort — run exists even if n8n is down)
     webhook_url = f"{settings.n8n_webhook_url}pipeline-trigger"
+    headers: dict[str, str] = {}
+    if settings.pipeline_webhook_secret:
+        headers["X-Pipeline-Token"] = settings.pipeline_webhook_secret
     try:
         httpx.post(
             webhook_url,
@@ -142,6 +153,7 @@ def trigger_pipeline(
                 "source_dir": req.source_dir,
                 "tenant_id": req.tenant_id,
             },
+            headers=headers,
             timeout=10.0,
             follow_redirects=False,
         )
@@ -183,3 +195,41 @@ def execute_dbt_marts(
 ) -> ExecutionResult:
     """Run dbt marts models."""
     return executor.run_dbt(run_id=body.run_id, selector="marts")
+
+
+@router.get("/runs/{run_id}/quality", response_model=QualityCheckList)
+def get_quality_checks(
+    service: ServiceDep,
+    quality_service: QualityServiceDep,
+    run_id: UUID,
+    stage: Annotated[str | None, Query(description="Filter by stage")] = None,
+) -> QualityCheckList:
+    """Return quality check results for a pipeline run."""
+    if service.get_run(run_id) is None:
+        raise HTTPException(status_code=404, detail="Pipeline run not found")
+    if stage is not None and stage not in VALID_STAGES:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Invalid stage '{stage}'. Must be one of: {', '.join(sorted(VALID_STAGES))}",
+        )
+    return quality_service.get_checks(run_id, stage)
+
+
+@router.post("/execute/quality-check", response_model=QualityReport)
+def execute_quality_check(
+    quality_service: QualityServiceDep,
+    body: QualityCheckRequest,
+) -> QualityReport:
+    """Run quality checks for a specific pipeline stage.
+
+    Returns a QualityReport with gate_passed indicating whether
+    the pipeline should continue (True) or halt (False).
+    """
+    if body.stage not in VALID_STAGES:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Invalid stage '{body.stage}'. Must be one of: {', '.join(sorted(VALID_STAGES))}",
+        )
+    return quality_service.run_checks_for_stage(
+        run_id=body.run_id, stage=body.stage, tenant_id=body.tenant_id,
+    )

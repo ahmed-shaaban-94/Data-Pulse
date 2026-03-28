@@ -37,6 +37,7 @@ class Settings(BaseSettings):
 
     # n8n
     n8n_webhook_url: str = "http://n8n:5678/webhook/"
+    pipeline_webhook_secret: str = ""
 
     # OpenRouter (AI-Light)
     openrouter_api_key: str = ""
