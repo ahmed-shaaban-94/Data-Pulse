@@ -2,9 +2,7 @@
 
 from __future__ import annotations
 
-import pytest
-from datetime import datetime, timezone
-from decimal import Decimal
+from datetime import UTC, datetime
 from unittest.mock import MagicMock
 from uuid import uuid4
 
@@ -17,7 +15,7 @@ def _make_row(**overrides):
         "run_type": "full_refresh",
         "status": "pending",
         "trigger_source": None,
-        "started_at": datetime.now(timezone.utc),
+        "started_at": datetime.now(UTC),
         "finished_at": None,
         "duration_seconds": None,
         "rows_loaded": None,

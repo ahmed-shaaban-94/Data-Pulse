@@ -2,12 +2,11 @@
 
 from pathlib import Path
 
-import polars as pl
 import pytest
 
+from datapulse.import_pipeline.models import FileFormat, ImportConfig
 from datapulse.import_pipeline.reader import read_csv, read_file
 from datapulse.import_pipeline.validator import ValidationError
-from datapulse.import_pipeline.models import ImportConfig, FileFormat
 
 FIXTURES = Path(__file__).parent / "fixtures"
 

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 from datetime import date
 from decimal import Decimal
 from unittest.mock import MagicMock, patch
@@ -19,7 +18,6 @@ from datapulse.ai_light.models import (
     InsightRequest,
 )
 from datapulse.ai_light.service import AILightService
-
 
 # ---------------------------------------------------------------------------
 # Model tests
@@ -349,7 +347,7 @@ class TestAILightEndpoints:
 
         app = create_app()
         app.dependency_overrides[get_ai_light_service] = lambda: mock_svc
-        yield TestClient(app)
+        yield TestClient(app, headers={"X-API-Key": "test-api-key"})
         app.dependency_overrides.clear()
 
     def test_status_endpoint(self, mock_svc, client):

@@ -1,18 +1,19 @@
 """Tests for the file watcher module (handler + service)."""
 from __future__ import annotations
 
-import threading
 import time
-from unittest.mock import MagicMock, patch, call
+from unittest.mock import MagicMock, patch
 
 import pytest
 from watchdog.events import FileCreatedEvent, FileMovedEvent
 
-from datapulse.watcher.handler import VALID_EXTENSIONS, DEFAULT_DEBOUNCE_SECONDS, DataFileHandler
+from datapulse.watcher.handler import DEFAULT_DEBOUNCE_SECONDS, VALID_EXTENSIONS, DataFileHandler
 from datapulse.watcher.service import FileWatcherService
 
 
-def _wait_for_callback(callback: MagicMock, *, expected_calls: int = 1, timeout: float = 2.0) -> None:
+def _wait_for_callback(
+    callback: MagicMock, *, expected_calls: int = 1, timeout: float = 2.0
+) -> None:
     """Poll until callback reaches expected call count (avoids flaky sleeps)."""
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
@@ -298,18 +299,18 @@ class TestFileWatcherServiceLifecycle:
 
     @patch("datapulse.watcher.service.Path")
     @patch("datapulse.watcher.service.Observer")
-    def test_start_creates_observer(self, MockObserver, MockPath):
+    def test_start_creates_observer(self, mock_observer_cls, mock_path_cls):
         mock_observer = MagicMock()
-        MockObserver.return_value = mock_observer
+        mock_observer_cls.return_value = mock_observer
         mock_path_inst = MagicMock()
         mock_path_inst.is_dir.return_value = True
         mock_path_inst.stat.return_value.st_mode = 0o755
-        MockPath.return_value = mock_path_inst
+        mock_path_cls.return_value = mock_path_inst
 
         svc = FileWatcherService(settings=self._make_settings())
         svc.start(debounce_seconds=5.0)
 
-        MockObserver.assert_called_once()
+        mock_observer_cls.assert_called_once()
         mock_observer.schedule.assert_called_once()
         # Verify the watched directory
         schedule_args = mock_observer.schedule.call_args
@@ -321,13 +322,13 @@ class TestFileWatcherServiceLifecycle:
 
     @patch("datapulse.watcher.service.Path")
     @patch("datapulse.watcher.service.Observer")
-    def test_stop_joins_observer(self, MockObserver, MockPath):
+    def test_stop_joins_observer(self, mock_observer_cls, mock_path_cls):
         mock_observer = MagicMock()
-        MockObserver.return_value = mock_observer
+        mock_observer_cls.return_value = mock_observer
         mock_path_inst = MagicMock()
         mock_path_inst.is_dir.return_value = True
         mock_path_inst.stat.return_value.st_mode = 0o755
-        MockPath.return_value = mock_path_inst
+        mock_path_cls.return_value = mock_path_inst
 
         svc = FileWatcherService(settings=self._make_settings())
         svc.start()
@@ -337,26 +338,26 @@ class TestFileWatcherServiceLifecycle:
         mock_observer.join.assert_called_once_with(timeout=5)
 
     @patch("datapulse.watcher.service.Observer")
-    def test_stop_without_start_is_safe(self, MockObserver):
+    def test_stop_without_start_is_safe(self, mock_observer_cls):
         svc = FileWatcherService(settings=self._make_settings())
         # Should not raise
         svc.stop()
 
     @patch("datapulse.watcher.service.Observer")
-    def test_is_running_before_start(self, MockObserver):
+    def test_is_running_before_start(self, mock_observer_cls):
         svc = FileWatcherService(settings=self._make_settings())
         assert svc.is_running is False
 
     @patch("datapulse.watcher.service.Path")
     @patch("datapulse.watcher.service.Observer")
-    def test_is_running_after_start(self, MockObserver, MockPath):
+    def test_is_running_after_start(self, mock_observer_cls, mock_path_cls):
         mock_observer = MagicMock()
         mock_observer.is_alive.return_value = True
-        MockObserver.return_value = mock_observer
+        mock_observer_cls.return_value = mock_observer
         mock_path_inst = MagicMock()
         mock_path_inst.is_dir.return_value = True
         mock_path_inst.stat.return_value.st_mode = 0o755
-        MockPath.return_value = mock_path_inst
+        mock_path_cls.return_value = mock_path_inst
 
         svc = FileWatcherService(settings=self._make_settings())
         svc.start()
@@ -365,14 +366,14 @@ class TestFileWatcherServiceLifecycle:
 
     @patch("datapulse.watcher.service.Path")
     @patch("datapulse.watcher.service.Observer")
-    def test_is_running_after_stop(self, MockObserver, MockPath):
+    def test_is_running_after_stop(self, mock_observer_cls, mock_path_cls):
         mock_observer = MagicMock()
         mock_observer.is_alive.return_value = False
-        MockObserver.return_value = mock_observer
+        mock_observer_cls.return_value = mock_observer
         mock_path_inst = MagicMock()
         mock_path_inst.is_dir.return_value = True
         mock_path_inst.stat.return_value.st_mode = 0o755
-        MockPath.return_value = mock_path_inst
+        mock_path_cls.return_value = mock_path_inst
 
         svc = FileWatcherService(settings=self._make_settings())
         svc.start()

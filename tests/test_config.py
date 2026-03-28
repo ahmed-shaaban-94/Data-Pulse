@@ -3,10 +3,7 @@
 import os
 from unittest.mock import patch
 
-import pytest
-
 from datapulse.config import Settings, get_settings
-
 
 # ---------------------------------------------------------------------------
 # Helper: construct Settings without reading the real .env file on disk.

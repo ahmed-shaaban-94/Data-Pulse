@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
-import pytest
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
 from uuid import uuid4
+
+import pytest
+from pydantic import ValidationError
 
 from datapulse.pipeline.models import (
     VALID_STATUSES,
@@ -32,7 +34,7 @@ class TestPipelineRunCreate:
 
     def test_frozen(self):
         m = PipelineRunCreate(run_type="full_refresh")
-        with pytest.raises(Exception):
+        with pytest.raises(ValidationError):
             m.run_type = "other"
 
 
@@ -51,13 +53,13 @@ class TestPipelineRunUpdate:
 
     def test_frozen(self):
         m = PipelineRunUpdate(status="running")
-        with pytest.raises(Exception):
+        with pytest.raises(ValidationError):
             m.status = "failed"
 
 
 class TestPipelineRunResponse:
     def test_full_construction(self):
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         m = PipelineRunResponse(
             id=uuid4(), tenant_id=1, run_type="full_refresh",
             status="success", trigger_source="manual",
@@ -69,18 +71,18 @@ class TestPipelineRunResponse:
         assert m.rows_loaded == 5000
 
     def test_frozen(self):
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         m = PipelineRunResponse(
             id=uuid4(), tenant_id=1, run_type="x", status="pending",
             trigger_source=None, started_at=now, finished_at=None,
             duration_seconds=None, rows_loaded=None,
             error_message=None, metadata={},
         )
-        with pytest.raises(Exception):
+        with pytest.raises(ValidationError):
             m.status = "running"
 
     def test_json_decimal_serializes_as_float(self):
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         m = PipelineRunResponse(
             id=uuid4(), tenant_id=1, run_type="x", status="success",
             trigger_source=None, started_at=now, finished_at=now,
@@ -99,7 +101,7 @@ class TestPipelineRunList:
         assert m.total == 0
 
     def test_with_items(self):
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         item = PipelineRunResponse(
             id=uuid4(), tenant_id=1, run_type="x", status="success",
             trigger_source=None, started_at=now, finished_at=now,
@@ -116,7 +118,7 @@ class TestValidStatuses:
             "pending", "running", "bronze_complete", "silver_complete",
             "gold_complete", "success", "failed",
         }
-        assert VALID_STATUSES == expected
+        assert expected == VALID_STATUSES
 
     def test_is_frozenset(self):
         assert isinstance(VALID_STATUSES, frozenset)

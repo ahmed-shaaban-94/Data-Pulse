@@ -6,10 +6,11 @@ from collections.abc import Generator
 from typing import Annotated
 
 import structlog
-from fastapi import Depends
+from fastapi import Depends, Header, HTTPException
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
+from datapulse.ai_light.service import AILightService
 from datapulse.analytics.repository import AnalyticsRepository
 from datapulse.analytics.service import AnalyticsService
 from datapulse.config import get_settings
@@ -18,9 +19,16 @@ from datapulse.pipeline.quality_repository import QualityRepository
 from datapulse.pipeline.quality_service import QualityService
 from datapulse.pipeline.repository import PipelineRepository
 from datapulse.pipeline.service import PipelineService
-from datapulse.ai_light.service import AILightService
 
 logger = structlog.get_logger()
+
+
+async def verify_api_key(x_api_key: str = Header(...)) -> None:
+    """Validate the X-API-Key header against the configured API key."""
+    settings = get_settings()
+    if not settings.api_key or x_api_key != settings.api_key:
+        raise HTTPException(status_code=401, detail="Invalid API key")
+
 
 _engine = None
 _session_factory = None

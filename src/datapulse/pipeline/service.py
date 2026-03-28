@@ -6,18 +6,18 @@ and convenience methods for common status transitions.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
 from datapulse.logging import get_logger
 from datapulse.pipeline.models import (
+    VALID_STATUSES,
     PipelineRunCreate,
     PipelineRunList,
     PipelineRunResponse,
     PipelineRunUpdate,
-    VALID_STATUSES,
 )
 from datapulse.pipeline.repository import PipelineRepository
 
@@ -56,10 +56,10 @@ class PipelineService:
         if existing is None:
             return None
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         started = existing.started_at
         if started.tzinfo is None:
-            started = started.replace(tzinfo=timezone.utc)
+            started = started.replace(tzinfo=UTC)
         duration = Decimal(str((now - started).total_seconds())).quantize(
             Decimal("0.01")
         )
@@ -81,10 +81,10 @@ class PipelineService:
         if existing is None:
             return None
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         started = existing.started_at
         if started.tzinfo is None:
-            started = started.replace(tzinfo=timezone.utc)
+            started = started.replace(tzinfo=UTC)
         duration = Decimal(str((now - started).total_seconds())).quantize(
             Decimal("0.01")
         )

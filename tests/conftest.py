@@ -10,11 +10,20 @@ from defaults only (no .env file). Tests that need a custom Settings object
 patch get_settings() locally within the test.
 """
 
-from unittest.mock import patch
+from unittest.mock import MagicMock, create_autospec, patch
 
 import pytest
 
+from datapulse.api.limiter import limiter
 from datapulse.config import Settings, get_settings
+
+
+@pytest.fixture(autouse=True, scope="session")
+def _disable_rate_limiting():
+    """Disable rate limiting for all tests."""
+    limiter.enabled = False
+    yield
+    limiter.enabled = True
 
 
 @pytest.fixture(autouse=True, scope="session")
@@ -29,33 +38,21 @@ def _patch_get_settings_globally():
     locally — those local patches take precedence over this session patch.
     """
     # Build a clean Settings instance without touching the project's .env
-    clean_settings = Settings(_env_file=None)
+    clean_settings = Settings(_env_file=None, api_key="test-api-key")
     get_settings.cache_clear()
 
-    with patch(
-        "datapulse.config.get_settings",
-        return_value=clean_settings,
+    # Also patch the imported references in each module that uses get_settings
+    with (
+        patch("datapulse.config.get_settings", return_value=clean_settings),
+        patch("datapulse.import_pipeline.validator.get_settings", return_value=clean_settings),
+        patch("datapulse.import_pipeline.reader.get_settings", return_value=clean_settings),
+        patch("datapulse.bronze.loader.get_settings", return_value=clean_settings),
+        patch("datapulse.api.deps.get_settings", return_value=clean_settings),
     ):
-        # Also patch the imported references in each module that uses get_settings
-        with patch(
-            "datapulse.import_pipeline.validator.get_settings",
-            return_value=clean_settings,
-        ):
-            with patch(
-                "datapulse.import_pipeline.reader.get_settings",
-                return_value=clean_settings,
-            ):
-                with patch(
-                    "datapulse.bronze.loader.get_settings",
-                    return_value=clean_settings,
-                ):
-                    yield
+        yield
 
     get_settings.cache_clear()
 
-
-from unittest.mock import MagicMock, create_autospec
-from decimal import Decimal
 
 # --- Analytics fixtures ---
 
@@ -91,23 +88,23 @@ def analytics_service(mock_repo):
 @pytest.fixture()
 def api_client():
     """FastAPI TestClient with mocked dependencies."""
-    from unittest.mock import patch as _patch
     from fastapi.testclient import TestClient
-    from datapulse.analytics.service import AnalyticsService
+
     from datapulse.analytics.repository import AnalyticsRepository
+    from datapulse.analytics.service import AnalyticsService
 
     mock_session = MagicMock()
     mock_repo = create_autospec(AnalyticsRepository, instance=True)
     mock_svc = AnalyticsService(mock_repo)
 
-    from datapulse.api.app import create_app
     from datapulse.api import deps
+    from datapulse.api.app import create_app
 
     app = create_app()
     app.dependency_overrides[deps.get_db_session] = lambda: mock_session
     app.dependency_overrides[deps.get_analytics_service] = lambda: mock_svc
 
-    client = TestClient(app)
+    client = TestClient(app, headers={"X-API-Key": "test-api-key"})
     yield client, mock_repo
 
     app.dependency_overrides.clear()
@@ -141,21 +138,22 @@ def pipeline_service(mock_pipeline_repo):
 def pipeline_api_client():
     """FastAPI TestClient with mocked pipeline dependencies."""
     from fastapi.testclient import TestClient
-    from datapulse.pipeline.service import PipelineService
+
     from datapulse.pipeline.repository import PipelineRepository
+    from datapulse.pipeline.service import PipelineService
 
     mock_session = MagicMock()
     mock_pl_repo = create_autospec(PipelineRepository, instance=True)
     mock_pl_svc = PipelineService(mock_pl_repo)
 
-    from datapulse.api.app import create_app
     from datapulse.api import deps
+    from datapulse.api.app import create_app
 
     app = create_app()
     app.dependency_overrides[deps.get_db_session] = lambda: mock_session
     app.dependency_overrides[deps.get_pipeline_service] = lambda: mock_pl_svc
 
-    client = TestClient(app)
+    client = TestClient(app, headers={"X-API-Key": "test-api-key"})
     yield client, mock_pl_repo
 
     app.dependency_overrides.clear()

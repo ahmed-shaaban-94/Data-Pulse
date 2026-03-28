@@ -7,7 +7,7 @@ results, and returns a QualityReport.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import UUID
 
 from sqlalchemy.orm import Session
@@ -18,7 +18,6 @@ from datapulse.pipeline.quality import (
     STAGE_CHECKS,
     VALID_STAGES,
     QualityCheckList,
-    QualityCheckRequest,
     QualityCheckResult,
     QualityReport,
     check_null_rate,
@@ -128,7 +127,7 @@ class QualityService:
             checks=results,
             all_passed=all_passed,
             gate_passed=gate_passed,
-            checked_at=datetime.now(timezone.utc),
+            checked_at=datetime.now(UTC),
         )
 
     def get_checks(

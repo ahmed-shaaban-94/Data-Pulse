@@ -5,10 +5,9 @@ from unittest.mock import patch
 
 import pytest
 
-from datapulse.config import Settings, get_settings
+from datapulse.config import Settings
 from datapulse.import_pipeline.models import FileFormat
 from datapulse.import_pipeline.validator import ALLOWED_EXTENSIONS, ValidationError, validate_file
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -123,22 +122,19 @@ class TestValidateFileSize:
     def test_raises_when_file_exceeds_limit(self, tmp_path):
         # 2 MB file against a 1 MB limit
         large_file = _write(tmp_path / "large.csv", b"x" * (2 * 1024 * 1024))
-        with _patch_settings(max_mb=1):
-            with pytest.raises(ValidationError, match="File too large"):
-                validate_file(large_file)
+        with _patch_settings(max_mb=1), pytest.raises(ValidationError, match="File too large"):
+            validate_file(large_file)
 
     def test_error_message_contains_size_in_mb(self, tmp_path):
         large_file = _write(tmp_path / "large.csv", b"x" * (2 * 1024 * 1024))
-        with _patch_settings(max_mb=1):
-            with pytest.raises(ValidationError) as exc_info:
-                validate_file(large_file)
+        with _patch_settings(max_mb=1), pytest.raises(ValidationError) as exc_info:
+            validate_file(large_file)
         assert "MB" in str(exc_info.value)
 
     def test_error_message_contains_max_mb_limit(self, tmp_path):
         large_file = _write(tmp_path / "large.csv", b"x" * (2 * 1024 * 1024))
-        with _patch_settings(max_mb=1):
-            with pytest.raises(ValidationError) as exc_info:
-                validate_file(large_file)
+        with _patch_settings(max_mb=1), pytest.raises(ValidationError) as exc_info:
+            validate_file(large_file)
         # The message should mention the configured limit (1 MB)
         assert "1" in str(exc_info.value)
 
@@ -158,9 +154,8 @@ class TestValidateFileSize:
 
     def test_file_one_byte_over_limit_is_rejected(self, tmp_path):
         over_limit = _write(tmp_path / "over.csv", b"x" * (1 * 1024 * 1024 + 1))
-        with _patch_settings(max_mb=1):
-            with pytest.raises(ValidationError, match="File too large"):
-                validate_file(over_limit)
+        with _patch_settings(max_mb=1), pytest.raises(ValidationError, match="File too large"):
+            validate_file(over_limit)
 
 
 # ---------------------------------------------------------------------------
@@ -187,4 +182,4 @@ class TestValidateFileReturnValues:
         assert issubclass(ValidationError, Exception)
 
     def test_allowed_extensions_set_content(self):
-        assert ALLOWED_EXTENSIONS == {".csv", ".xlsx", ".xls"}
+        assert {".csv", ".xlsx", ".xls"} == ALLOWED_EXTENSIONS

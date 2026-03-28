@@ -9,7 +9,7 @@ QualityService with a MagicMock, preventing any real DB connections.
 """
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from unittest.mock import MagicMock
 from uuid import UUID, uuid4
 
@@ -20,12 +20,10 @@ from datapulse.api import deps
 from datapulse.api.app import create_app
 from datapulse.pipeline.quality import (
     QualityCheckList,
-    QualityCheckRequest,
     QualityCheckResponse,
-    QualityReport,
     QualityCheckResult,
+    QualityReport,
 )
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -44,7 +42,7 @@ def _make_check_response(**overrides) -> QualityCheckResponse:
         passed=True,
         message="50000 rows loaded",
         details={"row_count": 50_000},
-        checked_at=datetime.now(timezone.utc),
+        checked_at=datetime.now(UTC),
     )
     defaults.update(overrides)
     return QualityCheckResponse(**defaults)
@@ -76,7 +74,7 @@ def _make_quality_report(
         checks=checks,
         all_passed=all(c.passed for c in checks),
         gate_passed=gate_passed,
-        checked_at=datetime.now(timezone.utc),
+        checked_at=datetime.now(UTC),
     )
 
 
@@ -97,7 +95,7 @@ def quality_api_client():
     app.dependency_overrides[deps.get_pipeline_service] = lambda: MagicMock()
     app.dependency_overrides[deps.get_pipeline_executor] = lambda: MagicMock()
 
-    client = TestClient(app, raise_server_exceptions=True)
+    client = TestClient(app, raise_server_exceptions=True, headers={"X-API-Key": "test-api-key"})
     yield client, mock_quality_svc
     app.dependency_overrides.clear()
 

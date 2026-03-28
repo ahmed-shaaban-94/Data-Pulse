@@ -47,6 +47,9 @@ class Settings(BaseSettings):
     watcher_debounce_seconds: float = 10.0
     api_base_url: str = "http://localhost:8000"
 
+    # API Authentication
+    api_key: str = ""
+
     # Notifications
     slack_webhook_url: str = ""
     notification_email: str = ""

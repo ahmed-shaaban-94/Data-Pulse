@@ -10,7 +10,8 @@ Covers:
 from __future__ import annotations
 
 import subprocess
-from unittest.mock import MagicMock, call, patch
+from datetime import UTC
+from unittest.mock import MagicMock, patch
 from uuid import uuid4
 
 import pytest
@@ -29,7 +30,6 @@ from datapulse.pipeline.quality import (
     check_schema_drift,
     run_dbt_tests,
 )
-
 
 # ---------------------------------------------------------------------------
 # Session mock helpers
@@ -694,14 +694,14 @@ class TestQualityModels:
                 passed=True, message=None, details={},
             ),
         ]
-        from datetime import datetime, timezone
+        from datetime import datetime
         report = QualityReport(
             pipeline_run_id=uuid4(),
             stage="bronze",
             checks=checks,
             all_passed=True,
             gate_passed=True,
-            checked_at=datetime.now(timezone.utc),
+            checked_at=datetime.now(UTC),
         )
 
         assert report.gate_passed is True
@@ -719,14 +719,14 @@ class TestQualityModels:
                 passed=False, message="High delta", details={},
             ),
         ]
-        from datetime import datetime, timezone
+        from datetime import datetime
         report = QualityReport(
             pipeline_run_id=uuid4(),
             stage="bronze",
             checks=checks,
             all_passed=False,
             gate_passed=False,  # error check failed
-            checked_at=datetime.now(timezone.utc),
+            checked_at=datetime.now(UTC),
         )
 
         assert report.gate_passed is False
@@ -744,7 +744,6 @@ class TestQualityModels:
                 passed=False, message="Large drop", details={},
             ),
         ]
-        from datetime import datetime, timezone
         # Simulate service logic: gate_passed because no error checks failed
         error_checks_all_pass = all(
             c.passed for c in checks if c.severity == "error"
@@ -797,14 +796,14 @@ class TestQualityModels:
 
     def test_quality_report_frozen(self):
         """QualityReport is immutable — mutation must raise TypeError."""
-        from datetime import datetime, timezone
+        from datetime import datetime
         report = QualityReport(
             pipeline_run_id=uuid4(),
             stage="bronze",
             checks=[],
             all_passed=True,
             gate_passed=True,
-            checked_at=datetime.now(timezone.utc),
+            checked_at=datetime.now(UTC),
         )
 
         with pytest.raises((TypeError, Exception)):

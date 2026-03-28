@@ -6,10 +6,7 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 from uuid import uuid4
 
-import pytest
-
 from datapulse.pipeline.executor import PipelineExecutor
-from datapulse.pipeline.models import ExecutionResult
 
 
 class TestRunBronze:

@@ -31,7 +31,7 @@ def client():
     app = create_app()
     mock_service, _ = _mock_service()
     app.dependency_overrides[get_pipeline_service] = lambda: mock_service
-    yield TestClient(app)
+    yield TestClient(app, headers={"X-API-Key": "test-api-key"})
     app.dependency_overrides.clear()
 
 
@@ -40,7 +40,7 @@ def mock_service_and_client():
     app = create_app()
     mock_service, run_id = _mock_service()
     app.dependency_overrides[get_pipeline_service] = lambda: mock_service
-    client = TestClient(app)
+    client = TestClient(app, headers={"X-API-Key": "test-api-key"})
     yield mock_service, run_id, client
     app.dependency_overrides.clear()
 
