@@ -10,13 +10,15 @@ from __future__ import annotations
 from datetime import date
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Path, Query
 from pydantic import BaseModel, Field
 
 from datapulse.analytics.models import (
     AnalyticsFilter,
+    CustomerAnalytics,
     DateRange,
     KPISummary,
+    ProductPerformance,
     RankingResult,
     ReturnAnalysis,
     TrendResult,
@@ -37,8 +39,8 @@ class AnalyticsQueryParams(BaseModel):
 
     start_date: date | None = None
     end_date: date | None = None
-    category: str | None = None
-    brand: str | None = None
+    category: Annotated[str | None, Field(max_length=100)] = None
+    brand: Annotated[str | None, Field(max_length=100)] = None
     site_key: int | None = None
     staff_key: int | None = None
     limit: int = Field(default=10, ge=1, le=100)
@@ -173,19 +175,25 @@ def get_returns(
     return service.get_return_report(_to_filter(params))
 
 
-@router.get("/products/{product_key}")
-def get_product_detail(product_key: int) -> None:
-    """Detailed product performance (not yet implemented)."""
-    raise HTTPException(
-        status_code=501,
-        detail="Product detail endpoint not yet implemented.",
-    )
+@router.get("/products/{product_key}", response_model=ProductPerformance)
+def get_product_detail(
+    product_key: Annotated[int, Path(ge=1, description="Product surrogate key")],
+    service: ServiceDep,
+) -> ProductPerformance:
+    """Detailed product performance metrics."""
+    result = service.get_product_detail(product_key)
+    if result is None:
+        raise HTTPException(status_code=404, detail="Product not found")
+    return result
 
 
-@router.get("/customers/{customer_key}")
-def get_customer_detail(customer_key: int) -> None:
-    """Detailed customer analytics (not yet implemented)."""
-    raise HTTPException(
-        status_code=501,
-        detail="Customer detail endpoint not yet implemented.",
-    )
+@router.get("/customers/{customer_key}", response_model=CustomerAnalytics)
+def get_customer_detail(
+    customer_key: Annotated[int, Path(ge=1, description="Customer surrogate key")],
+    service: ServiceDep,
+) -> CustomerAnalytics:
+    """Detailed customer analytics."""
+    result = service.get_customer_detail(customer_key)
+    if result is None:
+        raise HTTPException(status_code=404, detail="Customer not found")
+    return result

@@ -6,8 +6,10 @@ from datetime import date, timedelta
 
 from datapulse.analytics.models import (
     AnalyticsFilter,
+    CustomerAnalytics,
     DateRange,
     KPISummary,
+    ProductPerformance,
     RankingResult,
     ReturnAnalysis,
     TrendResult,
@@ -97,3 +99,13 @@ class AnalyticsService:
         f = self._default_filter(filters)
         log.info("return_report", filters=f.model_dump())
         return self._repo.get_return_analysis(f)
+
+    def get_product_detail(self, product_key: int) -> ProductPerformance | None:
+        """Detailed performance for a single product."""
+        log.info("product_detail", product_key=product_key)
+        return self._repo.get_product_detail(product_key)
+
+    def get_customer_detail(self, customer_key: int) -> CustomerAnalytics | None:
+        """Detailed analytics for a single customer."""
+        log.info("customer_detail", customer_key=customer_key)
+        return self._repo.get_customer_detail(customer_key)

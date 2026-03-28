@@ -17,9 +17,14 @@
 -- gold/silver data. It has no INSERT, UPDATE, or DELETE rights.
 -- Change the password before Phase 1.5 deployment.
 
+-- Password MUST be set via DB_READER_PASSWORD environment variable.
+-- Example: DB_READER_PASSWORD=$(openssl rand -hex 32) psql -f 002_add_rls_and_roles.sql
 DO $$ BEGIN
     IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'datapulse_reader') THEN
-        CREATE ROLE datapulse_reader LOGIN PASSWORD 'changeme';
+        EXECUTE format(
+            'CREATE ROLE datapulse_reader LOGIN PASSWORD %L',
+            coalesce(current_setting('app.db_reader_password', true), 'CHANGE_ME_BEFORE_PRODUCTION')
+        );
     END IF;
 END $$;
 

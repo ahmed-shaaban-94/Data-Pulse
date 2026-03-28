@@ -22,10 +22,9 @@ def _settings(**overrides) -> Settings:
 class TestSettings:
     """Unit tests for the Settings model itself."""
 
-    def test_default_database_url(self):
+    def test_default_database_url_is_empty(self):
         s = _settings()
-        assert "datapulse" in s.database_url
-        assert s.database_url.startswith("postgresql://")
+        assert s.database_url == ""
 
     def test_default_max_file_size_mb(self):
         s = _settings()
@@ -144,7 +143,7 @@ class TestGetSettings:
         assert first is not second
 
     def test_database_url_readable_from_cached_settings(self):
-        with patch("datapulse.config.Settings", return_value=_settings()):
+        with patch("datapulse.config.Settings", return_value=_settings(database_url="postgresql://test:test@localhost/test")):
             s = get_settings()
         assert isinstance(s.database_url, str)
         assert len(s.database_url) > 0

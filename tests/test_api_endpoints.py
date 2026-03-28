@@ -7,7 +7,9 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from datapulse.analytics.models import (
+    CustomerAnalytics,
     KPISummary,
+    ProductPerformance,
     RankingItem,
     RankingResult,
     ReturnAnalysis,
@@ -180,22 +182,52 @@ def test_returns_endpoint(api_client):
     assert len(data) == 1
 
 
-def test_product_detail_not_implemented(api_client):
-    """GET /api/v1/analytics/products/1 returns 501."""
+def test_product_detail_found(api_client):
+    """GET /api/v1/analytics/products/1 returns product detail."""
     client, mock_repo = api_client
+    mock_repo.get_product_detail.return_value = ProductPerformance(
+        product_key=1, drug_code="D001", drug_name="Aspirin",
+        drug_brand="BrandA", drug_category="Analgesic",
+        total_quantity=Decimal("500"), total_sales=Decimal("10000"),
+        total_net_amount=Decimal("9000"), return_rate=Decimal("0.02"),
+        unique_customers=50,
+    )
 
     resp = client.get("/api/v1/analytics/products/1")
+    assert resp.status_code == 200
+    assert resp.json()["drug_name"] == "Aspirin"
 
-    assert resp.status_code == 501
 
-
-def test_customer_detail_not_implemented(api_client):
-    """GET /api/v1/analytics/customers/1 returns 501."""
+def test_product_detail_not_found(api_client):
+    """GET /api/v1/analytics/products/999 returns 404."""
     client, mock_repo = api_client
+    mock_repo.get_product_detail.return_value = None
+
+    resp = client.get("/api/v1/analytics/products/999")
+    assert resp.status_code == 404
+
+
+def test_customer_detail_found(api_client):
+    """GET /api/v1/analytics/customers/1 returns customer detail."""
+    client, mock_repo = api_client
+    mock_repo.get_customer_detail.return_value = CustomerAnalytics(
+        customer_key=1, customer_id="C001", customer_name="Pharmacy X",
+        total_quantity=Decimal("1000"), total_net_amount=Decimal("50000"),
+        transaction_count=200, unique_products=30, return_count=5,
+    )
 
     resp = client.get("/api/v1/analytics/customers/1")
+    assert resp.status_code == 200
+    assert resp.json()["customer_name"] == "Pharmacy X"
 
-    assert resp.status_code == 501
+
+def test_customer_detail_not_found(api_client):
+    """GET /api/v1/analytics/customers/999 returns 404."""
+    client, mock_repo = api_client
+    mock_repo.get_customer_detail.return_value = None
+
+    resp = client.get("/api/v1/analytics/customers/999")
+    assert resp.status_code == 404
 
 
 def test_invalid_date_range_one_date(api_client):

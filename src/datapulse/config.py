@@ -9,8 +9,8 @@ from pydantic_settings import BaseSettings
 class Settings(BaseSettings):
     """DataPulse configuration — reads from .env file."""
 
-    # Database
-    database_url: str = "postgresql://datapulse:CHANGEME@localhost:5432/datapulse"
+    # Database (must be set via DATABASE_URL env var)
+    database_url: str = ""
 
     # Paths
     raw_data_dir: Path = Path("data/raw")
@@ -42,6 +42,10 @@ class Settings(BaseSettings):
     # OpenRouter (AI-Light)
     openrouter_api_key: str = ""
     openrouter_model: str = "openrouter/free"
+
+    # File watcher
+    watcher_debounce_seconds: float = 10.0
+    api_base_url: str = "http://localhost:8000"
 
     # Notifications
     slack_webhook_url: str = ""
