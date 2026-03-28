@@ -11,6 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from slowapi.errors import RateLimitExceeded
 
+from datapulse.api.audit import enqueue_audit, start_audit_writer
 from datapulse.api.limiter import limiter
 from datapulse.api.routes import ai_light, analytics, health, pipeline
 from datapulse.config import get_settings
@@ -78,7 +79,27 @@ def create_app() -> FastAPI:
             duration_ms=duration_ms,
             user_agent=request.headers.get("user-agent", ""),
         )
+
+        # Async audit log (non-blocking)
+        enqueue_audit(
+            method=request.method,
+            path=request.url.path,
+            ip_address=request.client.host if request.client else None,
+            user_agent=request.headers.get("user-agent"),
+            query_params=dict(request.query_params),
+            response_status=response.status_code,
+            duration_ms=duration_ms,
+        )
+
         return response
+
+    # Start audit writer (best-effort — no crash if DB not ready)
+    settings = get_settings()
+    if settings.database_url:
+        try:
+            start_audit_writer(settings.database_url)
+        except Exception as exc:
+            logger.warning("audit_writer_start_failed", error=str(exc))
 
     # Register routers
     app.include_router(health.router)
