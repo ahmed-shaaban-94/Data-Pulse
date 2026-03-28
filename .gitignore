@@ -55,3 +55,6 @@ dbt/dbt_packages/
 frontend/node_modules/
 frontend/.next/
 frontend/.env*.local
+
+# Claude Code
+.claude/settings.local.json
