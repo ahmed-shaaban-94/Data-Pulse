@@ -266,7 +266,7 @@ class TestDataFileHandlerIsDataFile:
         ("/data/file.json", False),
         ("/data/file.parquet", False),
         ("/data/file", False),
-        ("/data/.csv", True),  # hidden file with valid extension
+        ("/data/.csv", False),  # dotfile — Path(".csv").suffix is ""
     ])
     def test_is_data_file(self, path: str, expected: bool):
         assert self.handler._is_data_file(path) is expected

@@ -67,16 +67,27 @@ These are already in `.env` and passed via docker-compose:
 
 ---
 
-## Remaining Phases (Not Started)
+## Completed Phases (Latest)
 
-### Phase 2.4: File Watcher
-- Directory watcher service that auto-triggers pipeline when new Excel/CSV files appear
-- Depends on: Phase 2.3 trigger endpoint (DONE)
+### Phase 2.4: File Watcher [DONE]
+- watchdog-based directory monitor with debounce logic (10s default)
+- DataFileHandler: detects new CSV/Excel files, debounces events
+- FileWatcherService: triggers pipeline via API on file detection
+- CLI: `python -m datapulse.watcher --debounce 10`
+- Docker service: `datapulse-watcher` container
+- Tests: test_watcher.py
 
-### Phase 2.8: AI-Light (OpenRouter Free Tier)
-- AI summaries, anomaly detection, change narratives
-- Architecture: n8n + OpenRouter free models (no LangGraph)
-- Depends on: All Phase 2 infrastructure (mostly DONE)
+### Phase 2.8: AI-Light [DONE]
+- OpenRouter client with chat + JSON parsing
+- AILightService: summaries, anomaly detection (statistical + AI), change narratives
+- 4 API endpoints: /status, /summary, /anomalies, /changes
+- Frontend: /insights page with AI summary card + anomaly list
+- 3 SWR hooks + TypeScript types
+- n8n workflow: 2.8.1_ai_insights_digest.json (daily 09:00 → Slack)
+- Tests: test_ai_light.py
+- Config: `OPENROUTER_API_KEY` + `OPENROUTER_MODEL` in .env
+
+## Remaining Phases
 
 ### Phase 4: Public Website / Landing Page
 - Marketing/landing page for DataPulse
