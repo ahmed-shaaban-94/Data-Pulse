@@ -1,782 +1,482 @@
 # DataPulse — Phase 4: Public Website & Landing Page
 
-> **Goal**: Build a stunning, professional landing page that showcases DataPulse as a modern SaaS product.
-> **Stack**: Next.js 14 + TypeScript + Tailwind CSS (no new dependencies)
-> **Theme**: Midnight-pharma dark theme with optional light toggle
+> **Goal**: Build a modern, conversion-optimized landing page for DataPulse SaaS platform.
+> **Prerequisite**: All Phases 1.x–2.x complete (dashboard, API, pipeline, AI-Light).
 
 ---
 
-## Architectural Overview
+## Architecture Overview
 
-### The Core Challenge
-
-Separate public-facing marketing pages from the authenticated dashboard — **without breaking any existing URLs**.
-
-### Solution: Next.js Route Groups
+The current frontend uses a sidebar-based layout for the dashboard. The landing page needs a **completely different layout** (top navbar + footer, no sidebar). We use **Next.js 14 Route Groups** to cleanly separate the two:
 
 ```
-frontend/src/app/
-├── layout.tsx                    # Minimal root (html + body only)
-├── globals.css                   # Shared styles + light/dark CSS vars
-│
-├── (marketing)/                  # Public website — NO sidebar
-│   ├── layout.tsx                # Navbar + Footer wrapper
-│   ├── page.tsx                  # Landing page at /
-│   └── not-found.tsx             # Marketing 404
-│
-└── (dashboard)/                  # App dashboard — WITH sidebar
-    ├── layout.tsx                # Sidebar + Providers + ErrorBoundary
-    ├── dashboard/page.tsx        # /dashboard (unchanged URL)
-    ├── products/page.tsx         # /products (unchanged URL)
-    ├── customers/page.tsx        # /customers (unchanged URL)
-    ├── staff/page.tsx            # /staff (unchanged URL)
-    ├── sites/page.tsx            # /sites (unchanged URL)
-    ├── returns/page.tsx          # /returns (unchanged URL)
-    ├── pipeline/page.tsx         # /pipeline (unchanged URL)
-    └── insights/page.tsx         # /insights (unchanged URL)
+src/app/
+  layout.tsx              # Minimal root: <html>, <body>, metadata, globals.css ONLY
+  not-found.tsx           # Shared 404 page
+  error.tsx               # Shared error boundary
+  (marketing)/            # Public pages — navbar + footer layout
+    layout.tsx
+    page.tsx              # Landing page (/, the hero + all sections)
+    pricing/page.tsx      # Dedicated pricing page (optional)
+    privacy/page.tsx      # Privacy policy
+    terms/page.tsx        # Terms of service
+  (app)/                  # Dashboard — sidebar layout (existing)
+    layout.tsx            # Sidebar + Providers + ErrorBoundary
+    dashboard/page.tsx
+    products/page.tsx
+    customers/page.tsx
+    staff/page.tsx
+    sites/page.tsx
+    returns/page.tsx
+    pipeline/page.tsx
+    insights/page.tsx
 ```
 
-Route groups `(parenthesized)` do NOT affect URLs. After migration:
-- `/` renders the landing page (instead of redirecting)
-- `/dashboard`, `/products`, etc. work exactly as before
-- Each group has its own layout (navbar vs sidebar)
+**Key insight**: Route group names `(marketing)` and `(app)` do NOT appear in URLs. `/dashboard` stays `/dashboard`. Root `/` becomes the landing page instead of redirecting to `/dashboard`.
 
 ---
 
-## Sub-Phase 4.1: Foundation — Route Group Migration
+## Phase 4.1 — Project Setup & Landing Hero
 
-**Goal**: Restructure the app to support two independent layouts.
+**Goal**: Route group restructure + marketing layout shell + hero section.
+**Complexity**: L (structural refactor)
+**Dependencies**: None (foundation phase)
 
-### Tasks
+### Files to Create
 
-#### 1. Create Dashboard Route Group
+| # | File | Purpose |
+|---|------|---------|
+| 1 | `src/app/(marketing)/layout.tsx` | Marketing shell: `<Navbar>` + `{children}` + `<Footer>`. No sidebar, no SWR/FilterProvider. |
+| 2 | `src/app/(marketing)/page.tsx` | Landing page assembling all sections (Hero + Features + HowItWorks + Stats + Pricing + FAQ + CTA). |
+| 3 | `src/app/(app)/layout.tsx` | Dashboard shell: moves Sidebar + Providers + ErrorBoundary from current root layout. |
+| 4 | `src/components/marketing/navbar.tsx` | Responsive top nav: logo, links (Features, How It Works, Pricing, FAQ as `#anchors`), CTA button. Mobile hamburger. |
+| 5 | `src/components/marketing/footer.tsx` | 4-column footer: Product, Company, Legal, Social. Copyright line. |
+| 6 | `src/components/marketing/hero-section.tsx` | Headline + subtitle + 2 CTAs + stylized dashboard mockup (pure CSS, no images). |
+| 7 | `src/components/marketing/section-wrapper.tsx` | Reusable section: `id` for anchors, max-width container, padding, optional bg variant. |
+| 8 | `src/lib/marketing-constants.ts` | All marketing copy centralized: nav links, footer links, features, pricing, FAQ, stats. |
 
-**New file**: `frontend/src/app/(dashboard)/layout.tsx`
+### Files to Modify
 
-Move the current root layout's inner content here:
-```tsx
-// Sidebar + Providers + ErrorBoundary + main wrapper
-// This is literally the current layout.tsx body, extracted
+| File | Change |
+|------|--------|
+| `src/app/layout.tsx` | **Slim down**: remove Sidebar, Providers, ErrorBoundary. Keep only `<html>`, `<body>`, metadata, globals.css. |
+| `src/app/page.tsx` | **Delete**: remove redirect to /dashboard. Replaced by `(marketing)/page.tsx`. |
+| `tailwind.config.ts` | Add marketing tokens: `accent-glow`, gradient colors, new animations (`glow-pulse`, `float`). |
+| `src/app/globals.css` | Add: `scroll-behavior: smooth`, `.gradient-text`, `.glow-card`, `.section-divider`. |
+| `src/middleware.ts` | Update CSP `img-src` to allow marketing images (`https:`). |
+
+### Files to Move (content unchanged, path only)
+
+| From | To |
+|------|-----|
+| `src/app/dashboard/` | `src/app/(app)/dashboard/` |
+| `src/app/products/` | `src/app/(app)/products/` |
+| `src/app/customers/` | `src/app/(app)/customers/` |
+| `src/app/staff/` | `src/app/(app)/staff/` |
+| `src/app/sites/` | `src/app/(app)/sites/` |
+| `src/app/returns/` | `src/app/(app)/returns/` |
+| `src/app/pipeline/` | `src/app/(app)/pipeline/` |
+| `src/app/insights/` | `src/app/(app)/insights/` |
+
+### Component Hierarchy
+
+```
+(marketing)/layout.tsx
+  Navbar
+    Logo (Activity icon + "DataPulse")
+    NavLinks (#features | #how-it-works | #pricing | #faq)
+    CTA Button ("Get Started")
+    MobileMenuToggle -> SlideOutMenu
+  {children}
+    HeroSection
+      Headline: "Turn Raw Sales Data into Revenue Intelligence"
+      Subtitle
+      CTA Primary: "Start Free Trial"
+      CTA Secondary: "Watch Demo"
+      DashboardMockup (CSS-only fake KPI grid + chart with glow)
+  Footer
+    4 columns + copyright
 ```
 
-**Move** all existing page directories into `(dashboard)/`:
-```
-dashboard/  →  (dashboard)/dashboard/
-products/   →  (dashboard)/products/
-customers/  →  (dashboard)/customers/
-staff/      →  (dashboard)/staff/
-sites/      →  (dashboard)/sites/
-returns/    →  (dashboard)/returns/
-pipeline/   →  (dashboard)/pipeline/
-insights/   →  (dashboard)/insights/
-```
+### Implementation Details
 
-Also move: `not-found.tsx`, `error.tsx` → `(dashboard)/`
+1. **Root layout becomes minimal** — `<html lang="en" className="dark"><body>{children}</body></html>` plus metadata. All provider/sidebar logic moves to `(app)/layout.tsx`.
 
-#### 2. Strip Root Layout
+2. **Navbar scroll behavior** — `"use client"` with scroll listener: apply `backdrop-blur-md bg-page/80` after scrolling 50px. Anchor links use CSS `scroll-behavior: smooth`.
 
-**Modify**: `frontend/src/app/layout.tsx`
+3. **Dashboard mockup** — Pure CSS/Tailwind: dark card with fake KPI boxes, gradient-filled chart area, subtle glow. Zero bytes, more impressive than a screenshot.
 
-Strip to minimal shell:
-```tsx
-export default function RootLayout({ children }) {
-  return (
-    <html lang="en" className="dark">
-      <body className="bg-page text-text-primary antialiased">
-        {children}
-      </body>
-    </html>
-  );
-}
-```
-
-No Sidebar, no Providers — those live in `(dashboard)/layout.tsx` now.
-
-#### 3. Create Marketing Layout Shell
-
-**New file**: `frontend/src/app/(marketing)/layout.tsx`
-
-```tsx
-import { Navbar } from "@/components/marketing/navbar";
-import { Footer } from "@/components/marketing/footer";
-
-export default function MarketingLayout({ children }) {
-  return (
-    <>
-      <Navbar />
-      <main>{children}</main>
-      <Footer />
-    </>
-  );
-}
-```
-
-#### 4. Delete Root Redirect
-
-**Delete**: `frontend/src/app/page.tsx` (the `redirect("/dashboard")` file)
-
-Replaced by `(marketing)/page.tsx` in Sub-Phase 4.3.
-
-#### 5. Extend Tailwind Config
-
-**Modify**: `frontend/tailwind.config.ts`
-
-Add new landing page animations:
-```ts
-keyframes: {
-  // Existing: fadeIn, slideUp
-  // New:
-  float:        { "0%,100%": { transform: "translateY(0)" }, "50%": { transform: "translateY(-10px)" } },
-  shimmer:      { "0%": { backgroundPosition: "-200% 0" }, "100%": { backgroundPosition: "200% 0" } },
-  scaleIn:      { from: { opacity: "0", transform: "scale(0.95)" }, to: { opacity: "1", transform: "scale(1)" } },
-  slideInLeft:  { from: { opacity: "0", transform: "translateX(-20px)" }, to: { opacity: "1", transform: "translateX(0)" } },
-  slideInRight: { from: { opacity: "0", transform: "translateX(20px)" }, to: { opacity: "1", transform: "translateX(0)" } },
-},
-animation: {
-  // Existing: fade-in, slide-up
-  // New:
-  "float": "float 6s ease-in-out infinite",
-  "shimmer": "shimmer 3s linear infinite",
-  "scale-in": "scaleIn 0.5s ease-out forwards",
-  "slide-in-left": "slideInLeft 0.6s ease-out forwards",
-  "slide-in-right": "slideInRight 0.6s ease-out forwards",
-}
-```
-
-### Deliverables
-- [x] Route groups created
-- [x] All dashboard pages migrated (zero URL changes)
-- [x] Root `/` ready for landing page
-- [x] Marketing layout shell in place
-- [x] No visual regressions on dashboard
+4. **Root `/` no longer redirects** — Landing page replaces the redirect. Users go to `/dashboard` via CTA or direct link.
 
 ---
 
-## Sub-Phase 4.2: Core Marketing Components
+## Phase 4.2 — Features & How It Works
 
-**Goal**: Build shared components used across all landing page sections.
+**Goal**: Feature showcase grid + pipeline visualization.
+**Complexity**: M
+**Dependencies**: Phase 4.1
 
-### Components
+### Files to Create
 
-#### 1. Intersection Observer Hook
+| # | File | Purpose |
+|---|------|---------|
+| 9 | `src/components/marketing/features-grid.tsx` | 6 feature cards in responsive grid (1→2→3 cols). `.glow-card` hover effect. |
+| 10 | `src/components/marketing/feature-card.tsx` | Single card: lucide icon + title + description. |
+| 11 | `src/components/marketing/how-it-works.tsx` | 4-step horizontal pipeline: Import → Clean → Analyze → Visualize. Gradient connecting line. |
+| 12 | `src/components/marketing/pipeline-step.tsx` | Single step: numbered circle + icon + label + description. |
+| 13 | `src/hooks/use-intersection-observer.ts` | Custom hook for scroll-triggered animations. Returns `ref` + `isVisible`. `once: true` option. |
 
-**New file**: `frontend/src/hooks/use-intersection-observer.ts`
+### Files to Modify
 
-Custom hook for scroll-triggered animations:
-- Observes element visibility
-- Triggers once (no re-triggering on scroll back)
-- Default threshold: 0.1, rootMargin: "0px 0px -50px 0px"
-- Returns `{ ref, isVisible }`
+| File | Change |
+|------|--------|
+| `src/app/(marketing)/page.tsx` | Add `<FeaturesGrid>` + `<HowItWorks>` sections. |
+| `src/lib/marketing-constants.ts` | Add `FEATURES` (6 items) + `PIPELINE_STEPS` (4 items). |
+| `src/app/globals.css` | Add `.animate-on-scroll` with opacity/transform transition. |
 
-#### 2. Animated Section Wrapper
-
-**New file**: `frontend/src/components/marketing/animated-section.tsx`
-
-```tsx
-// Wraps children with opacity-0 → animation on scroll
-// Props: animation type, delay, className
-// Types: "slide-up" | "fade-in" | "scale-in" | "slide-in-left" | "slide-in-right"
-```
-
-#### 3. Navbar (Sticky + Transparent → Opaque)
-
-**New file**: `frontend/src/components/marketing/navbar.tsx`
-
-Features:
-- Fixed position, `z-50`
-- Transparent initially → `bg-card/95 backdrop-blur-md` after 50px scroll
-- Logo: Activity icon + "DataPulse" (links to `/`)
-- Nav links: Features | How It Works | Pricing | FAQ (smooth scroll anchors)
-- CTA: "Go to Dashboard" button → `/dashboard`
-- Mobile: hamburger menu with slide-out panel
-- Scroll listener for background transition
-
-#### 4. Footer
-
-**New file**: `frontend/src/components/marketing/footer.tsx`
-
-4-column grid layout:
-| Product | Resources | Company | Connect |
-|---------|-----------|---------|---------|
-| Features | Documentation | About | GitHub |
-| Pricing | API Reference | Contact | Twitter |
-| Dashboard | Changelog | Privacy | LinkedIn |
-
-Plus: logo + tagline row, copyright bar.
-
-#### 5. Section Heading
-
-**New file**: `frontend/src/components/marketing/section-heading.tsx`
-
-Reusable centered header: badge pill + h2 title + description paragraph.
-
-#### 6. Gradient Text
-
-**New file**: `frontend/src/components/marketing/gradient-text.tsx`
-
-Utility: `bg-gradient-to-r from-accent to-blue bg-clip-text text-transparent`
-
-### Deliverables
-- [x] Scroll-aware navbar with mobile menu
-- [x] Footer with link columns
-- [x] Intersection observer hook + animated wrapper
-- [x] Reusable section heading + gradient text
-
----
-
-## Sub-Phase 4.3: Hero + Features + How It Works
-
-**Goal**: Build the first three major landing page sections.
-
-### Sections
-
-#### 1. Landing Page Compositor
-
-**New file**: `frontend/src/app/(marketing)/page.tsx`
-
-Composes all sections. Fully static — `export const metadata` for SEO. No `"use client"` at page level.
-
-#### 2. Hero Section
-
-**New file**: `frontend/src/components/marketing/hero.tsx`
-
-Design:
-```
-┌─────────────────────────────────────────────────────┐
-│            (radial teal glow, top-center)            │
-│                                                       │
-│      Transform Raw Sales Data Into                   │
-│        ✨ Actionable Insights ✨                     │
-│              (gradient text)                          │
-│                                                       │
-│   Import, clean, analyze, and visualize millions     │
-│   of rows — powered by AI and automation.            │
-│                                                       │
-│    [Get Started Free]  [Watch Demo]                  │
-│                                                       │
-│   ● 2M+ rows processed  ● Real-time dashboards      │
-│   ● AI-powered insights  ● Zero config setup        │
-│                                                       │
-│      ◇ (floating shapes, animate-float)  ◇          │
-└─────────────────────────────────────────────────────┘
-```
-
-- Full viewport height
-- Radial gradient background (subtle teal glow)
-- Floating CSS-only geometric decorations (`animate-float` with staggered delays)
-- No images — pure CSS/text for performance
-
-#### 3. Features Grid
-
-**New file**: `frontend/src/components/marketing/features.tsx`
-
-6 feature cards (3x2 grid desktop, 1-col mobile):
+### Feature Cards Content
 
 | Icon | Title | Description |
 |------|-------|-------------|
-| Upload | **Data Import** | Drag-and-drop Excel/CSV. Millions of rows in seconds. |
-| Sparkles | **Smart Cleaning** | Automated deduplication, type detection, standardization. |
-| Layers | **Medallion Pipeline** | Bronze→Silver→Gold ensures quality at every stage. |
-| BarChart3 | **Interactive Dashboards** | Real-time charts, KPIs, and drill-down analytics. |
-| Brain | **AI Insights** | Anomaly detection and AI summaries surface hidden patterns. |
-| Workflow | **Automation** | Automated pipelines with quality gates and Slack alerts. |
+| FileUp | Upload & Import | Import Excel and CSV files with automatic schema detection |
+| Sparkles | Data Cleaning | Automated deduplication, normalization, and validation |
+| ShieldCheck | Quality Gates | 7 automated quality checks ensure data integrity |
+| BarChart3 | Real-time Analytics | Interactive dashboards with KPIs, trends, and rankings |
+| Brain | AI Insights | AI-powered anomaly detection and narrative summaries |
+| GitBranch | Pipeline Automation | File watcher auto-triggers the full data pipeline |
 
-Each card: Lucide icon, hover effect (`border-accent/30`), staggered `AnimatedSection`.
-
-#### 4. How It Works Stepper
-
-**New file**: `frontend/src/components/marketing/how-it-works.tsx`
-
-4-step connected flow:
+### Pipeline Steps
 
 ```
-  ①  Import  ——→  ②  Clean  ——→  ③  Analyze  ——→  ④  Visualize
-   Upload          Sparkles       BarChart3         LineChart
+[1. Import] ---→ [2. Clean] ---→ [3. Analyze] ---→ [4. Visualize]
+  FileUp         Sparkles        BarChart3         Monitor
+  Bronze          Silver           Gold            Dashboard
 ```
 
-- Horizontal on desktop, vertical on mobile
-- Connecting line with gradient (accent → blue)
-- Steps appear on scroll via `AnimatedSection`
-
-### Deliverables
-- [x] Landing page rendering at `/`
-- [x] Hero with gradient effects + floating decorations
-- [x] 6-card features grid with hover effects
-- [x] 4-step "How It Works" stepper
+- Connected by gradient line (teal→blue) via CSS `::after` pseudo-element
+- Vertical layout on mobile, horizontal on desktop
 
 ---
 
-## Sub-Phase 4.4: Preview + Pricing + Testimonials + FAQ + CTA
+## Phase 4.3 — Social Proof & Pricing
 
-**Goal**: Complete all remaining landing page sections.
+**Goal**: Stats banner, pricing tiers, FAQ, tech badges.
+**Complexity**: M
+**Dependencies**: Phase 4.2 (uses intersection observer hook)
 
-### Sections
+### Files to Create
 
-#### 1. Dashboard Preview
+| # | File | Purpose |
+|---|------|---------|
+| 14 | `src/components/marketing/stats-banner.tsx` | 4 animated stats with count-up on scroll. Full-width gradient bg. |
+| 15 | `src/components/marketing/pricing-section.tsx` | 3 pricing cards. Middle card (Pro) highlighted with accent border + "Popular" badge. |
+| 16 | `src/components/marketing/pricing-card.tsx` | Single card: tier, price, features list, CTA. `isPopular` prop for emphasis. |
+| 17 | `src/components/marketing/faq-section.tsx` | Accordion FAQ list. Single-item-open behavior. |
+| 18 | `src/components/marketing/faq-item.tsx` | Single FAQ item: question + collapsible answer. ChevronDown rotates on open. |
+| 19 | `src/components/marketing/tech-badges.tsx` | Pill-shaped badges for tech stack: Next.js, PostgreSQL, dbt, Polars, FastAPI, Docker. Text-only, no images. |
 
-**New file**: `frontend/src/components/marketing/dashboard-preview.tsx`
+### Files to Modify
 
-CSS-only mock dashboard (no screenshots needed):
-```
-┌─────────────────────────────────────────┐
-│ ┌──┐  ┌─────────────────────────────┐   │
-│ │▌▌│  │  ▓▓▓  ▓▓▓  ▓▓▓  ▓▓▓       │   │
-│ │▌▌│  │  KPI   KPI   KPI  KPI      │   │
-│ │▌▌│  ├─────────────────────────────┤   │
-│ │▌▌│  │  📈 Chart area              │   │
-│ │▌▌│  │  ████ ██ ████████ ███      │   │
-│ └──┘  └─────────────────────────────┘   │
-│         [ Live Dashboard Preview ]       │
-└─────────────────────────────────────────┘
-```
+| File | Change |
+|------|--------|
+| `src/app/(marketing)/page.tsx` | Add Stats, Pricing, FAQ, TechBadges sections. |
+| `src/lib/marketing-constants.ts` | Add `STATS`, `PRICING_TIERS`, `FAQ_ITEMS`. |
 
-- 3D perspective tilt: `perspective(1000px) rotateX(2deg) rotateY(-2deg)`
-- Floating "Live Preview" badge
-- "See it in action →" link to `/dashboard`
-- Crisp at any resolution (no image assets)
+### Stats
 
-#### 2. Pricing Section
+| Stat | Value |
+|------|-------|
+| Rows Processed | 2.2M+ |
+| Data Quality Score | 99.5% |
+| Speed vs Pandas | 10x Faster |
+| API Endpoints | 25+ |
 
-**New file**: `frontend/src/components/marketing/pricing.tsx`
+### Pricing Tiers
 
-3-tier layout, middle card highlighted:
+| Tier | Price | Highlights |
+|------|-------|-----------|
+| **Starter** | $0/mo | 1 data source, 10K rows, basic dashboard, community support |
+| **Pro** *(Popular)* | $49/mo | 5 sources, 1M rows, AI insights, pipeline automation, priority support |
+| **Enterprise** | Custom | Unlimited everything, SSO, dedicated support, custom integrations |
 
-| | Starter | Professional | Enterprise |
-|---|---------|-------------|-----------|
-| **Price** | Free | $49/mo | Custom |
-| **Sources** | 1 | Unlimited | Unlimited |
-| **Rows** | 100K | 10M | Unlimited |
-| **Dashboards** | 5 | Unlimited | Unlimited |
-| **AI Insights** | - | ✓ | ✓ |
-| **API Access** | - | ✓ | ✓ |
-| **SSO** | - | - | ✓ |
-| **Support** | Community | Email | Dedicated |
-| **Badge** | — | ⭐ Most Popular | — |
-| **CTA** | Get Started | Start Free Trial | Contact Sales |
+### FAQ Items (6-8 questions)
 
-Professional card: accent border, "Most Popular" pill, `scale-105`.
-
-#### 3. Testimonials
-
-**New file**: `frontend/src/components/marketing/testimonials.tsx`
-
-3-column grid with placeholder testimonials:
-- Quote text + author name + role + company
-- Avatar: initials circle (gradient background)
-- Decorative large semi-transparent Quote icon
-- Realistic pharma/sales domain context
-
-#### 4. FAQ Accordion
-
-**New file**: `frontend/src/components/marketing/faq.tsx`
-
-6-8 questions with smooth expand/collapse:
-
-```
-▸ What data formats does DataPulse support?
-▾ How is my data secured?
-    DataPulse uses tenant-scoped Row Level Security (RLS)
-    on PostgreSQL. All data is isolated per tenant...
-▸ Can I connect to my existing database?
-▸ How long does setup take?
-▸ What's included in the free tier?
-▸ Do you offer on-premise deployment?
-```
-
-- CSS `grid-template-rows: 0fr → 1fr` transition (no JS height calc)
-- ChevronDown icon rotates on open
-- Client component with `useState`
-
-#### 5. Final CTA
-
-**New file**: `frontend/src/components/marketing/cta.tsx`
-
-Full-width gradient section:
-```
-┌─────────────────────────────────────────────┐
-│   gradient: accent/10 → page                 │
-│                                               │
-│    Ready to Transform Your Sales Data?       │
-│    Start analyzing in minutes, not months.   │
-│                                               │
-│    [Get Started Free]  [Contact Sales]       │
-└─────────────────────────────────────────────┘
-```
-
-### Deliverables
-- [x] Dashboard preview (CSS mock)
-- [x] 3-tier pricing section
-- [x] Testimonials grid
-- [x] Accordion FAQ
-- [x] Final CTA section
+- What data formats does DataPulse support?
+- How does the medallion architecture work?
+- What quality checks are included?
+- Can I use my own AI/LLM provider?
+- Is my data secure?
+- How long does setup take?
+- What's included in the free tier?
+- Do you offer custom integrations?
 
 ---
 
-## Sub-Phase 4.5: Light/Dark Theme Toggle
+## Phase 4.4 — Auth & Waitlist
 
-**Goal**: Optional light theme for marketing pages (dashboard stays dark).
+**Goal**: Email collection, API endpoint, legal pages.
+**Complexity**: M
+**Dependencies**: Phase 4.1 (footer links)
 
-### Strategy: CSS Variables
+### Files to Create
 
-**Key insight**: The codebase already uses custom color tokens (`bg-page`, `text-text-primary`). Making them CSS-variable-backed means **zero changes to existing components**.
+| # | File | Purpose |
+|---|------|---------|
+| 20 | `src/components/marketing/waitlist-form.tsx` | `"use client"`: email input + submit. States: idle → loading → success → error. |
+| 21 | `src/components/marketing/cta-section.tsx` | Full-width CTA band: "Ready to transform your sales data?" + waitlist form. |
+| 22 | `src/app/(marketing)/privacy/page.tsx` | Privacy policy (static TSX content). |
+| 23 | `src/app/(marketing)/terms/page.tsx` | Terms of service (static TSX content). |
+| 24 | `src/app/api/waitlist/route.ts` | Next.js Route Handler: POST `{ email }` → validate → store → respond. |
 
-#### 1. Update Tailwind Colors to CSS Variables
+### Files to Modify
 
-**Modify**: `frontend/tailwind.config.ts`
+| File | Change |
+|------|--------|
+| `src/app/(marketing)/page.tsx` | Add `<CTASection>` before footer. |
+| `src/components/marketing/footer.tsx` | Add `/privacy` and `/terms` links. |
 
-```ts
-colors: {
-  page: "var(--bg-page)",          // was: "#0D1117"
-  card: "var(--bg-card)",          // was: "#161B22"
-  border: "var(--border)",         // was: "#30363D"
-  divider: "var(--divider)",       // was: "#21262D"
-  "text-primary": "var(--text-primary)",    // was: "#E6EDF3"
-  "text-secondary": "var(--text-secondary)", // was: "#A8B3BD"
-  accent: "#00BFA5",               // stays constant
-}
+### Waitlist API
+
+```
+POST /api/waitlist
+Body: { "email": "user@example.com" }
+Response: { "success": true, "message": "You're on the list!" }
 ```
 
-#### 2. Add Light Theme Variables
+**MVP approach**: Next.js Route Handler writes to `waitlist.json` file (simple, works in Docker standalone). Production would migrate to proper database.
 
-**Modify**: `frontend/src/app/globals.css`
-
-```css
-:root {
-  /* Dark theme (default) — existing values */
-  --bg-page: #0D1117;
-  --bg-card: #161B22;
-  --border: #30363D;
-  --divider: #21262D;
-  --text-primary: #E6EDF3;
-  --text-secondary: #A8B3BD;
-}
-
-html.light {
-  --bg-page: #FFFFFF;
-  --bg-card: #F6F8FA;
-  --border: #D0D7DE;
-  --divider: #E8ECEF;
-  --text-primary: #1F2328;
-  --text-secondary: #656D76;
-}
-```
-
-#### 3. Theme Hook
-
-**New file**: `frontend/src/hooks/use-theme.ts`
-
-- Manages `"light" | "dark"` state
-- Persists to `localStorage` key `"datapulse-theme"`
-- Toggles class on `<html>` element
-
-#### 4. Theme Toggle Button
-
-**New file**: `frontend/src/components/marketing/theme-toggle.tsx`
-
-Sun/Moon icon button, integrated into navbar.
-
-#### 5. Force Dark on Dashboard
-
-**Modify**: `frontend/src/app/(dashboard)/layout.tsx`
-
-Add `useEffect` to force `document.documentElement.classList.add("dark")` on mount.
-
-### Deliverables
-- [x] Light/dark toggle on marketing navbar
-- [x] CSS variable-based theming (zero component changes)
-- [x] Dashboard always forced dark
-- [x] localStorage persistence
+**Form UX**:
+- Loading: Loader2 icon with `animate-spin`
+- Success: Checkmark + "You're on the list!" message
+- Error: Red error message + retry
+- Client-side email validation + server-side re-validation
+- Rate limiting (in-memory IP counter)
 
 ---
 
-## Sub-Phase 4.6: SEO, Metadata & Performance
+## Phase 4.5 — SEO, Performance & Analytics
 
-**Goal**: Optimize for search engines and Core Web Vitals.
+**Goal**: Search engine optimization, structured data, performance.
+**Complexity**: S
+**Dependencies**: Phase 4.1 + Phase 4.3 (FAQ data for JSON-LD)
 
-### Tasks
+### Files to Create
 
-#### 1. Enhanced Metadata
+| # | File | Purpose |
+|---|------|---------|
+| 25 | `src/app/(marketing)/metadata.ts` | Shared marketing metadata constants (site name, base URL, OG defaults). |
+| 26 | `src/app/sitemap.ts` | Next.js sitemap convention: `/`, `/pricing`, `/privacy`, `/terms`. |
+| 27 | `src/app/robots.ts` | Allow crawlers for marketing pages, disallow `/dashboard`, `/api/`. |
+| 28 | `src/components/marketing/json-ld.tsx` | Server component: `<script type="application/ld+json">` for Organization, WebSite, FAQPage. |
+| 29 | `src/app/opengraph-image.tsx` | Next.js OG image generation via `ImageResponse` (dynamic, no static file). |
 
-**Modify**: `frontend/src/app/(marketing)/page.tsx`
+### Files to Modify
 
-```tsx
-export const metadata: Metadata = {
-  title: "DataPulse | Transform Sales Data Into Actionable Insights",
-  description: "Import Excel/CSV, clean with automated pipelines, analyze with AI...",
-  keywords: ["sales analytics", "data pipeline", "business intelligence", "dashboard"],
-  openGraph: {
-    title: "DataPulse | Sales Analytics Platform",
-    type: "website",
-    url: "https://datapulse.app",
-    images: [{ url: "/og-image.png", width: 1200, height: 630 }],
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: "DataPulse | Sales Analytics Platform",
-    images: ["/og-image.png"],
-  },
-  robots: { index: true, follow: true },
-};
+| File | Change |
+|------|--------|
+| `src/app/layout.tsx` | Add `metadataBase`, `openGraph` defaults, `twitter` card, `icons`. |
+| `src/app/(marketing)/page.tsx` | Export page-specific `metadata` + add `<JsonLd>` component. |
+| `next.config.mjs` | Add `images` config, `headers()` for cache-control. |
+
+### Robots Configuration
+
+```
+Allow: /
+Allow: /pricing
+Allow: /privacy
+Allow: /terms
+Disallow: /dashboard
+Disallow: /products
+Disallow: /customers
+Disallow: /staff
+Disallow: /sites
+Disallow: /returns
+Disallow: /pipeline
+Disallow: /insights
+Disallow: /api/
 ```
 
-#### 2. Sitemap
+### JSON-LD Schemas
 
-**New file**: `frontend/src/app/sitemap.ts`
+- **Organization**: name, url, logo, description
+- **WebSite**: name, url, searchAction (optional)
+- **FAQPage**: from `FAQ_ITEMS` constant (rich snippets in Google)
 
-```ts
-// Generates sitemap.xml with / and /pricing
-// Dashboard routes excluded
-```
+### Performance Notes
 
-#### 3. Robots.txt
-
-**New file**: `frontend/src/app/robots.ts`
-
-```ts
-// Allows: /
-// Disallows: /dashboard, /products, /customers, etc.
-// Points to sitemap.xml
-```
-
-#### 4. JSON-LD Structured Data
-
-Add `SoftwareApplication` schema to the marketing page for rich search results.
-
-#### 5. Image Optimization
-
-**Modify**: `frontend/next.config.mjs`
-
-```js
-images: { formats: ["image/avif", "image/webp"] }
-```
-
-#### 6. OpenGraph Image
-
-**New file**: `frontend/public/og-image.png` — branded social share image (1200x630).
-
-### Deliverables
-- [x] Rich OpenGraph + Twitter card metadata
-- [x] sitemap.xml + robots.txt
-- [x] Dashboard routes excluded from crawling
-- [x] Structured data markup
-- [x] Image optimization config
+- Marketing pages are **Server Components** by default → zero client JS for static content
+- Only `"use client"` for: navbar mobile toggle, FAQ accordion, waitlist form
+- System fonts already in use → zero font loading latency
+- No images needed (CSS mockups, text badges) → minimal asset weight
 
 ---
 
-## Sub-Phase 4.7: E2E Tests
+## Phase 4.6 — Polish, Testing & Deploy
 
-**Goal**: Comprehensive Playwright coverage for the landing page.
+**Goal**: Accessibility, responsiveness, E2E tests, final QA.
+**Complexity**: M
+**Dependencies**: All previous phases
 
-### Test Files
+### Files to Create
 
-#### 1. Landing Page Tests
+| # | File | Purpose |
+|---|------|---------|
+| 30 | `e2e/marketing.spec.ts` | 12-15 E2E specs: hero renders, nav scrolls, pricing cards, FAQ expands, waitlist submits, mobile nav, legal pages. |
+| 31 | `e2e/marketing-seo.spec.ts` | SEO specs: meta tags, OG tags, JSON-LD present, canonical URL, no `noindex` on public pages. |
 
-**New file**: `frontend/e2e/landing.spec.ts`
+### Files to Modify
 
-```
-✓ Root / renders landing page (not redirect)
-✓ Navbar visible with logo and nav links
-✓ Hero renders headline and CTA buttons
-✓ "Get Started" CTA links to /dashboard
-✓ Features section renders 6 cards
-✓ How It Works renders 4 steps
-✓ Pricing renders 3 tier cards
-✓ "Most Popular" badge on Professional tier
-✓ FAQ accordion opens/closes on click
-✓ Smooth scroll: clicking "Features" scrolls to #features
-✓ Mobile: hamburger menu opens
-✓ Mobile: no horizontal scroll
-✓ Footer renders all link columns
-✓ Page has correct meta title
-```
+| File | Change |
+|------|--------|
+| `e2e/navigation.spec.ts` | Update: root `/` now shows landing page (not redirect). |
+| `e2e/pages.spec.ts` | Verify dashboard pages still work under `(app)/`. |
+| `src/components/marketing/navbar.tsx` | Add `aria-*` attributes, keyboard nav, focus trap for mobile menu. |
+| `src/components/marketing/faq-item.tsx` | Add `aria-expanded`, `aria-controls`, keyboard Enter/Space toggle. |
+| `src/components/marketing/waitlist-form.tsx` | Add `aria-live="polite"`, proper `<label>`, focus management. |
+| `playwright.config.ts` | Add mobile viewport project: `devices['iPhone 13']`. |
+| `src/app/globals.css` | Add `@media (prefers-reduced-motion: reduce)` to disable animations. |
 
-#### 2. Navigation Integration Tests
-
-**New file**: `frontend/e2e/landing-navigation.spec.ts`
+### E2E Test Specs
 
 ```
-✓ "Go to Dashboard" navigates to /dashboard
-✓ Dashboard sidebar NOT visible on landing page
-✓ Landing navbar NOT visible on dashboard pages
-✓ Back navigation from dashboard to landing works
+marketing.spec.ts:
+  - "hero section renders with headline and CTA"
+  - "navbar links scroll to correct sections"
+  - "mobile menu opens and closes"
+  - "features grid shows 6 cards"
+  - "how it works shows 4 steps"
+  - "pricing cards show 3 tiers"
+  - "FAQ accordion expands on click"
+  - "waitlist form validates email"
+  - "waitlist form submits successfully"
+  - "privacy page loads"
+  - "terms page loads"
+  - "footer links are present"
+
+marketing-seo.spec.ts:
+  - "meta title and description present"
+  - "Open Graph tags present"
+  - "JSON-LD script tag present"
+  - "canonical URL set"
+  - "robots meta allows indexing"
 ```
 
-#### 3. Update Existing Tests
+### Accessibility Checklist
 
-**Modify**: `frontend/e2e/navigation.spec.ts`
+- [ ] All interactive elements keyboard-accessible
+- [ ] Color contrast WCAG AA (current: 13.5:1 — well above 4.5:1)
+- [ ] `aria-label` on icon-only buttons
+- [ ] Skip-to-content link at top of marketing layout
+- [ ] Single `<h1>` per page, proper heading hierarchy
+- [ ] `prefers-reduced-motion` media query
+- [ ] Focus visible styles on all interactive elements
 
-- Update: root `/` now shows landing page (not redirect to dashboard)
-- Add: navigating from `/` to `/dashboard` shows dashboard
+### Responsive Breakpoints
 
-### Deliverables
-- [x] 15+ E2E specs covering all sections
-- [x] Navigation integration tests
-- [x] Existing tests updated for new routing
-- [x] Mobile responsiveness tests
+| Component | Mobile | md (768px) | lg (1024px) |
+|-----------|--------|------------|-------------|
+| Navbar | Hamburger menu | Hamburger menu | Horizontal links |
+| Hero CTAs | Stacked | Side by side | Side by side |
+| Features | 1 column | 2 columns | 3 columns |
+| Pipeline | Vertical | Horizontal | Horizontal |
+| Pricing | 1 column | 1 column | 3 columns |
+| Footer | 2x2 grid | 4 columns | 4 columns |
 
 ---
 
-## Sub-Phase 4.8: Polish & Accessibility
+## Dependency Graph
 
-**Goal**: Final visual polish, a11y audit, and performance verification.
+```
+Phase 4.1 (Setup + Hero)
+    |
+    +-----> Phase 4.2 (Features + How It Works)
+    |           |
+    |           +-----> Phase 4.3 (Social Proof + Pricing)
+    |                       |
+    |                       +-----> Phase 4.5 (SEO) [needs FAQ from 4.3]
+    |
+    +-----> Phase 4.4 (Auth + Waitlist) [parallel with 4.2/4.3]
+    |
+    +-----> Phase 4.6 (Polish + Testing) [after all content phases]
+```
 
-### Tasks
-
-#### 1. Accessibility
-
-- All interactive elements: proper ARIA labels
-- FAQ accordion: `aria-expanded`, `aria-controls`, `role="region"`
-- Navbar mobile menu: `aria-hidden`, focus trap
-- Color contrast: WCAG AA compliance
-- Skip-to-content link
-- Semantic HTML: `<section>`, `<nav>`, `<footer>`, `<article>`
-
-#### 2. Visual Polish
-
-- Subtle noise/grain texture overlay on hero (inline SVG data URI)
-- 60fps scroll animations verified
-- Viewport testing: 320px, 768px, 1024px, 1440px
-- Smooth transitions on all interactive elements
-
-#### 3. Performance Verification
-
-- Landing page fully static (SSG at build time)
-- Only `Navbar`, `FAQ`, `ThemeToggle`, `AnimatedSection` are client components
-- Verify Docker standalone build works with new route structure
-- Lighthouse audit: target 95+ on all metrics
-
-#### 4. Marketing 404
-
-**New file**: `frontend/src/app/(marketing)/not-found.tsx`
-
-Marketing-themed 404 with link back to `/` (not dashboard).
-
-### Deliverables
-- [x] WCAG AA compliance
-- [x] All viewports tested
-- [x] Lighthouse 95+
-- [x] Docker build verified
+> **Parallelizable**: Phases 4.2 and 4.4 can run in parallel after 4.1.
 
 ---
 
-## Complete File Manifest
+## Complete File Inventory (31 new files)
 
-### New Files (27)
+| # | File | Phase | Type |
+|---|------|-------|------|
+| 1 | `src/app/(marketing)/layout.tsx` | 4.1 | Create |
+| 2 | `src/app/(marketing)/page.tsx` | 4.1 | Create |
+| 3 | `src/app/(app)/layout.tsx` | 4.1 | Create |
+| 4 | `src/components/marketing/navbar.tsx` | 4.1 | Create |
+| 5 | `src/components/marketing/footer.tsx` | 4.1 | Create |
+| 6 | `src/components/marketing/hero-section.tsx` | 4.1 | Create |
+| 7 | `src/components/marketing/section-wrapper.tsx` | 4.1 | Create |
+| 8 | `src/lib/marketing-constants.ts` | 4.1 | Create |
+| 9 | `src/components/marketing/features-grid.tsx` | 4.2 | Create |
+| 10 | `src/components/marketing/feature-card.tsx` | 4.2 | Create |
+| 11 | `src/components/marketing/how-it-works.tsx` | 4.2 | Create |
+| 12 | `src/components/marketing/pipeline-step.tsx` | 4.2 | Create |
+| 13 | `src/hooks/use-intersection-observer.ts` | 4.2 | Create |
+| 14 | `src/components/marketing/stats-banner.tsx` | 4.3 | Create |
+| 15 | `src/components/marketing/pricing-section.tsx` | 4.3 | Create |
+| 16 | `src/components/marketing/pricing-card.tsx` | 4.3 | Create |
+| 17 | `src/components/marketing/faq-section.tsx` | 4.3 | Create |
+| 18 | `src/components/marketing/faq-item.tsx` | 4.3 | Create |
+| 19 | `src/components/marketing/tech-badges.tsx` | 4.3 | Create |
+| 20 | `src/components/marketing/waitlist-form.tsx` | 4.4 | Create |
+| 21 | `src/components/marketing/cta-section.tsx` | 4.4 | Create |
+| 22 | `src/app/(marketing)/privacy/page.tsx` | 4.4 | Create |
+| 23 | `src/app/(marketing)/terms/page.tsx` | 4.4 | Create |
+| 24 | `src/app/api/waitlist/route.ts` | 4.4 | Create |
+| 25 | `src/app/(marketing)/metadata.ts` | 4.5 | Create |
+| 26 | `src/app/sitemap.ts` | 4.5 | Create |
+| 27 | `src/app/robots.ts` | 4.5 | Create |
+| 28 | `src/components/marketing/json-ld.tsx` | 4.5 | Create |
+| 29 | `src/app/opengraph-image.tsx` | 4.5 | Create |
+| 30 | `e2e/marketing.spec.ts` | 4.6 | Create |
+| 31 | `e2e/marketing-seo.spec.ts` | 4.6 | Create |
 
-```
-# Route Group Layouts
-frontend/src/app/(marketing)/layout.tsx
-frontend/src/app/(marketing)/page.tsx
-frontend/src/app/(marketing)/not-found.tsx
-frontend/src/app/(dashboard)/layout.tsx
-frontend/src/app/(dashboard)/not-found.tsx
-frontend/src/app/(dashboard)/error.tsx
+### Files to Modify (across all phases)
 
-# SEO
-frontend/src/app/sitemap.ts
-frontend/src/app/robots.ts
-frontend/public/og-image.png
+| File | Phases |
+|------|--------|
+| `src/app/layout.tsx` | 4.1, 4.5 |
+| `src/app/page.tsx` | 4.1 (delete) |
+| `tailwind.config.ts` | 4.1 |
+| `src/app/globals.css` | 4.1, 4.2, 4.6 |
+| `src/middleware.ts` | 4.1 |
+| `next.config.mjs` | 4.5 |
+| `e2e/navigation.spec.ts` | 4.6 |
+| `e2e/pages.spec.ts` | 4.6 |
+| `playwright.config.ts` | 4.6 |
 
-# Marketing Components (12)
-frontend/src/components/marketing/navbar.tsx
-frontend/src/components/marketing/footer.tsx
-frontend/src/components/marketing/hero.tsx
-frontend/src/components/marketing/features.tsx
-frontend/src/components/marketing/how-it-works.tsx
-frontend/src/components/marketing/dashboard-preview.tsx
-frontend/src/components/marketing/pricing.tsx
-frontend/src/components/marketing/testimonials.tsx
-frontend/src/components/marketing/faq.tsx
-frontend/src/components/marketing/cta.tsx
-frontend/src/components/marketing/section-heading.tsx
-frontend/src/components/marketing/gradient-text.tsx
-frontend/src/components/marketing/animated-section.tsx
-frontend/src/components/marketing/theme-toggle.tsx
+### Dashboard Files to Move (8 directories)
 
-# Hooks
-frontend/src/hooks/use-intersection-observer.ts
-frontend/src/hooks/use-theme.ts
-
-# Tests
-frontend/e2e/landing.spec.ts
-frontend/e2e/landing-navigation.spec.ts
-```
-
-### Modified Files (7)
-
-```
-frontend/src/app/layout.tsx           # Strip to minimal root
-frontend/src/app/globals.css          # Add light theme CSS vars
-frontend/tailwind.config.ts           # CSS var colors + new animations
-frontend/next.config.mjs              # Image optimization
-frontend/e2e/navigation.spec.ts       # Update root route test
-```
-
-### Moved Files (16 files into `(dashboard)/`)
-
-```
-dashboard/page.tsx + loading.tsx
-products/page.tsx + loading.tsx
-customers/page.tsx + loading.tsx
-staff/page.tsx + loading.tsx
-sites/page.tsx + loading.tsx
-returns/page.tsx + loading.tsx
-pipeline/page.tsx + loading.tsx
-insights/page.tsx + loading.tsx
-```
-
-### Deleted Files (3)
-
-```
-frontend/src/app/page.tsx             # Replaced by (marketing)/page.tsx
-frontend/src/app/not-found.tsx        # Moved to route groups
-frontend/src/app/error.tsx            # Moved to route groups
-```
+All existing dashboard routes move from `src/app/<route>/` to `src/app/(app)/<route>/` — file contents unchanged.
 
 ---
 
-## Dependency Graph & Execution Order
+## Risks & Mitigations
 
-```
-4.1 Foundation ─────┐
-                     ├──→ 4.2 Core Components ─────┬──→ 4.3 Hero/Features/HowItWorks ──┐
-                     │                               │                                    │
-                     │                               ├──→ 4.4 Preview/Pricing/FAQ/CTA ───┤
-                     │                               │                                    │
-                     │                               └──→ 4.5 Light/Dark Toggle           │
-                     │                                                                    │
-                     │                               4.6 SEO ←───────────────────────────┤
-                     │                                                                    │
-                     │                               4.7 E2E Tests ←─────────────────────┤
-                     │                                                                    │
-                     └───────────────────────────────── 4.8 Polish ←─────────────────────┘
-```
-
-**Parallelizable**: 4.3, 4.4, 4.5 can run in parallel after 4.2.
-**Sequential**: 4.1 → 4.2 → {4.3 || 4.4 || 4.5} → 4.6 → 4.7 → 4.8.
+| Risk | Impact | Mitigation |
+|------|--------|-----------|
+| Route group restructure breaks existing URLs | High | URLs don't change (group names invisible). E2E tests verify. |
+| Sidebar appears on marketing pages | Medium | Sidebar moves to `(app)/layout.tsx` only. |
+| SWR/FilterProvider errors on marketing pages | Medium | Providers move to `(app)/layout.tsx` only. |
+| Docker build breaks | Low | `output: "standalone"` is route-group agnostic. No Docker changes. |
+| Landing page conflicts with `/` redirect | Low | Old `page.tsx` redirect deleted, replaced by landing page. |
 
 ---
 
-## Key Architectural Decisions
+## Design Principles
 
-| Decision | Rationale |
-|----------|-----------|
-| **Route groups** over middleware | Zero runtime cost, clean layout separation |
-| **CSS variables** for theming | Every existing component gets free theme support — zero code changes |
-| **Intersection Observer** over animation libs | ~20 lines custom hook vs framer-motion (150KB). Zero bundle cost |
-| **CSS mock dashboard** over screenshots | Resolution-independent, no image assets, always up-to-date |
-| **Static generation** for landing | All content hardcoded — pre-rendered at build time for max performance |
-| **No new dependencies** | Everything achievable with React + Tailwind + Lucide. Bundle stays lean |
-
----
-
-## Success Criteria
-
-- [ ] Landing page loads at `/` with < 1s LCP
-- [ ] All 8 dashboard routes work unchanged
-- [ ] Lighthouse scores: 95+ Performance, 95+ Accessibility, 100 SEO
-- [ ] Mobile responsive down to 320px
-- [ ] Light/dark toggle persists across sessions
-- [ ] 15+ E2E tests passing
-- [ ] Docker build succeeds with new route structure
-- [ ] Zero new npm dependencies added
+1. **Zero images** — All visuals built with CSS (mockups, gradients, glows). No assets in `public/`.
+2. **Server-first** — Marketing pages are Server Components by default. `"use client"` only for interactivity.
+3. **Copy centralized** — All marketing text in `marketing-constants.ts`. Easy to update.
+4. **Same design system** — Extends existing midnight-pharma tokens. Consistent brand.
+5. **Mobile-first** — All components designed mobile-first, enhanced at breakpoints.
+6. **Accessible** — WCAG AA, keyboard nav, reduced motion, proper ARIA.
