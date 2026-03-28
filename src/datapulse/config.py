@@ -45,6 +45,7 @@ class Settings(BaseSettings):
 
     # File watcher
     watcher_debounce_seconds: float = 10.0
+    api_base_url: str = "http://localhost:8000"
 
     # Notifications
     slack_webhook_url: str = ""

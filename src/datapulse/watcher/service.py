@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
+import json
+from pathlib import Path
+
 import httpx
+from httpx import HTTPError
 from watchdog.observers import Observer
 
 from datapulse.config import Settings, get_settings
@@ -22,7 +26,7 @@ class FileWatcherService:
 
     def _trigger_pipeline(self, files: list[str]) -> None:
         """POST to the pipeline trigger endpoint."""
-        api_url = f"http://localhost:8000/api/v1/pipeline/trigger"
+        api_url = f"{self._settings.api_base_url}/api/v1/pipeline/trigger"
         payload = {
             "source_dir": self._settings.raw_sales_path,
             "tenant_id": 1,
@@ -48,8 +52,13 @@ class FileWatcherService:
                 status=data.get("status"),
                 files=files,
             )
-        except httpx.HTTPError as exc:
-            log.error("pipeline_trigger_http_error", error=str(exc), files=files)
+        except (HTTPError, json.JSONDecodeError, OSError) as exc:
+            log.error(
+                "pipeline_trigger_failed",
+                error=str(exc),
+                error_type=type(exc).__name__,
+                files=files,
+            )
 
     @property
     def watch_path(self) -> str:
@@ -58,11 +67,20 @@ class FileWatcherService:
     def start(self, debounce_seconds: float = 10.0) -> None:
         """Start watching the configured directory."""
         watch_dir = self.watch_path
+
+        # Verify directory exists and is accessible
+        watch_path = Path(watch_dir)
+        if not watch_path.is_dir():
+            raise FileNotFoundError(f"Watch directory does not exist: {watch_dir}")
+        if not watch_path.stat().st_mode & 0o444:
+            raise PermissionError(f"Watch directory is not readable: {watch_dir}")
+
         log.info("watcher_starting", watch_dir=watch_dir, debounce=debounce_seconds)
 
         self._handler = DataFileHandler(
             trigger_callback=self._trigger_pipeline,
             debounce_seconds=debounce_seconds,
+            watch_root=watch_dir,
         )
         self._observer = Observer()
         self._observer.schedule(self._handler, watch_dir, recursive=False)

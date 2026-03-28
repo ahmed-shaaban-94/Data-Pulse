@@ -140,6 +140,8 @@ class AILightService:
                     max_val=f"{max(values):,.0f}",
                 )
                 ai_results = self._client.chat_json(SYSTEM_PROMPT, prompt)
+                if not isinstance(ai_results, list):
+                    ai_results = [ai_results] if isinstance(ai_results, dict) else []
                 for item in ai_results:
                     # Only add AI anomalies not already found statistically
                     ai_date = item.get("date", "")

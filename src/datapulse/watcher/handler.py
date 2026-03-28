@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import threading
-import time
+from collections.abc import Callable
 from pathlib import Path
 
 from watchdog.events import FileCreatedEvent, FileMovedEvent, FileSystemEventHandler
@@ -22,12 +22,14 @@ class DataFileHandler(FileSystemEventHandler):
 
     def __init__(
         self,
-        trigger_callback: callable,
+        trigger_callback: Callable[[list[str]], None],
         debounce_seconds: float = DEFAULT_DEBOUNCE_SECONDS,
+        watch_root: str | None = None,
     ) -> None:
         super().__init__()
         self._trigger_callback = trigger_callback
         self._debounce_seconds = debounce_seconds
+        self._watch_root = Path(watch_root).resolve() if watch_root else None
         self._pending_files: set[str] = set()
         self._timer: threading.Timer | None = None
         self._lock = threading.Lock()
@@ -36,18 +38,28 @@ class DataFileHandler(FileSystemEventHandler):
         """Check if the file has a valid data extension."""
         return Path(path).suffix.lower() in VALID_EXTENSIONS
 
+    def _is_safe_path(self, path: str) -> bool:
+        """Verify the resolved path stays within the watch root (no symlink escape)."""
+        if self._watch_root is None:
+            return True
+        try:
+            resolved = Path(path).resolve()
+            return str(resolved).startswith(str(self._watch_root))
+        except (OSError, ValueError):
+            return False
+
     def on_created(self, event: FileCreatedEvent) -> None:
         if event.is_directory:
             return
-        if self._is_data_file(event.src_path):
-            log.info("file_detected", path=event.src_path, event="created")
+        if self._is_data_file(event.src_path) and self._is_safe_path(event.src_path):
+            log.info("file_detected", path=event.src_path, event_type="created")
             self._schedule_trigger(event.src_path)
 
     def on_moved(self, event: FileMovedEvent) -> None:
         if event.is_directory:
             return
-        if self._is_data_file(event.dest_path):
-            log.info("file_detected", path=event.dest_path, event="moved")
+        if self._is_data_file(event.dest_path) and self._is_safe_path(event.dest_path):
+            log.info("file_detected", path=event.dest_path, event_type="moved")
             self._schedule_trigger(event.dest_path)
 
     def _schedule_trigger(self, file_path: str) -> None:

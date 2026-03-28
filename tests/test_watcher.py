@@ -283,14 +283,20 @@ class TestFileWatcherServiceLifecycle:
         settings = MagicMock()
         settings.raw_sales_path = "/tmp/test_watch_dir"
         settings.pipeline_webhook_secret = ""
+        settings.api_base_url = "http://localhost:8000"
         for k, v in overrides.items():
             setattr(settings, k, v)
         return settings
 
+    @patch("datapulse.watcher.service.Path")
     @patch("datapulse.watcher.service.Observer")
-    def test_start_creates_observer(self, MockObserver):
+    def test_start_creates_observer(self, MockObserver, MockPath):
         mock_observer = MagicMock()
         MockObserver.return_value = mock_observer
+        mock_path_inst = MagicMock()
+        mock_path_inst.is_dir.return_value = True
+        mock_path_inst.stat.return_value.st_mode = 0o755
+        MockPath.return_value = mock_path_inst
 
         svc = FileWatcherService(settings=self._make_settings())
         svc.start(debounce_seconds=5.0)
@@ -305,10 +311,15 @@ class TestFileWatcherServiceLifecycle:
 
         svc.stop()
 
+    @patch("datapulse.watcher.service.Path")
     @patch("datapulse.watcher.service.Observer")
-    def test_stop_joins_observer(self, MockObserver):
+    def test_stop_joins_observer(self, MockObserver, MockPath):
         mock_observer = MagicMock()
         MockObserver.return_value = mock_observer
+        mock_path_inst = MagicMock()
+        mock_path_inst.is_dir.return_value = True
+        mock_path_inst.stat.return_value.st_mode = 0o755
+        MockPath.return_value = mock_path_inst
 
         svc = FileWatcherService(settings=self._make_settings())
         svc.start()
@@ -328,22 +339,32 @@ class TestFileWatcherServiceLifecycle:
         svc = FileWatcherService(settings=self._make_settings())
         assert svc.is_running is False
 
+    @patch("datapulse.watcher.service.Path")
     @patch("datapulse.watcher.service.Observer")
-    def test_is_running_after_start(self, MockObserver):
+    def test_is_running_after_start(self, MockObserver, MockPath):
         mock_observer = MagicMock()
         mock_observer.is_alive.return_value = True
         MockObserver.return_value = mock_observer
+        mock_path_inst = MagicMock()
+        mock_path_inst.is_dir.return_value = True
+        mock_path_inst.stat.return_value.st_mode = 0o755
+        MockPath.return_value = mock_path_inst
 
         svc = FileWatcherService(settings=self._make_settings())
         svc.start()
         assert svc.is_running is True
         svc.stop()
 
+    @patch("datapulse.watcher.service.Path")
     @patch("datapulse.watcher.service.Observer")
-    def test_is_running_after_stop(self, MockObserver):
+    def test_is_running_after_stop(self, MockObserver, MockPath):
         mock_observer = MagicMock()
         mock_observer.is_alive.return_value = False
         MockObserver.return_value = mock_observer
+        mock_path_inst = MagicMock()
+        mock_path_inst.is_dir.return_value = True
+        mock_path_inst.stat.return_value.st_mode = 0o755
+        MockPath.return_value = mock_path_inst
 
         svc = FileWatcherService(settings=self._make_settings())
         svc.start()
@@ -354,6 +375,13 @@ class TestFileWatcherServiceLifecycle:
         svc = FileWatcherService(settings=self._make_settings(raw_sales_path="/custom/path"))
         assert svc.watch_path == "/custom/path"
 
+    def test_start_raises_on_missing_directory(self):
+        svc = FileWatcherService(settings=self._make_settings(
+            raw_sales_path="/nonexistent/dir/that/does/not/exist"
+        ))
+        with pytest.raises(FileNotFoundError, match="does not exist"):
+            svc.start()
+
 
 class TestFileWatcherServiceTriggerPipeline:
     """Test the _trigger_pipeline HTTP call."""
@@ -362,6 +390,7 @@ class TestFileWatcherServiceTriggerPipeline:
         settings = MagicMock()
         settings.raw_sales_path = "/app/data/raw/sales"
         settings.pipeline_webhook_secret = ""
+        settings.api_base_url = "http://localhost:8000"
         for k, v in overrides.items():
             setattr(settings, k, v)
         return settings
@@ -383,6 +412,18 @@ class TestFileWatcherServiceTriggerPipeline:
         assert payload["tenant_id"] == 1
         assert call_args[1]["timeout"] == 30
         mock_resp.raise_for_status.assert_called_once()
+
+    @patch("datapulse.watcher.service.httpx")
+    def test_trigger_uses_config_api_url(self, mock_httpx):
+        mock_resp = MagicMock()
+        mock_resp.json.return_value = {"run_id": "x", "status": "running"}
+        mock_httpx.post.return_value = mock_resp
+
+        svc = FileWatcherService(settings=self._make_settings(api_base_url="http://api:8000"))
+        svc._trigger_pipeline(["/data/raw/a.csv"])
+
+        call_args = mock_httpx.post.call_args
+        assert call_args[0][0] == "http://api:8000/api/v1/pipeline/trigger"
 
     @patch("datapulse.watcher.service.httpx")
     def test_trigger_includes_webhook_secret_header(self, mock_httpx):
@@ -414,9 +455,9 @@ class TestFileWatcherServiceTriggerPipeline:
 
     @patch("datapulse.watcher.service.httpx")
     def test_trigger_http_error_does_not_raise(self, mock_httpx):
-        import httpx
-        mock_httpx.post.side_effect = httpx.HTTPError("Connection refused")
-        mock_httpx.HTTPError = httpx.HTTPError
+        import httpx as _httpx
+        mock_httpx.post.side_effect = _httpx.HTTPError("Connection refused")
+        mock_httpx.HTTPError = _httpx.HTTPError
 
         svc = FileWatcherService(settings=self._make_settings())
         # Should not raise — error is logged internally
@@ -424,15 +465,23 @@ class TestFileWatcherServiceTriggerPipeline:
 
     @patch("datapulse.watcher.service.httpx")
     def test_trigger_raise_for_status_error(self, mock_httpx):
-        import httpx
+        import httpx as _httpx
         mock_resp = MagicMock()
-        mock_resp.raise_for_status.side_effect = httpx.HTTPStatusError(
+        mock_resp.raise_for_status.side_effect = _httpx.HTTPStatusError(
             "500 Server Error",
             request=MagicMock(),
             response=MagicMock(),
         )
         mock_httpx.post.return_value = mock_resp
-        mock_httpx.HTTPError = httpx.HTTPError
+        mock_httpx.HTTPError = _httpx.HTTPError
+
+        svc = FileWatcherService(settings=self._make_settings())
+        # Should not raise
+        svc._trigger_pipeline(["/data/raw/a.csv"])
+
+    @patch("datapulse.watcher.service.httpx")
+    def test_trigger_os_error_does_not_raise(self, mock_httpx):
+        mock_httpx.post.side_effect = OSError("Network unreachable")
 
         svc = FileWatcherService(settings=self._make_settings())
         # Should not raise

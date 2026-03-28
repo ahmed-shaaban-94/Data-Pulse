@@ -56,7 +56,12 @@ class OpenRouterClient:
         resp.raise_for_status()
         data = resp.json()
 
-        content = data["choices"][0]["message"]["content"]
+        try:
+            content = data["choices"][0]["message"]["content"]
+        except (KeyError, IndexError, TypeError) as exc:
+            log.error("openrouter_bad_response", error=str(exc), data=str(data)[:500])
+            raise RuntimeError("Unexpected response structure from OpenRouter") from exc
+
         log.info(
             "openrouter_response",
             model=self._model,
@@ -71,7 +76,10 @@ class OpenRouterClient:
         cleaned = raw.strip()
         if cleaned.startswith("```"):
             lines = cleaned.split("\n")
-            # Remove first and last lines (code fences)
             lines = [l for l in lines if not l.strip().startswith("```")]
             cleaned = "\n".join(lines)
-        return json.loads(cleaned)
+        try:
+            return json.loads(cleaned)
+        except json.JSONDecodeError as exc:
+            log.error("openrouter_json_parse_failed", raw=raw[:500], error=str(exc))
+            raise RuntimeError(f"Failed to parse AI response as JSON: {exc}") from exc

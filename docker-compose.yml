@@ -125,11 +125,18 @@ services:
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-datapulse}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@postgres:5432/${POSTGRES_DB:-datapulse}
       PIPELINE_WEBHOOK_SECRET: ${PIPELINE_WEBHOOK_SECRET:-}
+      API_BASE_URL: http://api:8000
     command: ["python", "-m", "datapulse.watcher", "--debounce", "10"]
     volumes:
       - ./src:/app/src
       - ./data:/app/data
       - "${RAW_SALES_PATH:-./data/raw/sales}:/app/data/raw/sales"
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import os, sys; sys.exit(0 if os.path.isdir('/app/data/raw/sales') else 1)\""]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
 
   redis:
     image: redis:7-alpine

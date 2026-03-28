@@ -84,7 +84,7 @@
             {
               "id": "slack_text",
               "name": "slack_text",
-              "value": "=:brain: *DataPulse AI Daily Digest*\n\n*Executive Summary:*\n{{ $('Get AI Summary').item.json.narrative }}\n\n*Highlights:*\n{{ $('Get AI Summary').item.json.highlights.map(h => '• ' + h).join('\\n') }}\n\n*Anomalies Detected:* {{ $('Get Anomalies').item.json.count }}\n{{ $('Get Anomalies').item.json.anomalies ? $('Get Anomalies').item.json.anomalies.map(a => '⚠ ' + a.description).join('\\n') : 'None' }}",
+              "value": "=:brain: *DataPulse AI Daily Digest*\n\n*Executive Summary:*\n{{ $('Get AI Summary').item.json.narrative }}\n\n*Highlights:*\n{{ $('Get AI Summary').item.json.highlights.map(h => '• ' + h).join('\\n') }}\n\n*Anomalies Detected:* {{ $('Get Anomalies').item.json.total_checked }}\n{{ $('Get Anomalies').item.json.anomalies ? $('Get Anomalies').item.json.anomalies.map(a => '⚠ ' + a.description).join('\\n') : 'None' }}",
               "type": "string"
             }
           ]

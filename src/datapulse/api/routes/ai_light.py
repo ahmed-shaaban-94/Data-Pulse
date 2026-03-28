@@ -17,8 +17,10 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from datapulse.ai_light.models import AISummary, AnomalyReport, ChangeNarrative
 from datapulse.ai_light.service import AILightService
 from datapulse.api.deps import get_ai_light_service
+from datapulse.logging import get_logger
 
 router = APIRouter(prefix="/ai-light", tags=["ai-light"])
+log = get_logger(__name__)
 
 ServiceDep = Annotated[AILightService, Depends(get_ai_light_service)]
 
@@ -40,7 +42,8 @@ def get_summary(
     try:
         return service.generate_summary(target_date)
     except Exception as exc:
-        raise HTTPException(status_code=502, detail=f"AI service error: {exc}")
+        log.error("ai_summary_failed", error=str(exc), exc_info=True)
+        raise HTTPException(status_code=502, detail="AI service temporarily unavailable")
 
 
 @router.get("/anomalies", response_model=AnomalyReport)
@@ -53,7 +56,8 @@ def get_anomalies(
     try:
         return service.detect_anomalies(start_date, end_date)
     except Exception as exc:
-        raise HTTPException(status_code=502, detail=f"AI service error: {exc}")
+        log.error("ai_anomalies_failed", error=str(exc), exc_info=True)
+        raise HTTPException(status_code=502, detail="AI service temporarily unavailable")
 
 
 @router.get("/changes", response_model=ChangeNarrative)
@@ -66,4 +70,5 @@ def get_changes(
     try:
         return service.explain_changes(current_date, previous_date)
     except Exception as exc:
-        raise HTTPException(status_code=502, detail=f"AI service error: {exc}")
+        log.error("ai_changes_failed", error=str(exc), exc_info=True)
+        raise HTTPException(status_code=502, detail="AI service temporarily unavailable")
