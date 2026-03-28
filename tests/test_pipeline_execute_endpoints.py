@@ -17,7 +17,7 @@ def mock_executor_and_client():
     app = create_app()
     mock_exec = MagicMock()
     app.dependency_overrides[get_pipeline_executor] = lambda: mock_exec
-    client = TestClient(app)
+    client = TestClient(app, headers={"X-API-Key": "test-api-key"})
     yield mock_exec, client
     app.dependency_overrides.clear()
 

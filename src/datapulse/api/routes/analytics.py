@@ -24,9 +24,9 @@ from datapulse.analytics.models import (
     TrendResult,
 )
 from datapulse.analytics.service import AnalyticsService
-from datapulse.api.deps import get_analytics_service
+from datapulse.api.deps import get_analytics_service, verify_api_key
 
-router = APIRouter(prefix="/analytics", tags=["analytics"])
+router = APIRouter(prefix="/analytics", tags=["analytics"], dependencies=[Depends(verify_api_key)])
 
 
 # ------------------------------------------------------------------

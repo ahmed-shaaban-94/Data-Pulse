@@ -13,7 +13,7 @@ from uuid import UUID
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from datapulse.api.deps import get_pipeline_executor, get_pipeline_service, get_quality_service
+from datapulse.api.deps import get_pipeline_executor, get_pipeline_service, get_quality_service, verify_api_key
 from datapulse.config import get_settings
 from datapulse.logging import get_logger
 from datapulse.pipeline.executor import PipelineExecutor
@@ -39,7 +39,7 @@ from datapulse.pipeline.service import PipelineService
 
 log = get_logger(__name__)
 
-router = APIRouter(prefix="/pipeline", tags=["pipeline"])
+router = APIRouter(prefix="/pipeline", tags=["pipeline"], dependencies=[Depends(verify_api_key)])
 
 ServiceDep = Annotated[PipelineService, Depends(get_pipeline_service)]
 ExecutorDep = Annotated[PipelineExecutor, Depends(get_pipeline_executor)]

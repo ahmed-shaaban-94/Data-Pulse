@@ -29,7 +29,7 @@ def _patch_get_settings_globally():
     locally — those local patches take precedence over this session patch.
     """
     # Build a clean Settings instance without touching the project's .env
-    clean_settings = Settings(_env_file=None)
+    clean_settings = Settings(_env_file=None, api_key="test-api-key")
     get_settings.cache_clear()
 
     with patch(
@@ -49,7 +49,11 @@ def _patch_get_settings_globally():
                     "datapulse.bronze.loader.get_settings",
                     return_value=clean_settings,
                 ):
-                    yield
+                    with patch(
+                        "datapulse.api.deps.get_settings",
+                        return_value=clean_settings,
+                    ):
+                        yield
 
     get_settings.cache_clear()
 
@@ -107,7 +111,7 @@ def api_client():
     app.dependency_overrides[deps.get_db_session] = lambda: mock_session
     app.dependency_overrides[deps.get_analytics_service] = lambda: mock_svc
 
-    client = TestClient(app)
+    client = TestClient(app, headers={"X-API-Key": "test-api-key"})
     yield client, mock_repo
 
     app.dependency_overrides.clear()
@@ -155,7 +159,7 @@ def pipeline_api_client():
     app.dependency_overrides[deps.get_db_session] = lambda: mock_session
     app.dependency_overrides[deps.get_pipeline_service] = lambda: mock_pl_svc
 
-    client = TestClient(app)
+    client = TestClient(app, headers={"X-API-Key": "test-api-key"})
     yield client, mock_pl_repo
 
     app.dependency_overrides.clear()

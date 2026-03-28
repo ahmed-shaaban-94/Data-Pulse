@@ -1,6 +1,14 @@
 import { API_BASE_URL } from "./constants";
 import type { FilterParams } from "@/types/filters";
 
+const API_KEY = process.env.NEXT_PUBLIC_API_KEY || "";
+
+function authHeaders(): Record<string, string> {
+  const headers: Record<string, string> = {};
+  if (API_KEY) headers["X-API-Key"] = API_KEY;
+  return headers;
+}
+
 class ApiError extends Error {
   constructor(
     public status: number,
@@ -52,7 +60,7 @@ export async function fetchAPI<T>(
   params?: FilterParams,
 ): Promise<T> {
   const url = `${API_BASE_URL}${path}${buildQueryString(params)}`;
-  const res = await fetch(url);
+  const res = await fetch(url, { headers: authHeaders() });
   if (!res.ok) {
     const body = await res.text().catch(() => "Unknown error");
     throw new ApiError(res.status, `API error ${res.status}: ${body}`);
@@ -65,7 +73,7 @@ export async function postAPI<T>(path: string, body?: unknown): Promise<T> {
   const url = `${API_BASE_URL}${path}`;
   const res = await fetch(url, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...authHeaders() },
     body: body ? JSON.stringify(body) : undefined,
   });
   if (!res.ok) {

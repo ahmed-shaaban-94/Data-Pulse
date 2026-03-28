@@ -97,7 +97,7 @@ def quality_api_client():
     app.dependency_overrides[deps.get_pipeline_service] = lambda: MagicMock()
     app.dependency_overrides[deps.get_pipeline_executor] = lambda: MagicMock()
 
-    client = TestClient(app, raise_server_exceptions=True)
+    client = TestClient(app, raise_server_exceptions=True, headers={"X-API-Key": "test-api-key"})
     yield client, mock_quality_svc
     app.dependency_overrides.clear()
 

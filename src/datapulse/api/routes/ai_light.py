@@ -16,10 +16,10 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 
 from datapulse.ai_light.models import AISummary, AnomalyReport, ChangeNarrative
 from datapulse.ai_light.service import AILightService
-from datapulse.api.deps import get_ai_light_service
+from datapulse.api.deps import get_ai_light_service, verify_api_key
 from datapulse.logging import get_logger
 
-router = APIRouter(prefix="/ai-light", tags=["ai-light"])
+router = APIRouter(prefix="/ai-light", tags=["ai-light"], dependencies=[Depends(verify_api_key)])
 log = get_logger(__name__)
 
 ServiceDep = Annotated[AILightService, Depends(get_ai_light_service)]
