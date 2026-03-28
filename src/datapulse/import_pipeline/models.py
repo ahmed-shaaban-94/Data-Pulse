@@ -1,18 +1,18 @@
 """Pydantic models for import pipeline configuration and results."""
 
-from enum import Enum
+from enum import StrEnum
 from pathlib import Path
 
 from pydantic import BaseModel, Field
 
 
-class FileFormat(str, Enum):
+class FileFormat(StrEnum):
     CSV = "csv"
     XLSX = "xlsx"
     XLS = "xls"
 
 
-class DetectedType(str, Enum):
+class DetectedType(StrEnum):
     STRING = "string"
     INTEGER = "integer"
     FLOAT = "float"

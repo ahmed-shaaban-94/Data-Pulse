@@ -2,13 +2,9 @@
 
 from datetime import date
 from decimal import Decimal
-from unittest.mock import MagicMock
-
-import pytest
 
 from datapulse.analytics.models import AnalyticsFilter, DateRange
 from datapulse.analytics.repository import AnalyticsRepository
-
 
 # ------------------------------------------------------------------
 # _build_where

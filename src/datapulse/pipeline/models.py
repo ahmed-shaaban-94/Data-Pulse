@@ -95,8 +95,8 @@ class TriggerRequest(BaseModel):
             resolved = _Path(v).resolve()
             allowed_root = _Path("/app/data").resolve()
             resolved.relative_to(allowed_root)
-        except ValueError:
-            raise ValueError("source_dir must be inside /app/data")
+        except ValueError as exc:
+            raise ValueError("source_dir must be inside /app/data") from exc
         return str(resolved)
 
 
@@ -128,8 +128,8 @@ class ExecuteRequest(BaseModel):
             resolved = _Path(v).resolve()
             allowed_root = _Path("/app/data").resolve()
             resolved.relative_to(allowed_root)
-        except ValueError:
-            raise ValueError("source_dir must be inside /app/data")
+        except ValueError as exc:
+            raise ValueError("source_dir must be inside /app/data") from exc
         return str(resolved)
 
 

@@ -4,7 +4,6 @@ import os
 
 import structlog
 
-
 _SENSITIVE_KEYS = frozenset({
     "api_key", "password", "token", "secret", "credential",
     "database_url", "connection_string", "authorization",

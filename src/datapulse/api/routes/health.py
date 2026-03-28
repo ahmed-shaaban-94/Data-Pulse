@@ -5,8 +5,8 @@ from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 from sqlalchemy import text
 
-from datapulse.api.limiter import limiter
 from datapulse.api.deps import _get_engine
+from datapulse.api.limiter import limiter
 
 router = APIRouter(tags=["health"])
 logger = structlog.get_logger()

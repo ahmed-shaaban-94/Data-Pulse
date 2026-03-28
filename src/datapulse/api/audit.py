@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import threading
 from queue import Empty, Queue
 
@@ -45,7 +46,7 @@ def enqueue_audit(
     duration_ms: float,
 ) -> None:
     """Non-blocking enqueue of an audit record."""
-    try:
+    with contextlib.suppress(Exception):
         _audit_queue.put_nowait({
             "action": _classify_action(method, path),
             "endpoint": path,
@@ -56,14 +57,12 @@ def enqueue_audit(
             "response_status": response_status,
             "duration_ms": duration_ms,
         })
-    except Exception:
-        pass  # Never block the request path
 
 
 def _writer_loop(database_url: str) -> None:
     """Background thread that flushes audit records to PostgreSQL."""
     engine = create_engine(database_url, pool_pre_ping=True)
-    Session = sessionmaker(bind=engine)
+    session_factory = sessionmaker(bind=engine)
 
     insert_sql = text(
         "INSERT INTO public.audit_log "
@@ -92,7 +91,7 @@ def _writer_loop(database_url: str) -> None:
             continue
 
         try:
-            session = Session()
+            session = session_factory()
             try:
                 for record in batch:
                     import json

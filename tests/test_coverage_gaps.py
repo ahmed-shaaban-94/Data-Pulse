@@ -16,15 +16,13 @@ import polars as pl
 import pytest
 
 from datapulse.bronze.loader import (
-    extract_quarter,
     read_and_concat,
     save_parquet,
 )
+from datapulse.import_pipeline.models import FileFormat
 from datapulse.import_pipeline.reader import read_csv, read_excel, read_file
-from datapulse.import_pipeline.models import ImportConfig, FileFormat
 from datapulse.import_pipeline.validator import ValidationError
-from datapulse.logging import setup_logging, get_logger
-
+from datapulse.logging import get_logger, setup_logging
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
@@ -213,9 +211,8 @@ class TestReadCsvLatin1Retry:
         with patch(
             "datapulse.import_pipeline.reader.pl.read_csv",
             side_effect=pl.exceptions.ComputeError("encoding error"),
-        ):
-            with pytest.raises(pl.exceptions.ComputeError):
-                read_csv(latin1_csv, encoding="latin-1")
+        ), pytest.raises(pl.exceptions.ComputeError):
+            read_csv(latin1_csv, encoding="latin-1")
 
 
 # ---------------------------------------------------------------------------
@@ -235,7 +232,8 @@ class TestReadExcel:
         xlsx_file.write_bytes(b"fake")
         expected_df = pl.DataFrame({"col": [1, 2]})
 
-        with patch("datapulse.import_pipeline.reader.pl.read_excel", return_value=expected_df) as mock_read:
+        mock_target = "datapulse.import_pipeline.reader.pl.read_excel"
+        with patch(mock_target, return_value=expected_df) as mock_read:
             result = read_excel(xlsx_file)
 
         mock_read.assert_called_once()
@@ -246,7 +244,8 @@ class TestReadExcel:
         xlsx_file.write_bytes(b"fake")
         expected_df = pl.DataFrame({"col": [1]})
 
-        with patch("datapulse.import_pipeline.reader.pl.read_excel", return_value=expected_df) as mock_read:
+        mock_target = "datapulse.import_pipeline.reader.pl.read_excel"
+        with patch(mock_target, return_value=expected_df) as mock_read:
             read_excel(xlsx_file, sheet_name="Sheet2")
 
         call_kwargs = mock_read.call_args[1]
@@ -257,7 +256,8 @@ class TestReadExcel:
         xlsx_file.write_bytes(b"fake")
         expected_df = pl.DataFrame({"col": [1]})
 
-        with patch("datapulse.import_pipeline.reader.pl.read_excel", return_value=expected_df) as mock_read:
+        mock_target = "datapulse.import_pipeline.reader.pl.read_excel"
+        with patch(mock_target, return_value=expected_df) as mock_read:
             read_excel(xlsx_file, sheet_name=None)
 
         call_kwargs = mock_read.call_args[1]
@@ -280,9 +280,9 @@ class TestReadFileLimits:
             patch("datapulse.import_pipeline.reader.validate_file", return_value=FileFormat.CSV),
             patch("datapulse.import_pipeline.reader.read_csv", return_value=big_df),
             patch("datapulse.import_pipeline.reader.get_settings", return_value=tight_settings),
+            pytest.raises(ValidationError, match="Too many rows"),
         ):
-            with pytest.raises(ValidationError, match="Too many rows"):
-                read_file(FIXTURES / "sample.csv")
+            read_file(FIXTURES / "sample.csv")
 
     def test_raises_when_column_count_exceeds_max_columns(self):
         """read_file should raise ValidationError when df has too many columns."""
@@ -295,9 +295,9 @@ class TestReadFileLimits:
             patch("datapulse.import_pipeline.reader.validate_file", return_value=FileFormat.CSV),
             patch("datapulse.import_pipeline.reader.read_csv", return_value=wide_df),
             patch("datapulse.import_pipeline.reader.get_settings", return_value=tight_settings),
+            pytest.raises(ValidationError, match="Too many columns"),
         ):
-            with pytest.raises(ValidationError, match="Too many columns"):
-                read_file(FIXTURES / "sample.csv")
+            read_file(FIXTURES / "sample.csv")
 
 
 # ---------------------------------------------------------------------------
@@ -321,16 +321,17 @@ class TestSetupLogging:
 
     def test_setup_logging_console_renderer(self):
         """setup_logging with console format should not raise."""
-        with self._patch_get_level():
-            with patch.dict(os.environ, {"LOG_FORMAT": "console"}):
-                setup_logging("INFO")  # must not raise
+        with self._patch_get_level(), patch.dict(os.environ, {"LOG_FORMAT": "console"}):
+            setup_logging("INFO")  # must not raise
 
     def test_setup_logging_json_renderer(self):
         """setup_logging with json format should call structlog.configure."""
-        with self._patch_get_level():
-            with patch("structlog.configure") as mock_configure:
-                with patch.dict(os.environ, {"LOG_FORMAT": "json"}):
-                    setup_logging("DEBUG")
+        with (
+            self._patch_get_level(),
+            patch("structlog.configure") as mock_configure,
+            patch.dict(os.environ, {"LOG_FORMAT": "json"}),
+        ):
+            setup_logging("DEBUG")
         mock_configure.assert_called_once()
 
     def test_setup_logging_default_level(self):

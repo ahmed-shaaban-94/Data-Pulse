@@ -20,8 +20,6 @@ from datapulse.bronze.loader import (
     run,
     run_migrations,
 )
-from datapulse.config import Settings
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -303,7 +301,9 @@ class TestRunMigrations:
         bootstrap = MagicMock(spec=Path)
         bootstrap.name = "000_create_schema_migrations.sql"
         bootstrap.exists.return_value = bool(file_mocks)
-        bootstrap.read_text.return_value = "CREATE TABLE IF NOT EXISTS public.schema_migrations(filename text);"
+        bootstrap.read_text.return_value = (
+            "CREATE TABLE IF NOT EXISTS public.schema_migrations(filename text);"
+        )
 
         # / "000_..." returns bootstrap; / anything-else is unused in constructor
         def truediv_side_effect(arg):
@@ -385,9 +385,11 @@ class TestRunMigrations:
         conn = engine.begin.return_value.__enter__.return_value
         conn.execute.side_effect = RuntimeError("bootstrap failed")
 
-        with self._patch_path_to_dir(fake_dir):
-            with pytest.raises(RuntimeError, match="bootstrap failed"):
-                run_migrations(engine)
+        with (
+            self._patch_path_to_dir(fake_dir),
+            pytest.raises(RuntimeError, match="bootstrap failed"),
+        ):
+            run_migrations(engine)
 
     # ------------------------------------------------------------------
     # Migration-loop behaviour
@@ -428,9 +430,8 @@ class TestRunMigrations:
         not_applied.fetchone.return_value = None
         conn.execute.side_effect = [not_applied, RuntimeError("sql error")]
 
-        with self._patch_path_to_dir(fake_dir):
-            with pytest.raises(RuntimeError, match="sql error"):
-                run_migrations(engine)
+        with self._patch_path_to_dir(fake_dir), pytest.raises(RuntimeError, match="sql error"):
+            run_migrations(engine)
 
 
 # ---------------------------------------------------------------------------
@@ -525,20 +526,24 @@ class TestRun:
 
     def _base_patches(self):
         """Return a dict of patches shared by most run() tests."""
+        _mod = "datapulse.bronze.loader"
         return {
-            "datapulse.bronze.loader.discover_files": patch("datapulse.bronze.loader.discover_files"),
-            "datapulse.bronze.loader.read_and_concat": patch("datapulse.bronze.loader.read_and_concat"),
-            "datapulse.bronze.loader.rename_columns": patch("datapulse.bronze.loader.rename_columns"),
-            "datapulse.bronze.loader.save_parquet": patch("datapulse.bronze.loader.save_parquet"),
-            "datapulse.bronze.loader._create_engine": patch("datapulse.bronze.loader._create_engine"),
-            "datapulse.bronze.loader.run_migrations": patch("datapulse.bronze.loader.run_migrations"),
-            "datapulse.bronze.loader.load_to_postgres": patch("datapulse.bronze.loader.load_to_postgres"),
+            f"{_mod}.discover_files": patch(f"{_mod}.discover_files"),
+            f"{_mod}.read_and_concat": patch(f"{_mod}.read_and_concat"),
+            f"{_mod}.rename_columns": patch(f"{_mod}.rename_columns"),
+            f"{_mod}.save_parquet": patch(f"{_mod}.save_parquet"),
+            f"{_mod}._create_engine": patch(f"{_mod}._create_engine"),
+            f"{_mod}.run_migrations": patch(f"{_mod}.run_migrations"),
+            f"{_mod}.load_to_postgres": patch(f"{_mod}.load_to_postgres"),
         }
 
     def test_skip_db_does_not_create_engine(self, tmp_path):
         df = _sample_pipeline_df()
         with (
-            patch("datapulse.bronze.loader.discover_files", return_value=[tmp_path / "Q1.2023.xlsx"]),
+            patch(
+                "datapulse.bronze.loader.discover_files",
+                return_value=[tmp_path / "Q1.2023.xlsx"],
+            ),
             patch("datapulse.bronze.loader.read_and_concat", return_value=df),
             patch("datapulse.bronze.loader.rename_columns", return_value=df),
             patch("datapulse.bronze.loader.save_parquet", return_value=tmp_path / "out.parquet"),
@@ -563,7 +568,10 @@ class TestRun:
         fake_engine.dispose = MagicMock()
 
         with (
-            patch("datapulse.bronze.loader.discover_files", return_value=[tmp_path / "Q1.2023.xlsx"]),
+            patch(
+                "datapulse.bronze.loader.discover_files",
+                return_value=[tmp_path / "Q1.2023.xlsx"],
+            ),
             patch("datapulse.bronze.loader.read_and_concat", return_value=df),
             patch("datapulse.bronze.loader.rename_columns", return_value=df),
             patch("datapulse.bronze.loader.save_parquet", return_value=tmp_path / "out.parquet"),
@@ -586,7 +594,10 @@ class TestRun:
         fake_engine = MagicMock()
 
         with (
-            patch("datapulse.bronze.loader.discover_files", return_value=[tmp_path / "Q1.2023.xlsx"]),
+            patch(
+                "datapulse.bronze.loader.discover_files",
+                return_value=[tmp_path / "Q1.2023.xlsx"],
+            ),
             patch("datapulse.bronze.loader.read_and_concat", return_value=df),
             patch("datapulse.bronze.loader.rename_columns", return_value=df),
             patch("datapulse.bronze.loader.save_parquet", return_value=tmp_path / "out.parquet"),
@@ -608,23 +619,26 @@ class TestRun:
         fake_engine = MagicMock()
 
         with (
-            patch("datapulse.bronze.loader.discover_files", return_value=[tmp_path / "Q1.2023.xlsx"]),
+            patch(
+                "datapulse.bronze.loader.discover_files",
+                return_value=[tmp_path / "Q1.2023.xlsx"],
+            ),
             patch("datapulse.bronze.loader.read_and_concat", return_value=df),
             patch("datapulse.bronze.loader.rename_columns", return_value=df),
             patch("datapulse.bronze.loader.save_parquet", return_value=tmp_path / "out.parquet"),
             patch("datapulse.bronze.loader._create_engine", return_value=fake_engine),
             patch("datapulse.bronze.loader.run_migrations", side_effect=RuntimeError("boom")),
             patch("datapulse.bronze.loader.load_to_postgres"),
+            pytest.raises(RuntimeError, match="boom"),
         ):
-            with pytest.raises(RuntimeError, match="boom"):
-                run(
-                    source_dir=tmp_path,
-                    database_url="postgresql://localhost/test",
-                    parquet_path=tmp_path / "out.parquet",
-                    batch_size=1000,
-                    skip_db=False,
-                )
-            fake_engine.dispose.assert_called_once()
+            run(
+                source_dir=tmp_path,
+                database_url="postgresql://localhost/test",
+                parquet_path=tmp_path / "out.parquet",
+                batch_size=1000,
+                skip_db=False,
+            )
+        fake_engine.dispose.assert_called_once()
 
     def test_returns_polars_dataframe(self, tmp_path):
         df = _sample_pipeline_df()
@@ -635,7 +649,10 @@ class TestRun:
 
         with (
             patch("datapulse.bronze.loader.get_settings", return_value=fake_settings),
-            patch("datapulse.bronze.loader.discover_files", return_value=[tmp_path / "Q1.2023.xlsx"]),
+            patch(
+                "datapulse.bronze.loader.discover_files",
+                return_value=[tmp_path / "Q1.2023.xlsx"],
+            ),
             patch("datapulse.bronze.loader.read_and_concat", return_value=df),
             patch("datapulse.bronze.loader.rename_columns", return_value=df),
             patch("datapulse.bronze.loader.save_parquet", return_value=tmp_path / "out.parquet"),
@@ -658,7 +675,10 @@ class TestRun:
 
         with (
             patch("datapulse.bronze.loader.get_settings", return_value=fake_settings),
-            patch("datapulse.bronze.loader.discover_files", return_value=[tmp_path / "Q1.2023.xlsx"]),
+            patch(
+                "datapulse.bronze.loader.discover_files",
+                return_value=[tmp_path / "Q1.2023.xlsx"],
+            ),
             patch("datapulse.bronze.loader.read_and_concat", return_value=df),
             patch("datapulse.bronze.loader.rename_columns", return_value=df),
             patch("datapulse.bronze.loader.save_parquet", return_value=tmp_path / "out.parquet"),
@@ -679,10 +699,16 @@ class TestRun:
 
         with (
             patch("datapulse.bronze.loader.get_settings", return_value=fake_settings),
-            patch("datapulse.bronze.loader.discover_files", return_value=[tmp_path / "Q1.2023.xlsx"]),
+            patch(
+                "datapulse.bronze.loader.discover_files",
+                return_value=[tmp_path / "Q1.2023.xlsx"],
+            ),
             patch("datapulse.bronze.loader.read_and_concat", return_value=df),
             patch("datapulse.bronze.loader.rename_columns", return_value=df),
-            patch("datapulse.bronze.loader.save_parquet", return_value=tmp_path / "out.parquet") as mock_save,
+            patch(
+                "datapulse.bronze.loader.save_parquet",
+                return_value=tmp_path / "out.parquet",
+            ) as mock_save,
         ):
             run(
                 source_dir=tmp_path,

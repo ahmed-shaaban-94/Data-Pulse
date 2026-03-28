@@ -1,10 +1,7 @@
 """Tests for FastAPI analytics endpoints."""
 
-from datetime import date
 from decimal import Decimal
 from unittest.mock import MagicMock, patch
-
-import pytest
 
 from datapulse.analytics.models import (
     CustomerAnalytics,
@@ -13,8 +10,8 @@ from datapulse.analytics.models import (
     RankingItem,
     RankingResult,
     ReturnAnalysis,
-    TrendResult,
     TimeSeriesPoint,
+    TrendResult,
 )
 
 

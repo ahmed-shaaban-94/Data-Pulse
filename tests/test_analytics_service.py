@@ -2,9 +2,6 @@
 
 from datetime import date, timedelta
 from decimal import Decimal
-from unittest.mock import MagicMock
-
-import pytest
 
 from datapulse.analytics.models import (
     AnalyticsFilter,
@@ -13,8 +10,8 @@ from datapulse.analytics.models import (
     RankingItem,
     RankingResult,
     ReturnAnalysis,
-    TrendResult,
     TimeSeriesPoint,
+    TrendResult,
 )
 from datapulse.analytics.service import AnalyticsService
 

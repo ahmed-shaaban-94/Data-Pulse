@@ -13,8 +13,13 @@ from uuid import UUID
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
+from datapulse.api.deps import (
+    get_pipeline_executor,
+    get_pipeline_service,
+    get_quality_service,
+    verify_api_key,
+)
 from datapulse.api.limiter import limiter
-from datapulse.api.deps import get_pipeline_executor, get_pipeline_service, get_quality_service, verify_api_key
 from datapulse.config import get_settings
 from datapulse.logging import get_logger
 from datapulse.pipeline.executor import PipelineExecutor
@@ -64,9 +69,10 @@ def list_runs(
 ) -> PipelineRunList:
     """List pipeline runs with optional filters and pagination."""
     if status is not None and status not in VALID_STATUSES:
+        valid = ', '.join(sorted(VALID_STATUSES))
         raise HTTPException(
             status_code=422,
-            detail=f"Invalid status '{status}'. Must be one of: {', '.join(sorted(VALID_STATUSES))}",
+            detail=f"Invalid status '{status}'. Must be one of: {valid}",
         )
     return service.list_runs(
         status=status,
@@ -226,9 +232,10 @@ def get_quality_checks(
     if service.get_run(run_id) is None:
         raise HTTPException(status_code=404, detail="Pipeline run not found")
     if stage is not None and stage not in VALID_STAGES:
+        valid_stages = ', '.join(sorted(VALID_STAGES))
         raise HTTPException(
             status_code=422,
-            detail=f"Invalid stage '{stage}'. Must be one of: {', '.join(sorted(VALID_STAGES))}",
+            detail=f"Invalid stage '{stage}'. Must be one of: {valid_stages}",
         )
     return quality_service.get_checks(run_id, stage)
 
@@ -246,9 +253,10 @@ def execute_quality_check(
     the pipeline should continue (True) or halt (False).
     """
     if body.stage not in VALID_STAGES:
+        valid_stages = ', '.join(sorted(VALID_STAGES))
         raise HTTPException(
             status_code=422,
-            detail=f"Invalid stage '{body.stage}'. Must be one of: {', '.join(sorted(VALID_STAGES))}",
+            detail=f"Invalid stage '{body.stage}'. Must be one of: {valid_stages}",
         )
     return quality_service.run_checks_for_stage(
         run_id=body.run_id, stage=body.stage, tenant_id=body.tenant_id,

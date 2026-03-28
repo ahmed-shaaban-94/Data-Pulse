@@ -13,8 +13,6 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request
 from pydantic import BaseModel, Field
 
-from datapulse.api.limiter import limiter
-
 from datapulse.analytics.models import (
     AnalyticsFilter,
     CustomerAnalytics,
@@ -27,6 +25,7 @@ from datapulse.analytics.models import (
 )
 from datapulse.analytics.service import AnalyticsService
 from datapulse.api.deps import get_analytics_service, verify_api_key
+from datapulse.api.limiter import limiter
 
 router = APIRouter(prefix="/analytics", tags=["analytics"], dependencies=[Depends(verify_api_key)])
 

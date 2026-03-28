@@ -10,6 +10,7 @@ from fastapi import Depends, Header, HTTPException
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
+from datapulse.ai_light.service import AILightService
 from datapulse.analytics.repository import AnalyticsRepository
 from datapulse.analytics.service import AnalyticsService
 from datapulse.config import get_settings
@@ -18,7 +19,6 @@ from datapulse.pipeline.quality_repository import QualityRepository
 from datapulse.pipeline.quality_service import QualityService
 from datapulse.pipeline.repository import PipelineRepository
 from datapulse.pipeline.service import PipelineService
-from datapulse.ai_light.service import AILightService
 
 logger = structlog.get_logger()
 

@@ -59,11 +59,13 @@ class AILightService:
         )
 
         products_text = "\n".join(
-            f"  {i.rank}. {_sanitize_for_prompt(i.name)}: {i.value:,.0f} EGP ({i.pct_of_total:.1f}%)"
+            f"  {i.rank}. {_sanitize_for_prompt(i.name)}: "
+            f"{i.value:,.0f} EGP ({i.pct_of_total:.1f}%)"
             for i in top_products.items
         )
         customers_text = "\n".join(
-            f"  {i.rank}. {_sanitize_for_prompt(i.name)}: {i.value:,.0f} EGP ({i.pct_of_total:.1f}%)"
+            f"  {i.rank}. {_sanitize_for_prompt(i.name)}: "
+            f"{i.value:,.0f} EGP ({i.pct_of_total:.1f}%)"
             for i in top_customers.items
         )
 
@@ -82,9 +84,9 @@ class AILightService:
         raw = self._client.chat(SYSTEM_PROMPT, prompt)
 
         # Parse: first paragraph = narrative, bullet lines = highlights
-        lines = [l.strip() for l in raw.strip().split("\n") if l.strip()]
-        highlights = [l.lstrip("•-* ") for l in lines if l.startswith(("•", "-", "*"))]
-        narrative_lines = [l for l in lines if not l.startswith(("•", "-", "*"))]
+        lines = [line.strip() for line in raw.strip().split("\n") if line.strip()]
+        highlights = [line.lstrip("•-* ") for line in lines if line.startswith(("•", "-", "*"))]
+        narrative_lines = [line for line in lines if not line.startswith(("•", "-", "*"))]
         narrative = " ".join(narrative_lines) if narrative_lines else raw
 
         return AISummary(
@@ -107,7 +109,9 @@ class AILightService:
 
         values = [float(p.value) for p in trends.points]
         if len(values) < 3:
-            return AnomalyReport(anomalies=[], period=f"{start} to {end}", total_checked=len(values))
+            return AnomalyReport(
+                anomalies=[], period=f"{start} to {end}", total_checked=len(values)
+            )
 
         avg = statistics.mean(values)
         std = statistics.stdev(values) if len(values) > 1 else 0.0

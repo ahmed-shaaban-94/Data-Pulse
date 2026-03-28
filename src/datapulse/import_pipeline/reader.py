@@ -9,7 +9,7 @@ import polars as pl
 from datapulse.config import get_settings
 from datapulse.import_pipeline.models import FileFormat, ImportConfig, ImportResult
 from datapulse.import_pipeline.type_detector import detect_column_types
-from datapulse.import_pipeline.validator import validate_file, ValidationError
+from datapulse.import_pipeline.validator import ValidationError, validate_file
 from datapulse.logging import get_logger
 
 log = get_logger(__name__)

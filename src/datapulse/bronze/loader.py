@@ -12,7 +12,6 @@ import time
 from pathlib import Path
 
 import polars as pl
-import pyarrow as pa
 import pyarrow.parquet as pq
 from sqlalchemy import Engine, create_engine, text
 
