@@ -15,8 +15,10 @@ from pydantic import BaseModel, Field
 
 from datapulse.analytics.models import (
     AnalyticsFilter,
+    CustomerAnalytics,
     DateRange,
     KPISummary,
+    ProductPerformance,
     RankingResult,
     ReturnAnalysis,
     TrendResult,
@@ -173,19 +175,25 @@ def get_returns(
     return service.get_return_report(_to_filter(params))
 
 
-@router.get("/products/{product_key}")
-def get_product_detail(product_key: int) -> None:
-    """Detailed product performance (not yet implemented)."""
-    raise HTTPException(
-        status_code=501,
-        detail="Product detail endpoint not yet implemented.",
-    )
+@router.get("/products/{product_key}", response_model=ProductPerformance)
+def get_product_detail(
+    product_key: int,
+    service: ServiceDep,
+) -> ProductPerformance:
+    """Detailed product performance metrics."""
+    result = service.get_product_detail(product_key)
+    if result is None:
+        raise HTTPException(status_code=404, detail="Product not found")
+    return result
 
 
-@router.get("/customers/{customer_key}")
-def get_customer_detail(customer_key: int) -> None:
-    """Detailed customer analytics (not yet implemented)."""
-    raise HTTPException(
-        status_code=501,
-        detail="Customer detail endpoint not yet implemented.",
-    )
+@router.get("/customers/{customer_key}", response_model=CustomerAnalytics)
+def get_customer_detail(
+    customer_key: int,
+    service: ServiceDep,
+) -> CustomerAnalytics:
+    """Detailed customer analytics."""
+    result = service.get_customer_detail(customer_key)
+    if result is None:
+        raise HTTPException(status_code=404, detail="Customer not found")
+    return result
