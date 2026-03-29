@@ -4,7 +4,7 @@ import { useTopCustomers } from "@/hooks/use-top-customers";
 import { useFilters } from "@/contexts/filter-context";
 import { SummaryStats } from "@/components/shared/summary-stats";
 import { RankingChart } from "@/components/shared/ranking-chart";
-import { RankingTable } from "@/components/shared/ranking-table";
+import { RankingTableLinked } from "@/components/shared/ranking-table-linked";
 import { EmptyState } from "@/components/empty-state";
 import { LoadingCard } from "@/components/loading-card";
 import { formatCurrency, formatNumber } from "@/lib/formatters";
@@ -71,7 +71,7 @@ export function CustomerOverview() {
           <h3 className="mb-4 text-sm font-medium text-text-secondary">
             Customer Rankings
           </h3>
-          <RankingTable items={data.items} entityLabel="Customer" />
+          <RankingTableLinked items={data.items} entityLabel="Customer" hrefPrefix="/customers" />
         </div>
       </div>
     </div>

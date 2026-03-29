@@ -130,6 +130,29 @@ html {
   display: none;
 }
 
+/* Shimmer loading effect */
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.shimmer-line {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(
+    90deg,
+    #21262D 0%,
+    #30363D 50%,
+    #21262D 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+}
+
 /* Reduced motion */
 @media (prefers-reduced-motion: reduce) {
   html {
