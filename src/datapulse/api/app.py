@@ -80,13 +80,17 @@ def create_app() -> FastAPI:
             user_agent=request.headers.get("user-agent", ""),
         )
 
-        # Async audit log (non-blocking)
+        # Async audit log (non-blocking) — redact sensitive query params
+        safe_params = {
+            k: v for k, v in request.query_params.items()
+            if k.lower() not in ("api_key", "token", "secret", "password")
+        }
         enqueue_audit(
             method=request.method,
             path=request.url.path,
             ip_address=request.client.host if request.client else None,
             user_agent=request.headers.get("user-agent"),
-            query_params=dict(request.query_params),
+            query_params=safe_params,
             response_status=response.status_code,
             duration_ms=duration_ms,
         )

@@ -3,8 +3,8 @@ import { fetchAPI } from "@/lib/api-client";
 import type { FilterOptions } from "@/types/filters";
 
 export function useFilterOptions() {
-  const { data, error } = useSWR("/api/v1/analytics/filters/options", () =>
+  const { data, error, isLoading } = useSWR("/api/v1/analytics/filters/options", () =>
     fetchAPI<FilterOptions>("/api/v1/analytics/filters/options"),
   );
-  return { data, error, isLoading: !data && !error };
+  return { data, error, isLoading };
 }
