@@ -28,12 +28,14 @@ export function LastUpdated() {
     return () => clearInterval(interval);
   }, []);
 
-  if (!timestamp) return null;
-
   return (
     <div className="flex items-center gap-1.5 text-xs text-text-secondary">
       <Clock className="h-3 w-3" />
-      <span>Updated {timestamp}</span>
+      {timestamp ? (
+        <span>Updated {timestamp}</span>
+      ) : (
+        <span className="inline-block h-3 w-16 animate-pulse rounded bg-divider" />
+      )}
     </div>
   );
 }

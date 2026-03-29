@@ -38,8 +38,15 @@ export function Breadcrumbs() {
     if (index > 0 && !pathLabels[segment]) {
       const parentLabel = pathLabels[segments[index - 1]];
       if (parentLabel) {
+        // Proper singularization (avoids "Staff" → "Staf")
+        const singular =
+          parentLabel.endsWith("ies")
+            ? parentLabel.slice(0, -3) + "y"
+            : parentLabel.endsWith("s") && !parentLabel.endsWith("ss")
+              ? parentLabel.slice(0, -1)
+              : parentLabel;
         crumbs.push({
-          label: `${parentLabel.replace(/s$/, "")} Detail`,
+          label: `${singular} Detail`,
           href,
         });
         return;

@@ -7,24 +7,15 @@ import { useStaffDetail } from "@/hooks/use-staff-detail";
 import { Breadcrumbs } from "@/components/layout/breadcrumbs";
 import { PageTransition } from "@/components/layout/page-transition";
 import { LoadingCard } from "@/components/loading-card";
+import { ErrorRetry } from "@/components/error-retry";
 import { EmptyState } from "@/components/empty-state";
+import { StatCard } from "@/components/shared/stat-card";
 import { formatCurrency, formatNumber } from "@/lib/formatters";
-
-function StatCard({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="glow-card rounded-xl border border-border bg-card p-5">
-      <p className="text-xs font-medium uppercase tracking-wide text-text-secondary">
-        {label}
-      </p>
-      <p className="mt-1 text-xl font-bold text-text-primary">{value}</p>
-    </div>
-  );
-}
 
 export default function StaffDetailPage() {
   const params = useParams<{ key: string }>();
   const staffKey = Number(params.key);
-  const { data, error, isLoading } = useStaffDetail(staffKey);
+  const { data, error, isLoading, mutate } = useStaffDetail(staffKey);
 
   if (isLoading) {
     return (
@@ -44,9 +35,10 @@ export default function StaffDetailPage() {
   if (error) {
     return (
       <PageTransition>
-        <EmptyState
+        <ErrorRetry
           title="Failed to load staff details"
           description={error.message || "An error occurred while fetching staff data."}
+          onRetry={() => mutate()}
         />
       </PageTransition>
     );
@@ -67,14 +59,6 @@ export default function StaffDetailPage() {
     <PageTransition>
       <div className="space-y-6">
         <Breadcrumbs />
-
-        <nav className="flex items-center gap-2 text-sm text-text-secondary">
-          <Link href="/staff" className="hover:text-accent transition-colors">
-            Staff
-          </Link>
-          <span>/</span>
-          <span className="text-text-primary">{data.staff_name}</span>
-        </nav>
 
         <div>
           <h1 className="text-2xl font-bold text-text-primary">{data.staff_name}</h1>

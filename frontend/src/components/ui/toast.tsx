@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useCallback, useContext, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useRef, useState, type ReactNode } from "react";
 import { CheckCircle2, AlertCircle, Info, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -63,8 +63,13 @@ function ToastItem({ toast: t, onDismiss }: { toast: Toast; onDismiss: (id: numb
 
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
+  const timers = useRef<Record<number, ReturnType<typeof setTimeout>>>({});
 
   const dismiss = useCallback((id: number) => {
+    if (timers.current[id]) {
+      clearTimeout(timers.current[id]);
+      delete timers.current[id];
+    }
     setToasts((prev) => prev.filter((t) => t.id !== id));
   }, []);
 
@@ -72,7 +77,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     (type: ToastType, message: string) => {
       const id = ++nextId;
       setToasts((prev) => [...prev.slice(-4), { id, type, message }]);
-      setTimeout(() => dismiss(id), 4000);
+      timers.current[id] = setTimeout(() => dismiss(id), 4000);
     },
     [dismiss],
   );
@@ -90,7 +95,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       {/* Toast container */}
       <div
         aria-label="Notifications"
-        className="pointer-events-none fixed bottom-4 right-4 z-[100] flex flex-col gap-2"
+        className="pointer-events-none fixed bottom-4 right-4 z-[120] flex flex-col gap-2"
       >
         {toasts.map((t) => (
           <ToastItem key={t.id} toast={t} onDismiss={dismiss} />

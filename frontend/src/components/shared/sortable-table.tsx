@@ -52,9 +52,12 @@ export function SortableTable<T>({
     if (!col?.sortValue) return data;
 
     return [...data].sort((a, b) => {
-      const va = col.sortValue!(a);
-      const vb = col.sortValue!(b);
-      const cmp = typeof va === "number" && typeof vb === "number" ? va - vb : String(va).localeCompare(String(vb));
+      const va = col.sortValue?.(a) ?? "";
+      const vb = col.sortValue?.(b) ?? "";
+      const cmp =
+        typeof va === "number" && typeof vb === "number"
+          ? va - vb
+          : String(va).localeCompare(String(vb));
       return sortDir === "asc" ? cmp : -cmp;
     });
   }, [data, sortKey, sortDir, columns]);

@@ -16,7 +16,7 @@ export function FilterBar() {
 
   const [expanded, setExpanded] = useState(false);
 
-  const activeFilterCount = Object.keys(filters).length;
+  const activeFilterCount = Object.values(filters).filter((v) => v !== undefined).length;
   const hasFilters = activeFilterCount > 0;
 
   const handlePreset = (preset: { startDate: Date; endDate: Date }) => {
