@@ -22,6 +22,7 @@ from datapulse.analytics.models import (
     ProductPerformance,
     RankingResult,
     ReturnAnalysis,
+    StaffPerformance,
     TrendResult,
 )
 from datapulse.analytics.service import AnalyticsService
@@ -228,4 +229,18 @@ def get_customer_detail(
     result = service.get_customer_detail(customer_key)
     if result is None:
         raise HTTPException(status_code=404, detail="Customer not found")
+    return result
+
+
+@router.get("/staff/{staff_key}", response_model=StaffPerformance)
+@limiter.limit("100/minute")
+def get_staff_detail(
+    request: Request,
+    staff_key: Annotated[int, Path(ge=1, description="Staff surrogate key")],
+    service: ServiceDep,
+) -> StaffPerformance:
+    """Detailed staff performance metrics."""
+    result = service.get_staff_detail(staff_key)
+    if result is None:
+        raise HTTPException(status_code=404, detail="Staff member not found")
     return result

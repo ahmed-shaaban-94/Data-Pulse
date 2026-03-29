@@ -6,6 +6,7 @@ import { getDatePresets, formatDateParam } from "@/lib/date-utils";
 import { cn } from "@/lib/utils";
 import { X, SlidersHorizontal, ChevronDown } from "lucide-react";
 import { SlicerPanel } from "./slicer-panel";
+import { ActiveFilterChips } from "./active-filter-chips";
 
 export function FilterBar() {
   const { filters, setFilters, updateFilter, clearFilters } = useFilters();
@@ -84,6 +85,9 @@ export function FilterBar() {
           </button>
         )}
       </div>
+
+      {/* Active filter chips (always visible) */}
+      {!expanded && <ActiveFilterChips />}
 
       {/* Row 2: Collapsible slicer panel + custom date range */}
       {expanded && (

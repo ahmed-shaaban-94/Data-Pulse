@@ -23,6 +23,7 @@ from datapulse.analytics.models import (
     RankingItem,
     RankingResult,
     ReturnAnalysis,
+    StaffPerformance,
     TimeSeriesPoint,
     TrendResult,
 )
@@ -533,4 +534,41 @@ class AnalyticsRepository:
             transaction_count=int(row[5]),
             unique_products=int(row[6]),
             return_count=int(row[7]),
+        )
+
+    def get_staff_detail(self, staff_key: int) -> StaffPerformance | None:
+        """Return detailed performance for a single staff member."""
+        log.info("get_staff_detail", staff_key=staff_key)
+
+        stmt = text("""
+            SELECT
+                a.staff_key,
+                s.staff_id,
+                s.staff_name,
+                s.position,
+                SUM(a.total_net_amount)      AS total_net_amount,
+                SUM(a.transaction_count)     AS transaction_count,
+                SUM(a.total_net_amount)
+                    / NULLIF(SUM(a.transaction_count), 0)
+                                             AS avg_transaction_value,
+                SUM(a.unique_customers)      AS unique_customers
+            FROM public_marts.agg_sales_by_staff a
+            INNER JOIN public_marts.dim_staff s
+                ON a.staff_key = s.staff_key
+            WHERE a.staff_key = :staff_key
+            GROUP BY a.staff_key, s.staff_id, s.staff_name, s.position
+        """)
+        row = self._session.execute(stmt, {"staff_key": staff_key}).fetchone()
+        if row is None:
+            return None
+
+        return StaffPerformance(
+            staff_key=int(row[0]),
+            staff_id=str(row[1]),
+            staff_name=str(row[2]),
+            staff_position=str(row[3]),
+            total_net_amount=Decimal(str(row[4])),
+            transaction_count=int(row[5]),
+            avg_transaction_value=Decimal(str(row[6])) if row[6] is not None else Decimal("0"),
+            unique_customers=int(row[7]),
         )

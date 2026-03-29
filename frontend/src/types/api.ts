@@ -162,3 +162,14 @@ export interface CustomerAnalytics {
   unique_products: number;
   return_count: number;
 }
+
+export interface StaffPerformance {
+  staff_key: number;
+  staff_id: string;
+  staff_name: string;
+  staff_position: string;
+  total_net_amount: number;
+  transaction_count: number;
+  avg_transaction_value: number;
+  unique_customers: number;
+}

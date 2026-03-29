@@ -13,6 +13,7 @@ from datapulse.analytics.models import (
     ProductPerformance,
     RankingResult,
     ReturnAnalysis,
+    StaffPerformance,
     TrendResult,
 )
 from datapulse.analytics.repository import AnalyticsRepository
@@ -115,3 +116,8 @@ class AnalyticsService:
         """Detailed analytics for a single customer."""
         log.info("customer_detail", customer_key=customer_key)
         return self._repo.get_customer_detail(customer_key)
+
+    def get_staff_detail(self, staff_key: int) -> StaffPerformance | None:
+        """Detailed performance for a single staff member."""
+        log.info("staff_detail", staff_key=staff_key)
+        return self._repo.get_staff_detail(staff_key)

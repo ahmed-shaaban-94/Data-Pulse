@@ -18,7 +18,7 @@ export function RankingTableLinked({
 }: RankingTableLinkedProps) {
   return (
     <div className={cn("overflow-x-auto", className)}>
-      <table className="w-full text-left text-sm">
+      <table className="w-full min-w-[500px] text-left text-sm">
         <thead>
           <tr className="border-b border-border text-text-secondary">
             <th className="pb-3 pr-4 font-medium">#</th>
