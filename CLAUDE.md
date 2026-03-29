@@ -82,19 +82,7 @@ src/datapulse/
 │       ├── __init__.py
 │       ├── health.py            # GET /health
 │       ├── analytics.py         # 10 analytics endpoints under /api/v1/analytics/
-│       ├── pipeline.py          # 11 pipeline endpoints under /api/v1/pipeline/ (5 CRUD + trigger + 3 execute + 2 quality)
-│       └── ai_light.py          # 4 AI-Light endpoints under /api/v1/ai-light/ (status + summary + anomalies + changes)
-├── watcher/                     # File watcher — auto-trigger pipeline (Phase 2.4)
-│   ├── __init__.py
-│   ├── __main__.py              # CLI: python -m datapulse.watcher
-│   ├── handler.py               # Watchdog event handler with debouncing
-│   └── service.py               # Watcher service (start/stop, trigger via API)
-├── ai_light/                    # AI-Light — insights via OpenRouter (Phase 2.8)
-│   ├── __init__.py
-│   ├── client.py                # OpenRouter API client
-│   ├── models.py                # Pydantic models (AISummary, Anomaly, ChangeNarrative)
-│   ├── prompts.py               # Prompt templates for LLM
-│   └── service.py               # Business logic (summary, anomalies, changes)
+│       └── pipeline.py          # 11 pipeline endpoints under /api/v1/pipeline/ (5 CRUD + trigger + 3 execute + 2 quality)
 ├── logging.py                   # structlog configuration
 └── py.typed                     # PEP 561 typed package marker
 
@@ -147,69 +135,47 @@ n8n/                                 # n8n workflow automation (Phase 2)
     ├── 2.6.1_success_notification.json   # Sub-workflow: Slack success message
     ├── 2.6.2_failure_alert.json          # Sub-workflow: Slack @channel failure alert
     ├── 2.6.3_quality_digest.json         # Cron daily 18:00: quality summary digest
-    ├── 2.6.4_global_error_handler.json   # Global n8n error handler
-└── 2.8.1_ai_insights_digest.json    # Daily AI digest → Slack (summary + anomalies)
+    └── 2.6.4_global_error_handler.json   # Global n8n error handler
 
-frontend/                            # Next.js 14 dashboard + landing page
+frontend/                            # Next.js 14 dashboard (Phase 1.5)
 ├── Dockerfile                       # Multi-stage: dev + builder + production
 ├── .dockerignore                    # Excludes node_modules, .next, e2e, etc.
 ├── package.json                     # Next.js 14, SWR, Recharts, Tailwind, Playwright
-├── playwright.config.ts             # Playwright E2E config (Chromium + iPhone 13)
-├── tailwind.config.ts               # midnight-pharma color tokens + marketing animations
-├── e2e/                             # Playwright E2E tests
+├── playwright.config.ts             # Playwright E2E config (Chromium)
+├── tailwind.config.ts               # midnight-pharma color tokens + animations
+├── e2e/                             # Playwright E2E tests (18 specs)
 │   ├── dashboard.spec.ts            # KPI cards, trend charts, filter bar
-│   ├── navigation.spec.ts           # Sidebar nav, active highlight, landing page root
+│   ├── navigation.spec.ts           # Sidebar nav, active highlight, root redirect
 │   ├── filters.spec.ts              # Date preset clicks
 │   ├── pages.spec.ts                # All 5 analytics pages load
 │   ├── health.spec.ts               # API health indicator
-│   ├── pipeline.spec.ts             # Pipeline dashboard: title, trigger, overview, nav
-│   ├── insights.spec.ts             # AI Insights page
-│   ├── marketing.spec.ts            # 12 landing page specs (hero, nav, features, pricing, FAQ, waitlist, legal)
-│   └── marketing-seo.spec.ts        # 6 SEO specs (meta, OG, JSON-LD, sitemap, robots)
+│   └── pipeline.spec.ts             # Pipeline dashboard: title, trigger, overview, nav
 ├── src/
 │   ├── app/
-│   │   ├── layout.tsx               # Minimal root: html + body + metadata only
+│   │   ├── layout.tsx               # Root layout: responsive sidebar + providers
+│   │   ├── page.tsx                 # Redirect to /dashboard
 │   │   ├── not-found.tsx            # 404 page
 │   │   ├── error.tsx                # Error boundary page
-│   │   ├── sitemap.ts               # Next.js sitemap convention
-│   │   ├── robots.ts                # Robots.txt (allow marketing, disallow dashboard)
-│   │   ├── opengraph-image.tsx      # Dynamic OG image generation (edge runtime)
-│   │   ├── (marketing)/             # Public pages — navbar + footer layout
-│   │   │   ├── layout.tsx           # Navbar + Footer + skip-to-content
-│   │   │   ├── page.tsx             # Landing page (/) — all sections assembled
-│   │   │   ├── privacy/page.tsx     # Privacy policy
-│   │   │   └── terms/page.tsx       # Terms of service
-│   │   ├── (app)/                   # Dashboard — sidebar layout
-│   │   │   ├── layout.tsx           # Sidebar + Providers + ErrorBoundary
-│   │   │   ├── dashboard/           # Executive overview
-│   │   │   ├── products/            # Product analytics
-│   │   │   ├── customers/           # Customer intelligence
-│   │   │   ├── staff/               # Staff performance
-│   │   │   ├── sites/               # Site comparison
-│   │   │   ├── returns/             # Returns analysis
-│   │   │   ├── pipeline/            # Pipeline dashboard
-│   │   │   └── insights/            # AI Insights
-│   │   └── api/waitlist/route.ts    # POST email waitlist with rate limiting
+│   │   ├── dashboard/
+│   │   │   ├── page.tsx             # Executive overview: KPI grid + trend charts
+│   │   │   └── loading.tsx          # Skeleton loading state
+│   │   ├── products/
+│   │   │   ├── page.tsx             # Product analytics page
+│   │   │   └── loading.tsx
+│   │   ├── customers/
+│   │   │   ├── page.tsx             # Customer intelligence page
+│   │   │   └── loading.tsx
+│   │   ├── staff/
+│   │   │   ├── page.tsx             # Staff performance page
+│   │   │   └── loading.tsx
+│   │   ├── sites/
+│   │   │   ├── page.tsx             # Site comparison page
+│   │   │   └── loading.tsx
+│   │   └── returns/
+│   │       ├── page.tsx             # Returns analysis page
+│   │       └── loading.tsx
 │   ├── components/
-│   │   ├── marketing/               # Landing page components (Phase 4)
-│   │   │   ├── navbar.tsx           # Responsive top nav + mobile hamburger
-│   │   │   ├── footer.tsx           # 4-column footer + copyright
-│   │   │   ├── hero-section.tsx     # Headline + CTAs + CSS dashboard mockup
-│   │   │   ├── section-wrapper.tsx  # Reusable section with anchors + variants
-│   │   │   ├── features-grid.tsx    # 6 feature cards with scroll animation
-│   │   │   ├── feature-card.tsx     # Single feature card with icon
-│   │   │   ├── how-it-works.tsx     # 4-step pipeline visualization
-│   │   │   ├── pipeline-step.tsx    # Single pipeline step card
-│   │   │   ├── stats-banner.tsx     # 4 animated stat metrics
-│   │   │   ├── pricing-section.tsx  # 3 pricing tier cards
-│   │   │   ├── pricing-card.tsx     # Single pricing card
-│   │   │   ├── faq-section.tsx      # FAQ accordion (8 items)
-│   │   │   ├── faq-item.tsx         # Single FAQ accordion item
-│   │   │   ├── tech-badges.tsx      # Tech stack pill badges
-│   │   │   ├── waitlist-form.tsx    # Email form (idle/loading/success/error)
-│   │   │   ├── cta-section.tsx      # Full-width CTA with waitlist form
-│   │   │   └── json-ld.tsx          # JSON-LD structured data (Organization, WebSite, FAQPage)
-│   │   ├── layout/sidebar.tsx       # Nav sidebar (8 pages, responsive lg:flex)
+│   │   ├── layout/sidebar.tsx       # Nav sidebar (6 pages, responsive lg:flex)
 │   │   ├── layout/header.tsx        # Page header
 │   │   ├── layout/health-indicator.tsx # API health dot (green/amber/red)
 │   │   ├── dashboard/kpi-card.tsx   # KPI card with trend indicator
@@ -229,13 +195,11 @@ frontend/                            # Next.js 14 dashboard + landing page
 │   │   ├── returns/returns-overview.tsx    # Returns analysis orchestrator
 │   │   ├── returns/returns-table.tsx       # Custom returns table (5 cols)
 │   │   ├── returns/returns-chart.tsx       # Top returns horizontal bar chart
-│   │   ├── ai-light/ai-summary-card.tsx   # AI narrative summary card
-│   │   ├── ai-light/anomaly-list.tsx      # Anomaly detection list with severity badges
 │   │   ├── providers.tsx            # SWR + Filter context wrapper
 │   │   ├── error-boundary.tsx       # React error boundary
 │   │   ├── empty-state.tsx          # Empty data placeholder
 │   │   └── loading-card.tsx         # Skeleton loading card
-│   ├── hooks/                       # SWR hooks + utility hooks
+│   ├── hooks/                       # 9 SWR hooks (1 per API endpoint)
 │   │   ├── use-summary.ts           # GET /api/v1/analytics/summary
 │   │   ├── use-daily-trend.ts       # GET /api/v1/analytics/trends/daily
 │   │   ├── use-monthly-trend.ts     # GET /api/v1/analytics/trends/monthly
@@ -244,11 +208,7 @@ frontend/                            # Next.js 14 dashboard + landing page
 │   │   ├── use-top-staff.ts         # GET /api/v1/analytics/staff/top
 │   │   ├── use-sites.ts             # GET /api/v1/analytics/sites
 │   │   ├── use-returns.ts           # GET /api/v1/analytics/returns
-│   │   ├── use-health.ts            # GET /health
-│   │   ├── use-ai-summary.ts       # GET /api/v1/ai-light/summary
-│   │   ├── use-ai-anomalies.ts     # GET /api/v1/ai-light/anomalies
-│   │   ├── use-ai-status.ts        # GET /api/v1/ai-light/status
-│   │   └── use-intersection-observer.ts # Scroll-triggered animation hook
+│   │   └── use-health.ts            # GET /health
 │   ├── contexts/filter-context.tsx  # Global filters synced to URL params
 │   ├── types/api.ts                 # TS interfaces matching Pydantic models
 │   ├── types/filters.ts             # FilterParams interface
@@ -258,7 +218,6 @@ frontend/                            # Next.js 14 dashboard + landing page
 │       ├── formatters.ts            # Currency (EGP), percent, compact
 │       ├── date-utils.ts            # parseDateKey, date presets
 │       ├── constants.ts             # Chart colors, nav items, API URL
-│       ├── marketing-constants.ts   # All marketing copy (features, pricing, FAQ, stats)
 │       └── utils.ts                 # cn() helper
 
 tests/
@@ -268,9 +227,7 @@ tests/
 ├── test_config.py
 ├── test_validator.py
 ├── test_loader.py
-├── test_coverage_gaps.py
-├── test_watcher.py              # File watcher handler + service tests
-└── test_ai_light.py             # AI-Light models, client, service, endpoint tests
+└── test_coverage_gaps.py
 ```
 
 ## Docker Services
@@ -282,7 +239,6 @@ tests/
 | `pgadmin` | datapulse-pgadmin | 5050 | Database admin UI |
 | `api` | datapulse-api | 8000 | FastAPI analytics API |
 | `frontend` | datapulse-frontend | 3000 | Next.js dashboard |
-| `watcher` | datapulse-watcher | — | File watcher (auto-trigger pipeline) |
 | `redis` | datapulse-redis | (internal) | Redis cache for n8n |
 | `n8n` | datapulse-n8n | 5678 | n8n workflow automation |
 
@@ -413,7 +369,8 @@ docker exec -it datapulse-app python -m datapulse.bronze.loader --source /app/da
 - **Phase 2.5**: Data quality gates — quality_checks table + RLS, quality module (models/checks/repo/service), 2 API endpoints (GET quality + POST quality-check), 7 check functions, n8n quality gate nodes in pipeline workflow, 79 tests [DONE]
 - **Phase 2.6**: Notifications — 4 n8n sub-workflows (success/failure/digest/global error), Slack webhook integration, docker-compose SLACK_WEBHOOK_URL [DONE]
 - **Phase 2.7**: Pipeline dashboard — /pipeline page, 5 components (overview/history/status-badge/quality-details/trigger), 3 SWR hooks, postAPI function, E2E tests [DONE]
-- **Phase 2.4**: File watcher — watchdog-based directory monitor, debounce logic, auto-triggers pipeline via API, Docker service, tests [DONE]
-- **Phase 2.8**: AI-Light — OpenRouter client, AILightService (summaries/anomalies/changes), 4 API endpoints, statistical anomaly detection + AI enhancement, frontend /insights page (summary card + anomaly list), 3 SWR hooks, n8n daily digest workflow, tests [DONE]
+- **The Great Fix**: Full project remediation — 6-phase plan addressing 10 CRITICAL + 29 HIGH findings (auth, RLS enforcement, dim_site bug, fetch timeout, Docker hardening, frontend bugs). See `docs/The Great Fix.md` for full plan. [PLANNED]
+- **Phase 2.4**: File watcher (directory watcher service)
+- **Phase 2.8**: AI-Light (OpenRouter free tier) — AI summaries, anomaly detection, change narratives via n8n + OpenRouter free models
 - **Phase 3**: ~~AI-powered analysis via LangGraph~~ **CANCELLED** — replaced by Phase 2.8 AI-Light. LangGraph/Agent SDK not needed: OpenRouter free tier can't support agent loops reliably, and n8n + pre-computed dbt aggregations + simple LLM narration covers 80% of AI value at $0 cost. Conversational analytics deferred until paid API budget is available.
-- **Phase 4**: Public website & landing page — route groups `(marketing)`/`(app)`, hero, features, pricing, FAQ, waitlist API, privacy/terms, SEO (sitemap, robots, OG image, JSON-LD), 18 E2E tests [DONE]
+- **Phase 4**: Public website / landing page
