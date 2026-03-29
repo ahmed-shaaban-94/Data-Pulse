@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useFilters } from "@/contexts/filter-context";
+import { useToast } from "@/components/ui/toast";
 import { getDatePresets, formatDateParam } from "@/lib/date-utils";
 import { cn } from "@/lib/utils";
 import { X, SlidersHorizontal, ChevronDown } from "lucide-react";
@@ -10,6 +11,7 @@ import { ActiveFilterChips } from "./active-filter-chips";
 
 export function FilterBar() {
   const { filters, setFilters, updateFilter, clearFilters } = useFilters();
+  const { info } = useToast();
   const presets = getDatePresets();
 
   const [expanded, setExpanded] = useState(false);
@@ -54,6 +56,8 @@ export function FilterBar() {
         {/* More Filters toggle */}
         <button
           onClick={() => setExpanded((prev) => !prev)}
+          aria-expanded={expanded}
+          aria-label="Toggle advanced filters"
           className={cn(
             "ml-auto flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
             expanded
@@ -74,7 +78,11 @@ export function FilterBar() {
         {/* Clear button with badge */}
         {hasFilters && (
           <button
-            onClick={clearFilters}
+            onClick={() => {
+              clearFilters();
+              info("All filters cleared");
+            }}
+            aria-label={`Clear all ${activeFilterCount} filters`}
             className="flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium text-text-secondary transition-colors hover:bg-growth-red/10 hover:text-growth-red"
           >
             <X className="h-3.5 w-3.5" />

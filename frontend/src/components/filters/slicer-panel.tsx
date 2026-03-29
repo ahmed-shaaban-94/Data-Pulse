@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useFilters } from "@/contexts/filter-context";
 import { useFilterOptions } from "@/hooks/use-filter-options";
 import { cn } from "@/lib/utils";
@@ -29,18 +29,26 @@ function SlicerDropdown({
 }: SlicerDropdownProps) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
+  const [focusIdx, setFocusIdx] = useState(-1);
   const ref = useRef<HTMLDivElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
       if (ref.current && !ref.current.contains(e.target as Node)) {
         setOpen(false);
         setSearch("");
+        setFocusIdx(-1);
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  // Reset focus index when dropdown opens/closes or search changes
+  useEffect(() => {
+    setFocusIdx(-1);
+  }, [open, search]);
 
   const filtered = searchable && search
     ? options.filter((o) =>
@@ -52,12 +60,70 @@ function SlicerDropdown({
     ? options.find((o) => o.key === value)?.label ?? value
     : null;
 
+  // Keyboard navigation handler
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (!open) {
+        if (e.key === "ArrowDown" || e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          setOpen(true);
+        }
+        return;
+      }
+
+      switch (e.key) {
+        case "ArrowDown":
+          e.preventDefault();
+          setFocusIdx((prev) => Math.min(prev + 1, filtered.length - 1));
+          break;
+        case "ArrowUp":
+          e.preventDefault();
+          setFocusIdx((prev) => Math.max(prev - 1, 0));
+          break;
+        case "Enter":
+        case " ":
+          e.preventDefault();
+          if (focusIdx >= 0 && focusIdx < filtered.length) {
+            onChange(filtered[focusIdx].key);
+            setOpen(false);
+            setSearch("");
+          }
+          break;
+        case "Escape":
+          e.preventDefault();
+          setOpen(false);
+          setSearch("");
+          break;
+        case "Home":
+          e.preventDefault();
+          setFocusIdx(0);
+          break;
+        case "End":
+          e.preventDefault();
+          setFocusIdx(filtered.length - 1);
+          break;
+      }
+    },
+    [open, filtered, focusIdx, onChange],
+  );
+
+  // Scroll focused item into view
+  useEffect(() => {
+    if (focusIdx >= 0 && listRef.current) {
+      const items = listRef.current.querySelectorAll("[data-option]");
+      items[focusIdx]?.scrollIntoView({ block: "nearest" });
+    }
+  }, [focusIdx]);
+
   return (
-    <div ref={ref} className="relative">
+    <div ref={ref} className="relative" onKeyDown={handleKeyDown}>
       {/* Trigger button */}
       <button
         type="button"
         onClick={() => setOpen(!open)}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-label={`Filter by ${label}${selectedLabel ? `: ${selectedLabel}` : ""}`}
         className={cn(
           "flex items-center gap-2 rounded-lg border px-3 py-2 text-sm transition-all duration-200",
           "min-w-[140px] max-w-[220px]",
@@ -91,7 +157,11 @@ function SlicerDropdown({
 
       {/* Dropdown panel */}
       {open && (
-        <div className="absolute left-0 top-full z-50 mt-1 w-64 rounded-lg border border-border bg-card shadow-xl shadow-black/20">
+        <div
+          role="listbox"
+          aria-label={`${label} options`}
+          className="absolute left-0 top-full z-50 mt-1 w-64 rounded-lg border border-border bg-card shadow-xl shadow-black/20"
+        >
           {/* Search */}
           {searchable && (
             <div className="border-b border-border p-2">
@@ -104,13 +174,14 @@ function SlicerDropdown({
                   placeholder={`Search ${label.toLowerCase()}...`}
                   className="w-full rounded-md bg-page py-1.5 pl-8 pr-3 text-sm text-text-primary placeholder:text-text-secondary/50 focus:outline-none focus:ring-1 focus:ring-accent"
                   autoFocus
+                  aria-label={`Search ${label}`}
                 />
               </div>
             </div>
           )}
 
           {/* Options list */}
-          <div className="max-h-60 overflow-y-auto p-1">
+          <div ref={listRef} className="max-h-60 overflow-y-auto p-1">
             {/* Clear option */}
             {value && (
               <button
@@ -132,10 +203,13 @@ function SlicerDropdown({
                 No matches found
               </p>
             ) : (
-              filtered.map((option) => (
+              filtered.map((option, idx) => (
                 <button
                   key={option.key}
                   type="button"
+                  data-option
+                  role="option"
+                  aria-selected={option.key === value}
                   onClick={() => {
                     onChange(option.key);
                     setOpen(false);
@@ -146,6 +220,7 @@ function SlicerDropdown({
                     option.key === value
                       ? "bg-accent/10 text-accent"
                       : "text-text-primary hover:bg-divider",
+                    idx === focusIdx && "ring-2 ring-accent ring-inset",
                   )}
                 >
                   {/* Radio-style indicator */}

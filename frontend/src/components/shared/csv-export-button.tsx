@@ -1,6 +1,7 @@
 "use client";
 
 import { Download } from "lucide-react";
+import { useToast } from "@/components/ui/toast";
 
 interface CsvExportButtonProps {
   data: Record<string, unknown>[];
@@ -34,6 +35,8 @@ export default function CsvExportButton({
   filename,
   className,
 }: CsvExportButtonProps) {
+  const { success } = useToast();
+
   const handleExport = () => {
     const csv = toCsvString(data);
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
@@ -46,12 +49,15 @@ export default function CsvExportButton({
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
+
+    success(`Exported ${data.length} rows to ${link.download}`);
   };
 
   return (
     <button
       onClick={handleExport}
       disabled={data.length === 0}
+      aria-label={`Export ${data.length} rows as CSV`}
       className={`inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-sm text-text-secondary transition-colors hover:bg-card hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-50 ${className ?? ""}`}
     >
       <Download className="h-4 w-4" />
