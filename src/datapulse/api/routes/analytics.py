@@ -17,6 +17,7 @@ from datapulse.analytics.models import (
     AnalyticsFilter,
     CustomerAnalytics,
     DateRange,
+    FilterOptions,
     KPISummary,
     ProductPerformance,
     RankingResult,
@@ -179,6 +180,16 @@ def get_sites(
 ) -> RankingResult:
     """Site comparison ranked by net revenue."""
     return service.get_site_comparison(_to_filter(params))
+
+
+@router.get("/filters/options", response_model=FilterOptions)
+@limiter.limit("100/minute")
+def get_filter_options(
+    request: Request,
+    service: ServiceDep,
+) -> FilterOptions:
+    """Return available filter values for slicer/dropdown population."""
+    return service.get_filter_options()
 
 
 @router.get("/returns", response_model=list[ReturnAnalysis])

@@ -1,19 +1,17 @@
 "use client";
 
-import { useState, useRef, useCallback, type KeyboardEvent } from "react";
+import { useState } from "react";
 import { useFilters } from "@/contexts/filter-context";
 import { getDatePresets, formatDateParam } from "@/lib/date-utils";
 import { cn } from "@/lib/utils";
 import { X, SlidersHorizontal, ChevronDown } from "lucide-react";
+import { SlicerPanel } from "./slicer-panel";
 
 export function FilterBar() {
   const { filters, setFilters, updateFilter, clearFilters } = useFilters();
   const presets = getDatePresets();
 
   const [expanded, setExpanded] = useState(false);
-
-  const categoryRef = useRef<HTMLInputElement>(null);
-  const brandRef = useRef<HTMLInputElement>(null);
 
   const activeFilterCount = Object.keys(filters).length;
   const hasFilters = activeFilterCount > 0;
@@ -33,26 +31,8 @@ export function FilterBar() {
     );
   };
 
-  const commitTextFilter = useCallback(
-    (key: "category" | "brand", ref: React.RefObject<HTMLInputElement | null>) => {
-      const value = ref.current?.value.trim();
-      updateFilter(key, value || undefined);
-    },
-    [updateFilter],
-  );
-
-  const handleKeyDown = (
-    key: "category" | "brand",
-    ref: React.RefObject<HTMLInputElement | null>,
-    e: KeyboardEvent<HTMLInputElement>,
-  ) => {
-    if (e.key === "Enter") {
-      commitTextFilter(key, ref);
-    }
-  };
-
   return (
-    <div className="mb-6 space-y-2">
+    <div className="mb-6 space-y-3">
       {/* Row 1: Date presets + toggle + clear */}
       <div className="flex flex-wrap items-center gap-2">
         {presets.map((preset) => (
@@ -81,7 +61,7 @@ export function FilterBar() {
           )}
         >
           <SlidersHorizontal className="h-3.5 w-3.5" />
-          <span className="hidden sm:inline">More Filters</span>
+          <span className="hidden sm:inline">Filters</span>
           <ChevronDown
             className={cn(
               "h-3.5 w-3.5 transition-transform",
@@ -105,63 +85,40 @@ export function FilterBar() {
         )}
       </div>
 
-      {/* Row 2: Collapsible custom filters */}
+      {/* Row 2: Collapsible slicer panel + custom date range */}
       {expanded && (
-        <div className="flex flex-col gap-2 rounded-lg border border-divider bg-card p-3 sm:flex-row sm:flex-wrap sm:items-end">
+        <div className="rounded-lg border border-divider bg-card/50 p-3">
+          {/* Slicer dropdowns (Power BI style) */}
+          <SlicerPanel />
+
           {/* Custom date range */}
-          <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-2">
-            <label className="text-xs font-medium text-text-secondary">From</label>
-            <input
-              type="date"
-              value={filters.start_date ?? ""}
-              onChange={(e) =>
-                updateFilter("start_date", e.target.value || undefined)
-              }
-              className="h-8 rounded-md border border-divider bg-page px-2 text-sm text-text-primary outline-none focus:border-accent focus:ring-1 focus:ring-accent"
-            />
-          </div>
-
-          <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-2">
-            <label className="text-xs font-medium text-text-secondary">To</label>
-            <input
-              type="date"
-              value={filters.end_date ?? ""}
-              onChange={(e) =>
-                updateFilter("end_date", e.target.value || undefined)
-              }
-              className="h-8 rounded-md border border-divider bg-page px-2 text-sm text-text-primary outline-none focus:border-accent focus:ring-1 focus:ring-accent"
-            />
-          </div>
-
-          {/* Separator */}
-          <div className="hidden h-6 w-px bg-divider sm:block" />
-
-          {/* Category */}
-          <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-2">
-            <label className="text-xs font-medium text-text-secondary">Category</label>
-            <input
-              ref={categoryRef}
-              type="text"
-              defaultValue={filters.category ?? ""}
-              placeholder="Category..."
-              onBlur={() => commitTextFilter("category", categoryRef)}
-              onKeyDown={(e) => handleKeyDown("category", categoryRef, e)}
-              className="h-8 w-full rounded-md border border-divider bg-page px-2 text-sm text-text-primary placeholder:text-text-secondary/50 outline-none focus:border-accent focus:ring-1 focus:ring-accent sm:w-36"
-            />
-          </div>
-
-          {/* Brand */}
-          <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-2">
-            <label className="text-xs font-medium text-text-secondary">Brand</label>
-            <input
-              ref={brandRef}
-              type="text"
-              defaultValue={filters.brand ?? ""}
-              placeholder="Brand..."
-              onBlur={() => commitTextFilter("brand", brandRef)}
-              onKeyDown={(e) => handleKeyDown("brand", brandRef, e)}
-              className="h-8 w-full rounded-md border border-divider bg-page px-2 text-sm text-text-primary placeholder:text-text-secondary/50 outline-none focus:border-accent focus:ring-1 focus:ring-accent sm:w-36"
-            />
+          <div className="flex flex-wrap items-end gap-3 border-t border-divider pt-3">
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-semibold uppercase tracking-wider text-text-secondary">
+                From
+              </label>
+              <input
+                type="date"
+                value={filters.start_date ?? ""}
+                onChange={(e) =>
+                  updateFilter("start_date", e.target.value || undefined)
+                }
+                className="h-9 rounded-lg border border-border bg-page px-3 text-sm text-text-primary outline-none focus:border-accent focus:ring-1 focus:ring-accent"
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-semibold uppercase tracking-wider text-text-secondary">
+                To
+              </label>
+              <input
+                type="date"
+                value={filters.end_date ?? ""}
+                onChange={(e) =>
+                  updateFilter("end_date", e.target.value || undefined)
+                }
+                className="h-9 rounded-lg border border-border bg-page px-3 text-sm text-text-primary outline-none focus:border-accent focus:ring-1 focus:ring-accent"
+              />
+            </div>
           </div>
         </div>
       )}

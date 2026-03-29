@@ -8,6 +8,7 @@ from datapulse.analytics.models import (
     AnalyticsFilter,
     CustomerAnalytics,
     DateRange,
+    FilterOptions,
     KPISummary,
     ProductPerformance,
     RankingResult,
@@ -99,6 +100,11 @@ class AnalyticsService:
         f = self._default_filter(filters)
         log.info("return_report", filters=f.model_dump())
         return self._repo.get_return_analysis(f)
+
+    def get_filter_options(self) -> FilterOptions:
+        """Return available filter values for slicers/dropdowns."""
+        log.info("filter_options")
+        return self._repo.get_filter_options()
 
     def get_product_detail(self, product_key: int) -> ProductPerformance | None:
         """Detailed performance for a single product."""

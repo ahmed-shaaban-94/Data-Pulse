@@ -16,6 +16,8 @@ from sqlalchemy.orm import Session
 from datapulse.analytics.models import (
     AnalyticsFilter,
     CustomerAnalytics,
+    FilterOption,
+    FilterOptions,
     KPISummary,
     ProductPerformance,
     RankingItem,
@@ -186,6 +188,51 @@ class AnalyticsRepository:
     # ------------------------------------------------------------------
     # Public query methods
     # ------------------------------------------------------------------
+
+    def get_filter_options(self) -> FilterOptions:
+        """Return distinct values for all slicer/dropdown filters."""
+        log.info("get_filter_options")
+
+        cat_rows = self._session.execute(
+            text(
+                "SELECT DISTINCT drug_category FROM public_marts.agg_sales_by_product "
+                "WHERE drug_category IS NOT NULL ORDER BY drug_category"
+            )
+        ).fetchall()
+
+        brand_rows = self._session.execute(
+            text(
+                "SELECT DISTINCT drug_brand FROM public_marts.agg_sales_by_product "
+                "WHERE drug_brand IS NOT NULL ORDER BY drug_brand"
+            )
+        ).fetchall()
+
+        site_rows = self._session.execute(
+            text(
+                "SELECT DISTINCT site_key, site_name "
+                "FROM public_marts.agg_sales_by_site "
+                "WHERE site_key > 0 ORDER BY site_name"
+            )
+        ).fetchall()
+
+        staff_rows = self._session.execute(
+            text(
+                "SELECT DISTINCT staff_key, staff_name "
+                "FROM public_marts.agg_sales_by_staff "
+                "WHERE staff_key > 0 ORDER BY staff_name"
+            )
+        ).fetchall()
+
+        return FilterOptions(
+            categories=[str(r[0]) for r in cat_rows],
+            brands=[str(r[0]) for r in brand_rows],
+            sites=[
+                FilterOption(key=int(r[0]), label=str(r[1])) for r in site_rows
+            ],
+            staff=[
+                FilterOption(key=int(r[0]), label=str(r[1])) for r in staff_rows
+            ],
+        )
 
     def get_kpi_summary(self, target_date: date) -> KPISummary:
         """Return executive KPI snapshot for *target_date*.
