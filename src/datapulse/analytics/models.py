@@ -149,3 +149,23 @@ class ReturnAnalysis(BaseModel):
     return_quantity: JsonDecimal
     return_amount: JsonDecimal
     return_count: int
+
+
+class FilterOption(BaseModel):
+    """Single key-label pair for dropdown/slicer population."""
+
+    model_config = ConfigDict(frozen=True)
+
+    key: int
+    label: str
+
+
+class FilterOptions(BaseModel):
+    """Available filter values for all analytics slicers."""
+
+    model_config = ConfigDict(frozen=True)
+
+    categories: list[str]
+    brands: list[str]
+    sites: list[FilterOption]
+    staff: list[FilterOption]

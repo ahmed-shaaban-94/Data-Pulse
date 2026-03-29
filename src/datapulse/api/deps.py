@@ -10,8 +10,10 @@ from fastapi import Depends
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import Session, sessionmaker
 
+from datapulse.ai_light.service import AILightService
 from datapulse.analytics.repository import AnalyticsRepository
 from datapulse.analytics.service import AnalyticsService
+from datapulse.api.auth import require_api_key
 from datapulse.config import get_settings
 from datapulse.pipeline.executor import PipelineExecutor
 from datapulse.pipeline.quality_repository import QualityRepository
@@ -86,3 +88,15 @@ def get_quality_service(
     repo = QualityRepository(session)
     settings = get_settings()
     return QualityService(repo, session, settings)
+
+
+def get_ai_light_service(
+    session: Annotated[Session, Depends(get_db_session)],
+) -> AILightService:
+    """Factory for AI-Light service with analytics repo + OpenRouter client."""
+    settings = get_settings()
+    return AILightService(settings=settings, session=session)
+
+
+# Alias for backwards compatibility — analytics.py and ai_light.py import this name
+verify_api_key = require_api_key

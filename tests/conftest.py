@@ -38,7 +38,7 @@ def _patch_get_settings_globally():
     locally — those local patches take precedence over this session patch.
     """
     # Build a clean Settings instance without touching the project's .env
-    clean_settings = Settings(_env_file=None, api_key="test-api-key")
+    clean_settings = Settings(_env_file=None, api_key="test-api-key", database_url="")
     get_settings.cache_clear()
 
     # Also patch the imported references in each module that uses get_settings
