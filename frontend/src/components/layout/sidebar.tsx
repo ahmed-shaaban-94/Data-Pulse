@@ -13,11 +13,16 @@ import {
   Building2,
   RotateCcw,
   GitBranch,
+  Sparkles,
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { NAV_ITEMS } from "@/lib/constants";
 import { HealthIndicator } from "./health-indicator";
+
+interface SidebarProps {
+  anomalyCount?: number;
+}
 
 const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   LayoutDashboard,
@@ -27,20 +32,24 @@ const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   Building2,
   RotateCcw,
   GitBranch,
+  Sparkles,
 };
 
 function NavLinks({
   pathname,
   onNavigate,
+  anomalyCount = 0,
 }: {
   pathname: string;
   onNavigate?: () => void;
+  anomalyCount?: number;
 }) {
   return (
     <>
       {NAV_ITEMS.map((item) => {
         const Icon = iconMap[item.icon];
         const isActive = pathname === item.href || pathname?.startsWith(item.href + "/");
+        const showBadge = item.label === "Insights" && anomalyCount > 0;
         return (
           <Link
             key={item.href}
@@ -55,6 +64,11 @@ function NavLinks({
           >
             {Icon && <Icon className="h-5 w-5" />}
             <span>{item.label}</span>
+            {showBadge && (
+              <span className="ml-auto rounded-full bg-chart-amber px-1.5 py-0.5 text-xs font-bold text-black">
+                {anomalyCount}
+              </span>
+            )}
           </Link>
         );
       })}
@@ -62,7 +76,7 @@ function NavLinks({
   );
 }
 
-export function Sidebar() {
+export function Sidebar({ anomalyCount = 0 }: SidebarProps) {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -104,7 +118,7 @@ export function Sidebar() {
 
             {/* Navigation */}
             <nav className="flex-1 space-y-1 px-3 py-4">
-              <NavLinks pathname={pathname} onNavigate={() => setMobileOpen(false)} />
+              <NavLinks pathname={pathname} onNavigate={() => setMobileOpen(false)} anomalyCount={anomalyCount} />
             </nav>
 
             {/* Footer */}
@@ -126,7 +140,7 @@ export function Sidebar() {
 
         {/* Navigation */}
         <nav className="flex-1 space-y-1 px-3 py-4">
-          <NavLinks pathname={pathname} />
+          <NavLinks pathname={pathname} anomalyCount={anomalyCount} />
         </nav>
 
         {/* Footer */}

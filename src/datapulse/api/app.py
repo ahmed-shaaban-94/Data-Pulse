@@ -9,11 +9,11 @@ import structlog
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
-from slowapi.util import get_remote_address
 
-from datapulse.api.routes import analytics, health, pipeline
+from datapulse.api.limiter import limiter
+from datapulse.api.routes import ai_light, analytics, health, pipeline
 from datapulse.config import get_settings
 from datapulse.logging import setup_logging
 
@@ -23,9 +23,6 @@ logger = structlog.get_logger()
 def create_app() -> FastAPI:
     settings = get_settings()
     setup_logging(log_format=settings.log_format)
-
-    # Rate limiter — keyed by remote address
-    limiter = Limiter(key_func=get_remote_address, default_limits=["60/minute"])
 
     app = FastAPI(
         title="DataPulse API",
@@ -93,5 +90,6 @@ def create_app() -> FastAPI:
     app.include_router(health.router)
     app.include_router(analytics.router, prefix="/api/v1")
     app.include_router(pipeline.router, prefix="/api/v1")
+    app.include_router(ai_light.router, prefix="/api/v1")
 
     return app
