@@ -57,16 +57,15 @@ function getAuthHeaders(): Record<string, string> {
   return {};
 }
 
-export async function fetchAPI<T>(
-  path: string,
-  params?: FilterParams,
-): Promise<T> {
-  const url = `${API_BASE_URL}${path}${buildQueryString(params)}`;
+/** Shared fetch wrapper handling timeout, error checking, and decimal parsing. */
+async function _request<T>(url: string, init?: RequestInit): Promise<T> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 15_000);
   try {
+    const mergedHeaders = { ...getAuthHeaders(), ...init?.headers };
     const res = await fetch(url, {
-      headers: { ...getAuthHeaders() },
+      ...init,
+      headers: mergedHeaders,
       signal: controller.signal,
     });
     if (!res.ok) {
@@ -80,26 +79,38 @@ export async function fetchAPI<T>(
   }
 }
 
+export async function fetchAPI<T>(
+  path: string,
+  params?: FilterParams,
+): Promise<T> {
+  const url = `${API_BASE_URL}${path}${buildQueryString(params)}`;
+  return _request<T>(url);
+}
+
 export async function postAPI<T>(path: string, body?: unknown): Promise<T> {
   const url = `${API_BASE_URL}${path}`;
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 15_000);
-  try {
-    const res = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", ...getAuthHeaders() },
-      body: body ? JSON.stringify(body) : undefined,
-      signal: controller.signal,
-    });
-    if (!res.ok) {
-      const text = await res.text().catch(() => "Unknown error");
-      throw new ApiError(res.status, `API error ${res.status}: ${text}`);
+  return _request<T>(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+}
+
+/**
+ * Build a stable, order-independent SWR cache key from a path and filter params.
+ * Uses sorted URLSearchParams to avoid property-order sensitivity of JSON.stringify.
+ */
+export function swrKey(path: string, params?: FilterParams): string {
+  if (!params) return path;
+  const sp = new URLSearchParams();
+  for (const [k, v] of Object.entries(params)) {
+    if (v !== undefined && v !== null) {
+      sp.set(k, String(v));
     }
-    const json = await res.json();
-    return parseDecimals(json) as T;
-  } finally {
-    clearTimeout(timeout);
   }
+  sp.sort();
+  const qs = sp.toString();
+  return qs ? `${path}?${qs}` : path;
 }
 
 export { ApiError };

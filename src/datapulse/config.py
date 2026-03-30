@@ -54,6 +54,12 @@ class Settings(BaseSettings):
     # API security
     api_key: str = ""
 
+    # Keycloak OIDC
+    keycloak_url: str = "http://keycloak:8080"
+    keycloak_realm: str = "datapulse"
+    keycloak_client_id: str = "datapulse-frontend"
+    keycloak_client_secret: str = ""
+
     # Logging
     log_format: str = "console"
 
@@ -71,6 +77,16 @@ class Settings(BaseSettings):
 
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8", "extra": "ignore"}
 
+    @property
+    def keycloak_issuer_url(self) -> str:
+        """Keycloak issuer URL for JWT validation."""
+        return f"{self.keycloak_url}/realms/{self.keycloak_realm}"
+
+    @property
+    def keycloak_jwks_url(self) -> str:
+        """Keycloak JWKS endpoint for fetching public keys."""
+        return f"{self.keycloak_issuer_url}/protocol/openid-connect/certs"
+
     def warn_if_auth_disabled(self) -> None:
         """Log warnings when authentication secrets are not configured."""
         if not self.api_key:
@@ -82,6 +98,11 @@ class Settings(BaseSettings):
             logger.warning(
                 "auth_disabled",
                 detail="PIPELINE_WEBHOOK_SECRET is empty — pipeline token auth is disabled",
+            )
+        if not self.keycloak_client_id:
+            logger.warning(
+                "auth_disabled",
+                detail="KEYCLOAK_CLIENT_ID is empty — JWT authentication is disabled",
             )
 
 
