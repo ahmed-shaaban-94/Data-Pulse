@@ -47,6 +47,16 @@ function buildQueryString(params?: FilterParams): string {
   return qs ? `?${qs}` : "";
 }
 
+function getAuthHeaders(): Record<string, string> {
+  if (typeof window !== "undefined") {
+    const token = localStorage.getItem("access_token");
+    if (token) {
+      return { Authorization: `Bearer ${token}` };
+    }
+  }
+  return {};
+}
+
 export async function fetchAPI<T>(
   path: string,
   params?: FilterParams,
@@ -55,7 +65,10 @@ export async function fetchAPI<T>(
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 15_000);
   try {
-    const res = await fetch(url, { signal: controller.signal });
+    const res = await fetch(url, {
+      headers: { ...getAuthHeaders() },
+      signal: controller.signal,
+    });
     if (!res.ok) {
       const body = await res.text().catch(() => "Unknown error");
       throw new ApiError(res.status, `API error ${res.status}: ${body}`);
@@ -74,7 +87,7 @@ export async function postAPI<T>(path: string, body?: unknown): Promise<T> {
   try {
     const res = await fetch(url, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...getAuthHeaders() },
       body: body ? JSON.stringify(body) : undefined,
       signal: controller.signal,
     });

@@ -8,7 +8,7 @@ import { Suspense, type ReactNode } from "react";
 export function Providers({ children }: { children: ReactNode }) {
   return (
     <SWRConfig value={swrConfig}>
-      <Suspense>
+      <Suspense fallback={<div className="min-h-screen bg-background" />}>
         <FilterProvider>{children}</FilterProvider>
       </Suspense>
     </SWRConfig>

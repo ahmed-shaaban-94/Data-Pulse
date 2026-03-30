@@ -3,7 +3,10 @@
 from functools import lru_cache
 from pathlib import Path
 
+import structlog
 from pydantic_settings import BaseSettings
+
+logger = structlog.get_logger()
 
 
 class Settings(BaseSettings):
@@ -41,6 +44,9 @@ class Settings(BaseSettings):
     pipeline_bronze_timeout: int = 600   # seconds
     pipeline_dbt_timeout: int = 300      # seconds
 
+    # API base URL (used by watcher and internal services)
+    api_base_url: str = "http://localhost:8000"
+
     # n8n
     n8n_webhook_url: str = "http://n8n:5678/webhook/"
     pipeline_webhook_secret: str = ""
@@ -65,8 +71,23 @@ class Settings(BaseSettings):
 
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8", "extra": "ignore"}
 
+    def warn_if_auth_disabled(self) -> None:
+        """Log warnings when authentication secrets are not configured."""
+        if not self.api_key:
+            logger.warning(
+                "auth_disabled",
+                detail="API_KEY is empty — API key authentication is disabled",
+            )
+        if not self.pipeline_webhook_secret:
+            logger.warning(
+                "auth_disabled",
+                detail="PIPELINE_WEBHOOK_SECRET is empty — pipeline token auth is disabled",
+            )
+
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
     """Return the cached application settings singleton."""
-    return Settings()
+    settings = Settings()
+    settings.warn_if_auth_disabled()
+    return settings

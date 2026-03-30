@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import threading
 from collections.abc import Generator
 from typing import Annotated
 
@@ -25,37 +26,48 @@ logger = structlog.get_logger()
 
 _engine = None
 _session_factory = None
+_init_lock = threading.Lock()
 
 
 def get_engine():
-    """Return the SQLAlchemy engine singleton (with connection pooling)."""
+    """Return the SQLAlchemy engine singleton (with connection pooling).
+
+    Thread-safe: uses a lock to prevent duplicate engine creation
+    when multiple requests arrive concurrently at startup.
+    """
     global _engine
     if _engine is None:
-        settings = get_settings()
-        _engine = create_engine(
-            settings.database_url,
-            pool_pre_ping=True,
-            pool_size=settings.db_pool_size,
-            max_overflow=settings.db_pool_max_overflow,
-            pool_timeout=settings.db_pool_timeout,
-            pool_recycle=settings.db_pool_recycle,
-        )
+        with _init_lock:
+            if _engine is None:
+                settings = get_settings()
+                _engine = create_engine(
+                    settings.database_url,
+                    pool_pre_ping=True,
+                    pool_size=settings.db_pool_size,
+                    max_overflow=settings.db_pool_max_overflow,
+                    pool_timeout=settings.db_pool_timeout,
+                    pool_recycle=settings.db_pool_recycle,
+                )
     return _engine
 
 
 def _get_session_factory():
     global _session_factory
     if _session_factory is None:
-        _session_factory = sessionmaker(bind=get_engine())
+        with _init_lock:
+            if _session_factory is None:
+                _session_factory = sessionmaker(bind=get_engine())
     return _session_factory
 
 
 def get_db_session() -> Generator[Session, None, None]:
     session = _get_session_factory()()
     try:
-        # Set tenant context for RLS — default tenant_id=1 for dev mode
+        # Execute inside the auto-begun transaction so SET LOCAL persists
+        # for the entire request lifetime
         session.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": "1"})
         yield session
+        session.commit()
     except Exception:
         session.rollback()
         raise
