@@ -3,6 +3,20 @@ version: 2
 models:
   - name: fct_sales
     description: "Sales fact table. Grain: one line-item per invoice. Integer surrogate keys with COALESCE to -1 (Unknown). Financials rounded to 2 decimals."
+    meta:
+      joins:
+        - join: dim_date
+          sql_on: "${fct_sales.date_key} = ${dim_date.date_key}"
+        - join: dim_product
+          sql_on: "${fct_sales.product_key} = ${dim_product.product_key}"
+        - join: dim_customer
+          sql_on: "${fct_sales.customer_key} = ${dim_customer.customer_key}"
+        - join: dim_site
+          sql_on: "${fct_sales.site_key} = ${dim_site.site_key}"
+        - join: dim_staff
+          sql_on: "${fct_sales.staff_key} = ${dim_staff.staff_key}"
+        - join: dim_billing
+          sql_on: "${fct_sales.billing_key} = ${dim_billing.billing_key}"
     columns:
       - name: sales_key
         description: "Surrogate primary key"
@@ -57,18 +71,42 @@ models:
         description: "Degenerate dimension — billing type text (also resolved via billing_key)"
       - name: quantity
         description: "Units sold/returned (negative for returns). Rounded to 2 decimals."
+        meta:
+          metrics:
+            total_quantity:
+              type: sum
+            avg_quantity:
+              type: average
         tests:
           - not_null
       - name: sales
         description: "Gross sales amount before discount. Rounded to 2 decimals."
+        meta:
+          metrics:
+            total_sales:
+              type: sum
+            avg_sales:
+              type: average
         tests:
           - not_null
       - name: discount
         description: "Discount amount. Rounded to 2 decimals."
+        meta:
+          metrics:
+            total_discount:
+              type: sum
+            avg_discount:
+              type: average
         tests:
           - not_null
       - name: net_amount
         description: "Net amount = sales - discount. Rounded to 2 decimals."
+        meta:
+          metrics:
+            total_net_amount:
+              type: sum
+            avg_net_amount:
+              type: average
         tests:
           - not_null
       - name: is_return

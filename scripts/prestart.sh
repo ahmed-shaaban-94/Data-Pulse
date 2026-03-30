@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# prestart.sh — Run SQL migrations in order before the API starts.
+# prestart.sh — Run SQL migrations in order before the API starts,
+# then create auxiliary databases that services expect to exist.
 # Expects DATABASE_URL or individual PG* env vars to be set.
 
 DB_HOST="${DB_HOST:-postgres}"
@@ -46,4 +47,18 @@ for f in "${MIGRATIONS_DIR}"/*.sql; do
     applied=$((applied + 1))
 done
 
-echo "[prestart] Done. Applied: ${applied}, Skipped: ${skipped}"
+echo "[prestart] Migrations done. Applied: ${applied}, Skipped: ${skipped}"
+
+# --- Create lightdash database if it does not exist ---
+DB_EXISTS=$(psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d postgres -tAc \
+  "SELECT 1 FROM pg_database WHERE datname = 'lightdash'" 2>/dev/null || true)
+
+if [ "$DB_EXISTS" != "1" ]; then
+  echo "[prestart] Creating 'lightdash' database..."
+  psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d postgres -c "CREATE DATABASE lightdash OWNER ${DB_USER};"
+  echo "[prestart] 'lightdash' database created."
+else
+  echo "[prestart] 'lightdash' database already exists."
+fi
+
+echo "[prestart] Done."

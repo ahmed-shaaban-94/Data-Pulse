@@ -229,6 +229,42 @@ services:
     networks:
       - backend
 
+  # ---------- Lightdash (BI / Self-serve Analytics) ----------
+  lightdash:
+    image: lightdash/lightdash:latest
+    container_name: datapulse-lightdash
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8085:8080"
+    environment:
+      PGHOST: postgres
+      PGPORT: "5432"
+      PGUSER: ${POSTGRES_USER:-datapulse}
+      PGPASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
+      PGDATABASE: lightdash
+      LIGHTDASH_SECRET: ${LIGHTDASH_SECRET:?LIGHTDASH_SECRET must be set}
+      SITE_URL: http://localhost:8085
+      ALLOW_MULTIPLE_ORGS: "false"
+      LIGHTDASH_LOG_LEVEL: info
+    depends_on:
+      postgres:
+        condition: service_healthy
+      prestart:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:8080/api/v1/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+    networks:
+      - backend
+      - frontend-net
+
   # ---------- Keycloak (Auth / OAuth2 / OIDC) ----------
   keycloak:
     image: quay.io/keycloak/keycloak:26.0
