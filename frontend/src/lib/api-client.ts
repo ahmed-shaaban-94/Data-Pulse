@@ -48,12 +48,30 @@ function buildQueryString(params?: FilterParams): string {
   return qs ? `?${qs}` : "";
 }
 
-function getAuthHeaders(): Record<string, string> {
-  if (typeof window !== "undefined") {
-    const token = localStorage.getItem("access_token");
-    if (token) {
-      return { Authorization: `Bearer ${token}` };
-    }
+/**
+ * Retrieve the access token.
+ * Tries the NextAuth session first (Keycloak OIDC), then falls back to
+ * localStorage for backwards compatibility (e.g. API-key based auth).
+ */
+async function getAccessToken(): Promise<string | null> {
+  if (typeof window === "undefined") return null;
+
+  // Try NextAuth session (Keycloak)
+  try {
+    const session = await getSession();
+    if (session?.accessToken) return session.accessToken;
+  } catch {
+    // getSession may fail during SSR or before hydration — fall through
+  }
+
+  // Fallback: localStorage
+  return localStorage.getItem("access_token");
+}
+
+async function getAuthHeaders(): Promise<Record<string, string>> {
+  const token = await getAccessToken();
+  if (token) {
+    return { Authorization: `Bearer ${token}` };
   }
   return {};
 }
@@ -63,7 +81,8 @@ async function _request<T>(url: string, init?: RequestInit): Promise<T> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 15_000);
   try {
-    const mergedHeaders = { ...getAuthHeaders(), ...init?.headers };
+    const authHeaders = await getAuthHeaders();
+    const mergedHeaders = { ...authHeaders, ...init?.headers };
     const res = await fetch(url, {
       ...init,
       headers: mergedHeaders,
