@@ -7,6 +7,14 @@ sources:
     tables:
       - name: sales
         description: "Raw sales transactions from quarterly Excel exports"
+        loaded_at_field: loaded_at
+        freshness:
+          warn_after:
+            count: 24
+            period: hour
+          error_after:
+            count: 48
+            period: hour
         columns:
           - name: id
             description: "Auto-generated primary key"
