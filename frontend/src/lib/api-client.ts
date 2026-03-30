@@ -1,3 +1,4 @@
+import { getSession } from "next-auth/react";
 import { API_BASE_URL } from "./constants";
 import type { FilterParams } from "@/types/filters";
 
