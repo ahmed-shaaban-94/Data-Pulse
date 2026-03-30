@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Printer } from "lucide-react";
+import { Printer, BarChart3, TrendingUp, Trophy } from "lucide-react";
 import { Header } from "@/components/layout/header";
 import { Breadcrumbs } from "@/components/layout/breadcrumbs";
 import { PageTransition } from "@/components/layout/page-transition";
@@ -9,6 +9,20 @@ import { MonthlyTrendChart } from "@/components/dashboard/monthly-trend-chart";
 import { QuickRankings } from "@/components/dashboard/quick-rankings";
 import { LastUpdated } from "@/components/dashboard/last-updated";
 import { FilterBar } from "@/components/filters/filter-bar";
+
+function SectionHeader({ icon: Icon, title }: { icon: React.ComponentType<{ className?: string }>; title: string }) {
+  return (
+    <div className="flex items-center gap-2.5">
+      <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-accent/10">
+        <Icon className="h-4 w-4 text-accent" />
+      </div>
+      <h2 className="text-sm font-semibold uppercase tracking-wider text-text-secondary">
+        {title}
+      </h2>
+      <div className="flex-1 section-divider" />
+    </div>
+  );
+}
 
 export default function DashboardPage() {
   return (
@@ -23,7 +37,7 @@ export default function DashboardPage() {
           <div className="flex items-center gap-3">
             <Link
               href="/dashboard/report"
-              className="flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium text-text-secondary transition-colors hover:bg-divider hover:text-text-primary"
+              className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium text-text-secondary transition-all hover:bg-accent/10 hover:text-accent"
             >
               <Printer className="h-4 w-4" />
               Print Report
@@ -32,13 +46,25 @@ export default function DashboardPage() {
           </div>
         </div>
         <FilterBar />
+
+        {/* KPI Section */}
         <KPIGrid />
-        <div className="mt-6 grid gap-6 lg:grid-cols-2">
-          <DailyTrendChart />
-          <MonthlyTrendChart />
+
+        {/* Trends Section */}
+        <div className="mt-8">
+          <SectionHeader icon={TrendingUp} title="Trends" />
+          <div className="mt-4 grid gap-6 lg:grid-cols-2">
+            <DailyTrendChart />
+            <MonthlyTrendChart />
+          </div>
         </div>
-        <div className="mt-6">
-          <QuickRankings />
+
+        {/* Rankings Section */}
+        <div className="mt-8">
+          <SectionHeader icon={Trophy} title="Top Performers" />
+          <div className="mt-4">
+            <QuickRankings />
+          </div>
         </div>
       </div>
     </PageTransition>

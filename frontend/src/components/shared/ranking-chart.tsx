@@ -8,6 +8,7 @@ import {
   YAxis,
   Tooltip,
   ResponsiveContainer,
+  Cell,
 } from "recharts";
 import type { RankingItem } from "@/types/api";
 import { formatCurrency, truncate } from "@/lib/formatters";
@@ -17,6 +18,19 @@ import { useChartTheme } from "@/hooks/use-chart-theme";
 interface RankingChartProps {
   items: RankingItem[];
   className?: string;
+}
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
+function CustomTooltip({ active, payload }: any) {
+  if (!active || !payload?.length) return null;
+  return (
+    <div className="rounded-xl border border-border bg-card/95 px-4 py-3 shadow-xl backdrop-blur-sm">
+      <p className="text-xs font-medium text-text-secondary">{payload[0].payload.name}</p>
+      <p className="mt-1 text-lg font-bold text-text-primary">
+        {formatCurrency(payload[0].value)}
+      </p>
+    </div>
+  );
 }
 
 export function RankingChart({ items, className }: RankingChartProps) {
@@ -33,13 +47,13 @@ export function RankingChart({ items, className }: RankingChartProps) {
 
   return (
     <div className={className}>
-      <ResponsiveContainer width="100%" height={items.length * 40 + 20}>
+      <ResponsiveContainer width="100%" height={items.length * 44 + 20}>
         <BarChart data={chartData} layout="vertical" margin={{ left: 0 }}>
           <XAxis
             type="number"
             tick={{ fill: CHART_THEME.tickFill, fontSize: CHART_THEME.tickFontSize }}
             tickLine={false}
-            axisLine={{ stroke: CHART_THEME.axisStroke }}
+            axisLine={false}
             tickFormatter={(v) => formatCurrency(v)}
           />
           <YAxis
@@ -50,16 +64,21 @@ export function RankingChart({ items, className }: RankingChartProps) {
             axisLine={false}
             width={150}
           />
-          <Tooltip
-            contentStyle={{
-              backgroundColor: CHART_THEME.tooltipBg,
-              border: `1px solid ${CHART_THEME.tooltipBorder}`,
-              borderRadius: "8px",
-              color: CHART_THEME.tooltipColor,
-            }}
-            formatter={(value: number) => [formatCurrency(value), "Revenue"]}
-          />
-          <Bar dataKey="value" radius={[0, 4, 4, 0]} />
+          <Tooltip content={<CustomTooltip />} cursor={{ fill: CHART_THEME.gridStroke, radius: 4 }} />
+          <Bar
+            dataKey="value"
+            radius={[0, 6, 6, 0]}
+            animationDuration={1000}
+            animationEasing="ease-out"
+          >
+            {chartData.map((entry, index) => (
+              <Cell
+                key={`cell-${index}`}
+                fill={CHART_COLORS[index % CHART_COLORS.length]}
+                fillOpacity={1 - index * 0.06}
+              />
+            ))}
+          </Bar>
         </BarChart>
       </ResponsiveContainer>
     </div>
