@@ -86,32 +86,43 @@ body {
   font-family: "Segoe UI", system-ui, sans-serif;
 }
 
-/* Scrollbar styling */
+/* ═══════════════════════════════════════════════
+   Custom Scrollbar
+   ═══════════════════════════════════════════════ */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  background: var(--bg-page);
+  background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--border);
-  border-radius: 4px;
+  background: var(--border-color);
+  border-radius: 99px;
+  transition: background 0.2s;
 }
 
 ::-webkit-scrollbar-thumb:hover {
   background: var(--text-secondary);
 }
 
-/* Staggered animation delays for grid items */
+/* Firefox scrollbar */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-color) transparent;
+}
+
+/* ═══════════════════════════════════════════════
+   Staggered animation delays for grid items
+   ═══════════════════════════════════════════════ */
 .stagger-1 { animation-delay: 0.05s; }
-.stagger-2 { animation-delay: 0.1s; }
+.stagger-2 { animation-delay: 0.10s; }
 .stagger-3 { animation-delay: 0.15s; }
-.stagger-4 { animation-delay: 0.2s; }
+.stagger-4 { animation-delay: 0.20s; }
 .stagger-5 { animation-delay: 0.25s; }
-.stagger-6 { animation-delay: 0.3s; }
+.stagger-6 { animation-delay: 0.30s; }
 .stagger-7 { animation-delay: 0.35s; }
 
 /* Smooth scroll for anchor links */
@@ -119,7 +130,9 @@ html {
   scroll-behavior: smooth;
 }
 
-/* Gradient text for hero headlines */
+/* ═══════════════════════════════════════════════
+   Gradient text for hero headlines
+   ═══════════════════════════════════════════════ */
 .gradient-text {
   background: linear-gradient(135deg, #00BFA5, #2196F3);
   -webkit-background-clip: text;
@@ -127,24 +140,50 @@ html {
   background-clip: text;
 }
 
-/* Glow card hover effect */
+/* ═══════════════════════════════════════════════
+   Glow card hover effect (enhanced)
+   ═══════════════════════════════════════════════ */
 .glow-card {
   position: relative;
-  transition: box-shadow 0.3s ease, border-color 0.3s ease;
+  transition: box-shadow 0.3s ease, border-color 0.3s ease, transform 0.3s ease;
 }
 
 .glow-card:hover {
-  box-shadow: 0 0 30px rgba(0, 191, 165, 0.1);
+  box-shadow:
+    0 4px 20px rgba(0, 191, 165, 0.08),
+    0 0 40px rgba(0, 191, 165, 0.06);
   border-color: rgba(0, 191, 165, 0.3);
 }
 
-/* Section divider gradient line */
+/* ═══════════════════════════════════════════════
+   Section divider gradient line
+   ═══════════════════════════════════════════════ */
 .section-divider {
   height: 1px;
-  background: linear-gradient(90deg, transparent, #00BFA5, transparent);
+  background: linear-gradient(90deg, transparent, var(--accent-color), transparent);
+  opacity: 0.4;
 }
 
-/* Scroll-triggered animation */
+/* ═══════════════════════════════════════════════
+   Section header with accent line
+   ═══════════════════════════════════════════════ */
+.section-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.section-header::before {
+  content: '';
+  width: 3px;
+  height: 1.25rem;
+  border-radius: 99px;
+  background: linear-gradient(to bottom, var(--accent-color), transparent);
+}
+
+/* ═══════════════════════════════════════════════
+   Scroll-triggered animation
+   ═══════════════════════════════════════════════ */
 .animate-on-scroll {
   opacity: 0;
   transform: translateY(20px);
@@ -156,7 +195,9 @@ html {
   transform: translateY(0);
 }
 
-/* Pipeline connector line */
+/* ═══════════════════════════════════════════════
+   Pipeline connector line
+   ═══════════════════════════════════════════════ */
 .pipeline-connector {
   position: relative;
 }
@@ -175,7 +216,9 @@ html {
   display: none;
 }
 
-/* Shimmer loading effect */
+/* ═══════════════════════════════════════════════
+   Shimmer loading effect (enhanced)
+   ═══════════════════════════════════════════════ */
 @keyframes shimmer {
   0% {
     background-position: -200% 0;
@@ -188,6 +231,21 @@ html {
 .shimmer-line {
   position: relative;
   overflow: hidden;
+  border-radius: 6px;
+}
+
+:root .shimmer-line {
+  background: linear-gradient(
+    90deg,
+    #E8ECF0 0%,
+    #F0F3F6 50%,
+    #E8ECF0 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+}
+
+.dark .shimmer-line {
   background: linear-gradient(
     90deg,
     #21262D 0%,
@@ -198,7 +256,25 @@ html {
   animation: shimmer 1.5s ease-in-out infinite;
 }
 
-/* Toast slide-in animation */
+/* ═══════════════════════════════════════════════
+   Pulse glow animation for live indicators
+   ═══════════════════════════════════════════════ */
+@keyframes pulseGlow {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(0, 191, 165, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(0, 191, 165, 0);
+  }
+}
+
+.pulse-glow {
+  animation: pulseGlow 2s ease-in-out infinite;
+}
+
+/* ═══════════════════════════════════════════════
+   Toast slide-in animation
+   ═══════════════════════════════════════════════ */
 @keyframes slideInRight {
   from { opacity: 0; transform: translateX(100%); }
   to { opacity: 1; transform: translateX(0); }
@@ -208,13 +284,27 @@ html {
   animation: slideInRight 0.3s ease-out forwards;
 }
 
-/* Skip to content (accessibility) */
+/* ═══════════════════════════════════════════════
+   Counter number animation
+   ═══════════════════════════════════════════════ */
+@keyframes countUp {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-count-up {
+  animation: countUp 0.5s ease-out forwards;
+}
+
+/* ═══════════════════════════════════════════════
+   Skip to content (accessibility)
+   ═══════════════════════════════════════════════ */
 .skip-to-content {
   position: absolute;
   left: -9999px;
   z-index: 999;
   padding: 0.5rem 1rem;
-  background: var(--accent);
+  background: var(--accent-color);
   color: var(--bg-page);
   font-weight: 600;
   border-radius: 0 0 0.5rem 0;
@@ -227,12 +317,14 @@ html {
 
 /* Focus visible ring for all interactive elements */
 :focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--accent-color);
   outline-offset: 2px;
   border-radius: 4px;
 }
 
-/* react-day-picker DataPulse overrides */
+/* ═══════════════════════════════════════════════
+   react-day-picker DataPulse overrides
+   ═══════════════════════════════════════════════ */
 .rdp-datapulse {
   --rdp-accent-color: var(--accent-color);
   --rdp-accent-background-color: var(--accent-color);
@@ -246,7 +338,22 @@ html {
   background: var(--divider);
 }
 
-/* Print styles */
+/* ═══════════════════════════════════════════════
+   Recharts custom overrides
+   ═══════════════════════════════════════════════ */
+.recharts-default-tooltip {
+  border-radius: 12px !important;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12) !important;
+}
+
+.recharts-cartesian-grid-horizontal line,
+.recharts-cartesian-grid-vertical line {
+  stroke-opacity: 0.5;
+}
+
+/* ═══════════════════════════════════════════════
+   Print styles
+   ═══════════════════════════════════════════════ */
 @media print {
   nav, aside, .skip-to-content, button { display: none !important; }
   body { background: white !important; color: black !important; }
@@ -254,7 +361,9 @@ html {
   * { color-adjust: exact; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 }
 
-/* Reduced motion */
+/* ═══════════════════════════════════════════════
+   Reduced motion
+   ═══════════════════════════════════════════════ */
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;

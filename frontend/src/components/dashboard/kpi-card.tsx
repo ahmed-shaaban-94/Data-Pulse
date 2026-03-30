@@ -8,9 +8,10 @@ interface KPICardProps {
   trendLabel?: string;
   icon?: React.ComponentType<{ className?: string }>;
   className?: string;
+  accentGradient?: string;
 }
 
-export function KPICard({ label, value, trend, trendLabel, icon: Icon, className }: KPICardProps) {
+export function KPICard({ label, value, trend, trendLabel, icon: Icon, className, accentGradient }: KPICardProps) {
   const isPositive = trend !== null && trend !== undefined && trend > 0;
   const isNegative = trend !== null && trend !== undefined && trend < 0;
 
@@ -22,45 +23,64 @@ export function KPICard({ label, value, trend, trendLabel, icon: Icon, className
 
   const TrendIcon = isPositive ? TrendingUp : isNegative ? TrendingDown : Minus;
 
-  const accentBorderColor = isPositive
-    ? "border-t-growth-green"
-    : isNegative
-      ? "border-t-growth-red"
-      : "border-t-accent";
-
   const pillBg = isPositive
     ? "bg-growth-green/10 text-growth-green"
     : isNegative
       ? "bg-growth-red/10 text-growth-red"
       : "bg-text-secondary/10 text-text-secondary";
 
+  const defaultGradient = isPositive
+    ? "from-growth-green/20 to-transparent"
+    : isNegative
+      ? "from-growth-red/20 to-transparent"
+      : "from-accent/20 to-transparent";
+
+  const gradient = accentGradient || defaultGradient;
+
   return (
     <div
       className={cn(
-        "glow-card rounded-lg border border-border border-t-2 bg-card p-5",
-        "transition-all duration-300 hover:scale-[1.02]",
-        accentBorderColor,
+        "group relative overflow-hidden rounded-xl border border-border bg-card p-5",
+        "transition-all duration-300 hover:scale-[1.03] hover:shadow-lg",
+        "hover:border-accent/40 hover:shadow-accent/5",
         className,
       )}
     >
-      <div className="flex items-start justify-between">
-        <p className="text-xs font-semibold uppercase tracking-wide text-text-secondary">
+      {/* Gradient accent strip at top */}
+      <div className={cn(
+        "absolute inset-x-0 top-0 h-1 bg-gradient-to-r",
+        isPositive ? "from-growth-green to-growth-green/50" :
+        isNegative ? "from-growth-red to-growth-red/50" :
+        "from-accent to-accent/50"
+      )} />
+
+      {/* Background glow on hover */}
+      <div className={cn(
+        "absolute -right-4 -top-4 h-24 w-24 rounded-full bg-gradient-to-br opacity-0 blur-2xl transition-opacity duration-500 group-hover:opacity-100",
+        gradient,
+      )} />
+
+      <div className="relative flex items-start justify-between">
+        <p className="text-xs font-semibold uppercase tracking-wider text-text-secondary">
           {label}
         </p>
         {Icon && (
-          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-accent/10">
-            <Icon className="h-4 w-4 text-accent" />
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent/10 transition-all duration-300 group-hover:bg-accent/20 group-hover:scale-110">
+            <Icon className="h-5 w-5 text-accent" />
           </div>
         )}
       </div>
 
-      <p className="mt-3 text-3xl font-bold tracking-tight text-text-primary">{value}</p>
+      <p className="relative mt-3 text-3xl font-bold tracking-tight text-text-primary">
+        {value}
+      </p>
 
       {trend !== undefined && (
-        <div className="mt-3 flex items-center gap-2">
+        <div className="relative mt-3 flex items-center gap-2">
           <span
             className={cn(
-              "inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold",
+              "inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold",
+              "transition-all duration-300 group-hover:scale-105",
               pillBg,
             )}
           >

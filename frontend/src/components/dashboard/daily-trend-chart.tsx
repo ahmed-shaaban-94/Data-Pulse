@@ -17,6 +17,20 @@ import { ErrorRetry } from "@/components/error-retry";
 import { formatCurrency, formatCompact } from "@/lib/formatters";
 import { parseDateKey } from "@/lib/date-utils";
 import { useChartTheme } from "@/hooks/use-chart-theme";
+import { TrendingUp, TrendingDown } from "lucide-react";
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
+function CustomTooltip({ active, payload, label }: any) {
+  if (!active || !payload?.length) return null;
+  return (
+    <div className="rounded-xl border border-border bg-card/95 px-4 py-3 shadow-xl backdrop-blur-sm">
+      <p className="text-xs font-medium text-text-secondary">{label}</p>
+      <p className="mt-1 text-lg font-bold text-accent">
+        {formatCurrency(payload[0].value)}
+      </p>
+    </div>
+  );
+}
 
 export function DailyTrendChart() {
   const { filters } = useFilters();
@@ -33,64 +47,66 @@ export function DailyTrendChart() {
     value: p.value,
   }));
 
+  const isPositiveGrowth = data.growth_pct !== null && data.growth_pct >= 0;
+
   return (
-    <div className="rounded-lg border border-border bg-card p-5">
-      <div className="mb-4 flex items-center justify-between">
+    <div className="group rounded-xl border border-border bg-card p-5 transition-all duration-300 hover:border-accent/30 hover:shadow-lg hover:shadow-accent/5">
+      <div className="mb-5 flex items-center justify-between">
         <div>
-          <h3 className="text-sm font-medium text-text-secondary">
+          <h3 className="text-sm font-semibold uppercase tracking-wider text-text-secondary">
             Daily Net Sales
           </h3>
-          <p className="text-xl font-bold text-text-primary">
+          <p className="mt-1 text-2xl font-bold text-text-primary">
             {formatCurrency(data.total)}
           </p>
         </div>
         {data.growth_pct !== null && (
-          <span
-            className={`text-sm font-medium ${
-              data.growth_pct >= 0 ? "text-growth-green" : "text-growth-red"
-            }`}
-          >
+          <div className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-semibold ${
+            isPositiveGrowth
+              ? "bg-growth-green/10 text-growth-green"
+              : "bg-growth-red/10 text-growth-red"
+          }`}>
+            {isPositiveGrowth ? (
+              <TrendingUp className="h-4 w-4" />
+            ) : (
+              <TrendingDown className="h-4 w-4" />
+            )}
             {data.growth_pct > 0 ? "+" : ""}
             {data.growth_pct.toFixed(1)}%
-          </span>
+          </div>
         )}
       </div>
       <ResponsiveContainer width="100%" height={280}>
         <AreaChart data={chartData}>
           <defs>
             <linearGradient id="dailyGradient" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor={CHART_THEME.accentColor} stopOpacity={0.3} />
-              <stop offset="95%" stopColor={CHART_THEME.accentColor} stopOpacity={0} />
+              <stop offset="0%" stopColor={CHART_THEME.accentColor} stopOpacity={0.4} />
+              <stop offset="50%" stopColor={CHART_THEME.accentColor} stopOpacity={0.1} />
+              <stop offset="100%" stopColor={CHART_THEME.accentColor} stopOpacity={0} />
             </linearGradient>
           </defs>
-          <CartesianGrid strokeDasharray="3 3" stroke={CHART_THEME.gridStroke} />
+          <CartesianGrid strokeDasharray="3 3" stroke={CHART_THEME.gridStroke} vertical={false} />
           <XAxis
             dataKey="date"
-            tick={{ fill: CHART_THEME.tickFill, fontSize: 12 }}
+            tick={{ fill: CHART_THEME.tickFill, fontSize: 11 }}
             tickLine={false}
-            axisLine={{ stroke: CHART_THEME.axisStroke }}
+            axisLine={false}
           />
           <YAxis
-            tick={{ fill: CHART_THEME.tickFill, fontSize: 12 }}
+            tick={{ fill: CHART_THEME.tickFill, fontSize: 11 }}
             tickLine={false}
-            axisLine={{ stroke: CHART_THEME.axisStroke }}
+            axisLine={false}
             tickFormatter={(v) => formatCompact(v)}
           />
-          <Tooltip
-            contentStyle={{
-              backgroundColor: CHART_THEME.tooltipBg,
-              border: `1px solid ${CHART_THEME.tooltipBorder}`,
-              borderRadius: "8px",
-              color: CHART_THEME.tooltipColor,
-            }}
-            formatter={(value: number) => [formatCurrency(value), "Net Sales"]}
-          />
+          <Tooltip content={<CustomTooltip />} />
           <Area
             type="monotone"
             dataKey="value"
             stroke={CHART_THEME.accentColor}
-            strokeWidth={2}
+            strokeWidth={2.5}
             fill="url(#dailyGradient)"
+            animationDuration={1200}
+            animationEasing="ease-out"
           />
         </AreaChart>
       </ResponsiveContainer>

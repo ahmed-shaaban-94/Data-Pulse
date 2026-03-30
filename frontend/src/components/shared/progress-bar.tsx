@@ -11,12 +11,12 @@ export function ProgressBar({ value, label, className }: ProgressBarProps) {
     <div className={cn("flex items-center gap-2", className)}>
       <div className="h-2 flex-1 overflow-hidden rounded-full bg-divider">
         <div
-          className="h-full rounded-full bg-accent transition-all"
+          className="h-full rounded-full bg-gradient-to-r from-accent to-accent/60 transition-all duration-500"
           style={{ width: `${Math.min(value, 100)}%` }}
         />
       </div>
       {label && (
-        <span className="w-12 text-right text-xs text-text-secondary">
+        <span className="w-12 text-right text-xs font-medium text-text-secondary">
           {label}
         </span>
       )}

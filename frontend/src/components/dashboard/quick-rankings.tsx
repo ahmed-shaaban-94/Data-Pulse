@@ -5,9 +5,16 @@ import { useTopCustomers } from "@/hooks/use-top-customers";
 import { useFilters } from "@/contexts/filter-context";
 import { formatCurrency } from "@/lib/formatters";
 import Link from "next/link";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Package, Users, Trophy } from "lucide-react";
 import { LoadingCard } from "@/components/loading-card";
+import { cn } from "@/lib/utils";
 import type { RankingItem } from "@/types/api";
+
+const RANK_COLORS = [
+  "from-chart-amber/20 to-chart-amber/5 text-chart-amber border-chart-amber/30",
+  "from-text-secondary/15 to-text-secondary/5 text-text-secondary border-text-secondary/30",
+  "from-chart-amber/10 to-chart-amber/5 text-chart-amber/70 border-chart-amber/20",
+];
 
 function RankingCard({
   title,
@@ -15,12 +22,16 @@ function RankingCard({
   items,
   isLoading,
   error,
+  icon: Icon,
+  accentColor,
 }: {
   title: string;
   href: string;
   items: RankingItem[] | undefined;
   isLoading: boolean;
   error?: Error;
+  icon: React.ComponentType<{ className?: string }>;
+  accentColor: string;
 }) {
   if (isLoading) {
     return <LoadingCard lines={5} />;
@@ -37,39 +48,59 @@ function RankingCard({
   const top5 = items?.slice(0, 5) ?? [];
 
   return (
-    <div className="rounded-xl border border-border bg-card">
+    <div className="group rounded-xl border border-border bg-card transition-all duration-300 hover:border-accent/30 hover:shadow-lg hover:shadow-accent/5">
       <div className="flex items-center justify-between border-b border-border px-5 py-4">
-        <h3 className="text-sm font-semibold text-accent">{title}</h3>
+        <div className="flex items-center gap-2.5">
+          <div className={cn("flex h-8 w-8 items-center justify-center rounded-lg", accentColor)}>
+            <Icon className="h-4 w-4" />
+          </div>
+          <h3 className="text-sm font-semibold text-text-primary">{title}</h3>
+        </div>
         <Link
           href={href}
-          className="flex items-center gap-1 text-xs font-medium text-accent hover:text-accent/80 transition-colors"
+          className="flex items-center gap-1 rounded-full px-3 py-1 text-xs font-medium text-accent transition-all hover:bg-accent/10"
         >
           View All
-          <ArrowRight className="h-3 w-3" />
+          <ArrowRight className="h-3 w-3 transition-transform group-hover:translate-x-0.5" />
         </Link>
       </div>
-      <ul className="divide-y divide-border">
-        {top5.map((item) => (
+      <ul className="divide-y divide-border/50">
+        {top5.map((item, index) => (
           <li
             key={item.key}
-            className="relative px-5 py-3 hover:bg-divider/50 transition-colors"
+            className="relative px-5 py-3.5 transition-colors hover:bg-accent/5"
           >
             <div className="flex items-center justify-between relative z-10">
               <div className="flex items-center gap-3 min-w-0">
-                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-accent/10 text-xs font-semibold text-accent">
-                  {item.rank}
-                </span>
-                <span className="truncate text-sm text-accent">
+                {index < 3 ? (
+                  <span className={cn(
+                    "flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gradient-to-br border text-xs font-bold",
+                    RANK_COLORS[index],
+                  )}>
+                    {index === 0 ? <Trophy className="h-3.5 w-3.5" /> : item.rank}
+                  </span>
+                ) : (
+                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-divider/50 text-xs font-medium text-text-secondary">
+                    {item.rank}
+                  </span>
+                )}
+                <span className={cn(
+                  "truncate text-sm",
+                  index === 0 ? "font-semibold text-text-primary" : "font-medium text-text-primary/80",
+                )}>
                   {item.name}
                 </span>
               </div>
-              <span className="shrink-0 text-sm font-medium text-accent">
+              <span className={cn(
+                "shrink-0 text-sm tabular-nums",
+                index === 0 ? "font-bold text-accent" : "font-medium text-text-primary/80",
+              )}>
                 {formatCurrency(item.value)}
               </span>
             </div>
-            <div className="mt-1.5 h-1 w-full overflow-hidden rounded-full bg-divider">
+            <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-divider/50">
               <div
-                className="h-full rounded-full bg-accent/30 transition-all"
+                className="h-full rounded-full bg-gradient-to-r from-accent to-accent/40 transition-all duration-700"
                 style={{ width: `${Math.min(item.pct_of_total, 100)}%` }}
               />
             </div>
@@ -104,6 +135,8 @@ export function QuickRankings() {
         items={products?.items}
         isLoading={productsLoading}
         error={productsError}
+        icon={Package}
+        accentColor="bg-accent/10 text-accent"
       />
       <RankingCard
         title="Top 5 Customers"
@@ -111,6 +144,8 @@ export function QuickRankings() {
         items={customers?.items}
         isLoading={customersLoading}
         error={customersError}
+        icon={Users}
+        accentColor="bg-chart-blue/10 text-chart-blue"
       />
     </div>
   );
