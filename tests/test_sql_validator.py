@@ -149,8 +149,14 @@ class TestValidateSqlBlockedKeywords:
             validate_sql("SELECT grant FROM t")
 
     def test_do_dollar_blocked(self):
+        # DO $$ is caught by the non-SELECT sanity check at the end
+        with pytest.raises(SQLValidationError):
+            validate_sql("DO $$ BEGIN END $$")
+
+    def test_grant_in_subquery_blocked(self):
+        # Blocked keyword inside a subquery still triggers the blocklist
         with pytest.raises(SQLValidationError, match="disallowed keyword"):
-            validate_sql("SELECT 1; DO $$ BEGIN END $$")
+            validate_sql("SELECT * FROM (SELECT GRANT FROM t) sub")
 
 
 # ---------------------------------------------------------------------------
@@ -166,10 +172,10 @@ class TestValidateSqlNormalisation:
         assert not result.endswith(";")
         assert result == "SELECT 1"
 
-    def test_multiple_trailing_semicolons_stripped(self):
-        result = validate_sql("SELECT 1;;;")
-        # rstrip(";") removes all trailing semicolons
-        assert not result.endswith(";")
+    def test_multiple_trailing_semicolons_parsed_as_multiple(self):
+        # sqlparse treats extra semicolons as multiple statements
+        with pytest.raises(SQLValidationError, match="single"):
+            validate_sql("SELECT 1;;;")
 
     def test_leading_whitespace_trimmed(self):
         result = validate_sql("   SELECT 1")
