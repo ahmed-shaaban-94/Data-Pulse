@@ -131,7 +131,13 @@ async def stream_run_progress(
         elapsed = 0
 
         while elapsed < MAX_DURATION:
-            current = await loop.run_in_executor(None, service.get_run, run_id)
+            try:
+                current = await loop.run_in_executor(None, service.get_run, run_id)
+            except Exception as exc:
+                log.error("sse_poll_error", run_id=str(run_id), error=str(exc))
+                yield _sse_event("error", {"message": "Internal error polling run status"})
+                return
+
             if current is None:
                 yield _sse_event("error", {"message": "Run not found"})
                 return

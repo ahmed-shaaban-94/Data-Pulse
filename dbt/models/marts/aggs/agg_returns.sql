@@ -53,5 +53,5 @@ SELECT
     r.return_amount,
     r.return_count
 FROM returns_monthly r
-INNER JOIN {{ ref('dim_product') }}  p ON r.product_key  = p.product_key
-INNER JOIN {{ ref('dim_customer') }} c ON r.customer_key = c.customer_key
+INNER JOIN {{ ref('dim_product') }}  p ON r.product_key  = p.product_key  AND r.tenant_id = p.tenant_id
+INNER JOIN {{ ref('dim_customer') }} c ON r.customer_key = c.customer_key AND r.tenant_id = c.tenant_id

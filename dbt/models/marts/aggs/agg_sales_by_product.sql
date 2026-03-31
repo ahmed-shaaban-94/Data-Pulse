@@ -76,4 +76,4 @@ SELECT
     r.unique_sites,
     r.avg_basket_size
 FROM with_rate r
-INNER JOIN {{ ref('dim_product') }} p ON r.product_key = p.product_key
+INNER JOIN {{ ref('dim_product') }} p ON r.product_key = p.product_key AND r.tenant_id = p.tenant_id

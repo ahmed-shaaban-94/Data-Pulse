@@ -37,7 +37,10 @@ class QualityRepository:
     def _row_to_response(row) -> QualityCheckResponse:
         details = row._mapping["details"]
         if isinstance(details, str):
-            details = json.loads(details)
+            try:
+                details = json.loads(details)
+            except json.JSONDecodeError:
+                details = {}
         return QualityCheckResponse(
             id=row._mapping["id"],
             tenant_id=row._mapping["tenant_id"],
@@ -96,11 +99,14 @@ class QualityRepository:
         ]
 
         responses: list[QualityCheckResponse] = []
-        for params in all_params:
-            row = self._session.execute(stmt, params).fetchone()
-            responses.append(self._row_to_response(row))
-
-        self._session.commit()
+        try:
+            for params in all_params:
+                row = self._session.execute(stmt, params).fetchone()
+                responses.append(self._row_to_response(row))
+            self._session.commit()
+        except Exception:
+            self._session.rollback()
+            raise
         return responses
 
     def get_checks_for_run(

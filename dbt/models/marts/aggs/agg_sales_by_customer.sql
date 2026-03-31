@@ -62,4 +62,4 @@ SELECT
     cm.insurance_count,
     cm.avg_basket_size
 FROM customer_monthly cm
-INNER JOIN {{ ref('dim_customer') }} c ON cm.customer_key = c.customer_key
+INNER JOIN {{ ref('dim_customer') }} c ON cm.customer_key = c.customer_key AND cm.tenant_id = c.tenant_id

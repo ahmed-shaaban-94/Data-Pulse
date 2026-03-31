@@ -26,6 +26,18 @@ log = get_logger(__name__)
 class DetailRepository:
     """Detail queries for individual products, customers, and staff."""
 
+    _ALLOWED_TABLES: frozenset[str] = frozenset({
+        "public_marts.agg_sales_by_product",
+        "public_marts.agg_sales_by_customer",
+        "public_marts.agg_sales_by_staff",
+    })
+
+    _ALLOWED_KEY_COLS: frozenset[str] = frozenset({
+        "product_key",
+        "customer_key",
+        "staff_key",
+    })
+
     def __init__(self, session: Session) -> None:
         self._session = session
 
@@ -36,6 +48,10 @@ class DetailRepository:
         key_value: int,
     ) -> list[TimeSeriesPoint]:
         """Return monthly net_amount trend for a given entity."""
+        if table not in self._ALLOWED_TABLES:
+            raise ValueError(f"Invalid table: {table}")
+        if key_col not in self._ALLOWED_KEY_COLS:
+            raise ValueError(f"Invalid key column: {key_col}")
         stmt = text(f"""
             SELECT
                 TO_CHAR(a.month, 'YYYY-MM') AS period,
