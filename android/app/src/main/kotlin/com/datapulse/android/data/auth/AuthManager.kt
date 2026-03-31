@@ -4,7 +4,13 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import com.datapulse.android.BuildConfig
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.withContext
 import net.openid.appauth.AuthorizationRequest
 import net.openid.appauth.AuthorizationResponse
@@ -29,7 +35,12 @@ class AuthManager @Inject constructor(
     private val context: Context,
     private val tokenStore: TokenStore,
 ) {
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private val authService = AuthorizationService(context)
+
+    /** Reactive auth state — emits true when user has a valid access token. */
+    val authState: StateFlow<Boolean> = tokenStore.hasAccessToken
+        .stateIn(scope, SharingStarted.Eagerly, false)
 
     private val serviceConfig = AuthorizationServiceConfiguration(
         Uri.parse("${BuildConfig.KEYCLOAK_URL}/protocol/openid-connect/auth"),

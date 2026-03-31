@@ -42,12 +42,17 @@ for f in "${MIGRATIONS_DIR}"/*.sql; do
         -v ON_ERROR_STOP=1 -f "$f"
 
     psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" \
-        -c "INSERT INTO public.schema_migrations (filename) VALUES ('${fname}')"
+        -c "INSERT INTO public.schema_migrations (filename) VALUES ('${fname}') ON CONFLICT (filename) DO NOTHING"
 
     applied=$((applied + 1))
 done
 
 echo "[prestart] Migrations done. Applied: ${applied}, Skipped: ${skipped}"
+
+# --- Create keycloak schema if it does not exist ---
+echo "[prestart] Ensuring 'keycloak' schema exists..."
+psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" \
+  -c "CREATE SCHEMA IF NOT EXISTS keycloak AUTHORIZATION ${DB_USER};"
 
 # --- Create lightdash database if it does not exist ---
 DB_EXISTS=$(psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d postgres -tAc \

@@ -17,6 +17,9 @@ private val Context.tokenDataStore: DataStore<Preferences> by preferencesDataSto
 class TokenStore @Inject constructor(
     private val context: Context,
 ) {
+    /** Reactive stream that emits true when an access token is present. */
+    val hasAccessToken = context.tokenDataStore.data.map { it[ACCESS_TOKEN] != null }
+
     suspend fun getAccessToken(): String? =
         context.tokenDataStore.data.map { it[ACCESS_TOKEN] }.first()
 

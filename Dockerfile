@@ -23,7 +23,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends postgresql-clie
     && rm -rf /var/lib/apt/lists/*
 
 COPY scripts/prestart.sh /app/scripts/prestart.sh
-RUN chmod +x /app/scripts/prestart.sh
+RUN sed -i 's/\r$//' /app/scripts/prestart.sh && chmod +x /app/scripts/prestart.sh
 
 CMD ["/app/scripts/prestart.sh"]
 
