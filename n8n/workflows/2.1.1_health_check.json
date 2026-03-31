@@ -16,7 +16,10 @@
       "name": "Every 5 Minutes",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
-      "position": [240, 300]
+      "position": [
+        240,
+        300
+      ]
     },
     {
       "parameters": {
@@ -29,7 +32,10 @@
       "name": "GET /health",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [480, 300],
+      "position": [
+        480,
+        300
+      ],
       "onError": "continueRegularOutput"
     },
     {
@@ -59,7 +65,10 @@
       "name": "Is Healthy?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
-      "position": [700, 300]
+      "position": [
+        700,
+        300
+      ]
     },
     {
       "parameters": {
@@ -91,7 +100,10 @@
       "name": "Log OK",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
-      "position": [940, 200]
+      "position": [
+        940,
+        200
+      ]
     },
     {
       "parameters": {
@@ -123,7 +135,10 @@
       "name": "Format Alert",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
-      "position": [940, 420]
+      "position": [
+        940,
+        420
+      ]
     }
   ],
   "connections": {
@@ -176,8 +191,10 @@
   },
   "tags": [
     {
-      "name": "phase-2.1"
+      "name": "phase-2.1",
+      "id": "bee4d181-a326-440f-af5e-f0cf61369156"
     }
   ],
-  "active": false
+  "active": false,
+  "id": "d33daade-6896-4135-9485-528d534fb304"
 }

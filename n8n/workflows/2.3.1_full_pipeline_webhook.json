@@ -19,7 +19,10 @@
       "name": "Webhook Pipeline Trigger",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
-      "position": [240, 300],
+      "position": [
+        240,
+        300
+      ],
       "webhookId": "pipeline-trigger"
     },
     {
@@ -37,7 +40,10 @@
       "name": "Set Status Running",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [480, 300]
+      "position": [
+        480,
+        300
+      ]
     },
     {
       "parameters": {
@@ -54,7 +60,10 @@
       "name": "Execute Bronze",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [720, 300]
+      "position": [
+        720,
+        300
+      ]
     },
     {
       "parameters": {
@@ -71,7 +80,10 @@
       "name": "Set Status Bronze Complete",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [960, 300]
+      "position": [
+        960,
+        300
+      ]
     },
     {
       "parameters": {
@@ -88,7 +100,10 @@
       "name": "Quality Check Bronze",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1080, 300]
+      "position": [
+        1080,
+        300
+      ]
     },
     {
       "parameters": {
@@ -116,7 +131,10 @@
       "name": "Bronze Quality Gate",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
-      "position": [1200, 300]
+      "position": [
+        1200,
+        300
+      ]
     },
     {
       "parameters": {
@@ -133,7 +151,10 @@
       "name": "Execute dbt Staging",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1320, 300]
+      "position": [
+        1320,
+        300
+      ]
     },
     {
       "parameters": {
@@ -150,7 +171,10 @@
       "name": "Set Status Silver Complete",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1560, 300]
+      "position": [
+        1560,
+        300
+      ]
     },
     {
       "parameters": {
@@ -167,7 +191,10 @@
       "name": "Quality Check Silver",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1680, 300]
+      "position": [
+        1680,
+        300
+      ]
     },
     {
       "parameters": {
@@ -195,7 +222,10 @@
       "name": "Silver Quality Gate",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
-      "position": [1800, 300]
+      "position": [
+        1800,
+        300
+      ]
     },
     {
       "parameters": {
@@ -212,7 +242,10 @@
       "name": "Execute dbt Marts",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1920, 300]
+      "position": [
+        1920,
+        300
+      ]
     },
     {
       "parameters": {
@@ -229,7 +262,10 @@
       "name": "Set Status Gold Complete",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [2160, 300]
+      "position": [
+        2160,
+        300
+      ]
     },
     {
       "parameters": {
@@ -246,7 +282,10 @@
       "name": "Quality Check Gold",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [2280, 300]
+      "position": [
+        2280,
+        300
+      ]
     },
     {
       "parameters": {
@@ -274,7 +313,10 @@
       "name": "Gold Quality Gate",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
-      "position": [2400, 300]
+      "position": [
+        2400,
+        300
+      ]
     },
     {
       "parameters": {
@@ -291,7 +333,10 @@
       "name": "Set Status Success",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [2520, 300]
+      "position": [
+        2520,
+        300
+      ]
     },
     {
       "parameters": {
@@ -308,7 +353,10 @@
       "name": "Failed Bronze Quality",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1200, 560]
+      "position": [
+        1200,
+        560
+      ]
     },
     {
       "parameters": {
@@ -325,7 +373,10 @@
       "name": "Failed Silver Quality",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1800, 560]
+      "position": [
+        1800,
+        560
+      ]
     },
     {
       "parameters": {
@@ -342,7 +393,10 @@
       "name": "Failed Gold Quality",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [2400, 560]
+      "position": [
+        2400,
+        560
+      ]
     },
     {
       "parameters": {},
@@ -350,7 +404,10 @@
       "name": "Error Trigger",
       "type": "n8n-nodes-base.errorTrigger",
       "typeVersion": 1,
-      "position": [1200, 560]
+      "position": [
+        1200,
+        560
+      ]
     },
     {
       "parameters": {
@@ -367,7 +424,10 @@
       "name": "Set Status Failed",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1440, 560]
+      "position": [
+        1440,
+        560
+      ]
     }
   ],
   "connections": {
@@ -569,14 +629,18 @@
   },
   "tags": [
     {
-      "name": "datapulse"
+      "name": "datapulse",
+      "id": "336da042-e90f-4ef0-aab0-1f2f2afee17d"
     },
     {
-      "name": "phase-2.3"
+      "name": "phase-2.3",
+      "id": "6a36885b-5be8-4f86-bc4f-c0cadf548194"
     },
     {
-      "name": "phase-2.5"
+      "name": "phase-2.5",
+      "id": "6d341340-2988-4987-a7ea-add04a04a81d"
     }
   ],
-  "active": false
+  "active": false,
+  "id": "a6e1a6f4-644e-421c-929a-fd4e98fd307a"
 }

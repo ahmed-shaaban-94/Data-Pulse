@@ -1,6 +1,22 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: "standalone",
+  // Proxy /api/v1/* and /health to the FastAPI backend.
+  // This lets NEXT_PUBLIC_API_URL stay empty (same-origin requests from the
+  // browser) while the Next.js server forwards the calls to the API container.
+  async rewrites() {
+    const apiOrigin = process.env.INTERNAL_API_URL || "http://api:8000";
+    return [
+      {
+        source: "/health",
+        destination: `${apiOrigin}/health`,
+      },
+      {
+        source: "/api/v1/:path*",
+        destination: `${apiOrigin}/api/v1/:path*`,
+      },
+    ];
+  },
   async headers() {
     return [
       {

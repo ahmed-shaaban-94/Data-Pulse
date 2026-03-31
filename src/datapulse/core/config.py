@@ -59,6 +59,11 @@ class Settings(BaseSettings):
     keycloak_realm: str = "datapulse"
     keycloak_client_id: str = "datapulse-frontend"
     keycloak_client_secret: str = ""
+    # Public-facing Keycloak URL (used for `iss` claim validation).
+    # Keycloak issues tokens with its public hostname as `iss`, which differs
+    # from the internal Docker hostname used to reach Keycloak server-side.
+    # Leave empty to fall back to keycloak_url (single-host / no-proxy setups).
+    keycloak_public_url: str = ""
 
     # Redis cache
     redis_url: str = ""
@@ -84,12 +89,24 @@ class Settings(BaseSettings):
 
     @property
     def keycloak_issuer_url(self) -> str:
-        """Keycloak issuer URL for JWT validation."""
+        """Internal Keycloak issuer URL — used to build the JWKS endpoint."""
         return f"{self.keycloak_url}/realms/{self.keycloak_realm}"
 
     @property
+    def keycloak_token_issuer_url(self) -> str:
+        """Public-facing issuer URL that must match the `iss` claim in tokens.
+
+        Keycloak embeds its public hostname in the `iss` claim, which can differ
+        from the internal Docker hostname. Set KEYCLOAK_PUBLIC_URL to the
+        host-visible base URL (e.g. ``http://localhost:8081``) when running
+        behind a port-mapping proxy.
+        """
+        base = self.keycloak_public_url or self.keycloak_url
+        return f"{base}/realms/{self.keycloak_realm}"
+
+    @property
     def keycloak_jwks_url(self) -> str:
-        """Keycloak JWKS endpoint for fetching public keys."""
+        """Keycloak JWKS endpoint — always uses the internal URL for server-side access."""
         return f"{self.keycloak_issuer_url}/protocol/openid-connect/certs"
 
     def warn_if_auth_disabled(self) -> None:

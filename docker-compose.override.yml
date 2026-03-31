@@ -27,6 +27,10 @@ services:
       - ./frontend/src:/app/src
       - ./frontend/public:/app/public
       - /app/node_modules
-      - /app/.next
     environment:
       - WATCHPACK_POLLING=true
+      - NODE_OPTIONS=--max-old-space-size=1536
+    deploy:
+      resources:
+        limits:
+          memory: 2G

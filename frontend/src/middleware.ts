@@ -6,6 +6,7 @@ import { getToken } from "next-auth/jwt";
 const PUBLIC_PATHS = [
   "/login",
   "/api/auth",
+  "/api/dev-login", // TEMP: dev bypass
   "/",           // Marketing landing page
   "/terms",
   "/privacy",

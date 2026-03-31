@@ -16,7 +16,10 @@
       "name": "Daily 18:00 Trigger",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
-      "position": [240, 300]
+      "position": [
+        240,
+        300
+      ]
     },
     {
       "parameters": {
@@ -29,7 +32,10 @@
       "name": "Get Latest Run",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [480, 300],
+      "position": [
+        480,
+        300
+      ],
       "onError": "continueRegularOutput"
     },
     {
@@ -43,7 +49,10 @@
       "name": "Get Quality Checks",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [720, 300],
+      "position": [
+        720,
+        300
+      ],
       "onError": "continueRegularOutput"
     },
     {
@@ -64,7 +73,10 @@
       "name": "Format Digest",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
-      "position": [960, 300]
+      "position": [
+        960,
+        300
+      ]
     },
     {
       "parameters": {
@@ -81,7 +93,10 @@
       "name": "Send Digest",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1200, 300],
+      "position": [
+        1200,
+        300
+      ],
       "onError": "continueRegularOutput"
     }
   ],
@@ -139,8 +154,10 @@
   },
   "tags": [
     {
-      "name": "phase-2.6"
+      "name": "phase-2.6",
+      "id": "8fa6cde2-84c7-42ca-96b3-6a4c0c42b9b6"
     }
   ],
-  "active": false
+  "active": false,
+  "id": "203ff7b7-0159-4046-af5e-0564509bc56f"
 }

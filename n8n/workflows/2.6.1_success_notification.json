@@ -7,7 +7,10 @@
       "name": "Sub-Workflow Trigger",
       "type": "n8n-nodes-base.executeWorkflowTrigger",
       "typeVersion": 1,
-      "position": [240, 300]
+      "position": [
+        240,
+        300
+      ]
     },
     {
       "parameters": {
@@ -33,7 +36,10 @@
       "name": "Format Success Message",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
-      "position": [480, 300]
+      "position": [
+        480,
+        300
+      ]
     },
     {
       "parameters": {
@@ -50,7 +56,10 @@
       "name": "Send Slack Notification",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [720, 300],
+      "position": [
+        720,
+        300
+      ],
       "onError": "continueRegularOutput"
     }
   ],
@@ -86,8 +95,10 @@
   },
   "tags": [
     {
-      "name": "phase-2.6"
+      "name": "phase-2.6",
+      "id": "8fa6cde2-84c7-42ca-96b3-6a4c0c42b9b6"
     }
   ],
-  "active": false
+  "active": false,
+  "id": "30aae530-414d-4335-ae88-348a67109cbd"
 }

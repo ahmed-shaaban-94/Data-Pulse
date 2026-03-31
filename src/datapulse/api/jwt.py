@@ -117,7 +117,7 @@ def verify_jwt(token: str, settings: Settings | None = None) -> dict[str, Any]:
             signing_key.key,
             algorithms=["RS256"],
             audience=settings.keycloak_client_id,
-            issuer=settings.keycloak_issuer_url,
+            issuer=settings.keycloak_token_issuer_url,
             options={
                 "verify_exp": True,
                 "verify_aud": True,

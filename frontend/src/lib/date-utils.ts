@@ -1,23 +1,25 @@
 import { format, subDays, startOfMonth, startOfYear } from "date-fns";
 
 /**
- * Parse integer date key (e.g., "20240115" or "2024-01-15") to display string.
+ * Parse integer date key (e.g., 20240115, "20240115", or "2024-01-15") to display string.
+ * Accepts both string and number since parseDecimals may convert integer strings to numbers.
  */
-export function parseDateKey(key: string): string {
+export function parseDateKey(key: string | number): string {
+  const k = String(key);
   // Handle "YYYY-MM-DD" format
-  if (key.includes("-") && key.length === 10) {
+  if (k.includes("-") && k.length === 10) {
     const d = new Date(key + "T00:00:00Z");
     return format(d, "MMM dd");
   }
   // Handle integer key like "20240115"
-  if (/^\d{8}$/.test(key)) {
-    const year = key.slice(0, 4);
-    const month = key.slice(4, 6);
-    const day = key.slice(6, 8);
+  if (/^\d{8}$/.test(k)) {
+    const year = k.slice(0, 4);
+    const month = k.slice(4, 6);
+    const day = k.slice(6, 8);
     const d = new Date(`${year}-${month}-${day}T00:00:00Z`);
     return format(d, "MMM dd");
   }
-  return key;
+  return k;
 }
 
 export function formatDateParam(date: Date): string {

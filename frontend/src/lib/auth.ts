@@ -1,14 +1,17 @@
 import type { AuthOptions } from "next-auth";
 import type { JWT } from "next-auth/jwt";
-import KeycloakProvider from "next-auth/providers/keycloak";
+
+// Internal Docker URL — used for server-side token exchange & userinfo
+const KC_INTERNAL = process.env.KEYCLOAK_ISSUER || "http://keycloak:8080/realms/datapulse";
+// Public browser-facing URL — used for the auth redirect the user clicks
+const KC_PUBLIC = process.env.KEYCLOAK_PUBLIC_URL || "http://localhost:8081/realms/datapulse";
 
 /**
  * Refresh the Keycloak access token using the refresh_token grant.
  * Returns the updated JWT on success, or marks it with an error on failure.
  */
 async function refreshAccessToken(token: JWT): Promise<JWT> {
-  const issuer = process.env.KEYCLOAK_ISSUER!;
-  const tokenUrl = `${issuer}/protocol/openid-connect/token`;
+  const tokenUrl = `${KC_INTERNAL}/protocol/openid-connect/token`;
 
   try {
     const params = new URLSearchParams({
@@ -59,14 +62,53 @@ function decodeJwtPayload(token: string): Record<string, unknown> {
   }
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const keycloakProvider: any = {
+  id: "keycloak",
+  name: "Keycloak",
+  type: "oauth",
+  clientId: process.env.KEYCLOAK_CLIENT_ID || "datapulse-frontend",
+  clientSecret: process.env.KEYCLOAK_CLIENT_SECRET || "",
+  authorization: {
+    url: `${KC_PUBLIC}/protocol/openid-connect/auth`,
+    params: { scope: "openid email profile" },
+  },
+  token: `${KC_INTERNAL}/protocol/openid-connect/token`,
+  userinfo: `${KC_INTERNAL}/protocol/openid-connect/userinfo`,
+  jwks_endpoint: `${KC_INTERNAL}/protocol/openid-connect/certs`,
+  // issuer must match the `iss` claim Keycloak puts in tokens.
+  // Token exchange happens server-to-server via KC_INTERNAL (keycloak:8080),
+  // so Keycloak embeds the internal hostname in the `iss` claim.
+  // The authorization redirect still uses KC_PUBLIC (set in authorization.url above).
+  issuer: KC_INTERNAL,
+  checks: ["pkce", "state"],
+  idToken: true,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  profile(profile: any) {
+    return {
+      id: profile.sub,
+      name: profile.name ?? profile.preferred_username,
+      email: profile.email,
+      image: profile.picture,
+    };
+  },
+};
+
 export const authOptions: AuthOptions = {
-  providers: [
-    KeycloakProvider({
-      clientId: process.env.KEYCLOAK_CLIENT_ID || "datapulse-frontend",
-      clientSecret: process.env.KEYCLOAK_CLIENT_SECRET || "",
-      issuer: process.env.KEYCLOAK_ISSUER || "http://localhost:8080/realms/datapulse",
-    }),
-  ],
+  providers: [keycloakProvider],
+  debug: true,
+
+  logger: {
+    error(code, metadata) {
+      console.error("[NEXTAUTH_ERROR]", code, JSON.stringify(metadata, null, 2));
+    },
+    warn(code) {
+      console.warn("[NEXTAUTH_WARN]", code);
+    },
+    debug(code, metadata) {
+      console.log("[NEXTAUTH_DEBUG]", code, JSON.stringify(metadata, null, 2));
+    },
+  },
 
   pages: {
     signIn: "/login",

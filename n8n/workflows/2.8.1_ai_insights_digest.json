@@ -16,7 +16,10 @@
       "name": "Daily 09:00 Trigger",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
-      "position": [240, 300]
+      "position": [
+        240,
+        300
+      ]
     },
     {
       "parameters": {
@@ -29,7 +32,10 @@
       "name": "Check AI Status",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [480, 300],
+      "position": [
+        480,
+        300
+      ],
       "onError": "continueRegularOutput"
     },
     {
@@ -47,7 +53,10 @@
       "name": "Is AI Available?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [720, 300]
+      "position": [
+        720,
+        300
+      ]
     },
     {
       "parameters": {
@@ -60,7 +69,10 @@
       "name": "Get AI Summary",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [960, 200],
+      "position": [
+        960,
+        200
+      ],
       "onError": "continueRegularOutput"
     },
     {
@@ -74,7 +86,10 @@
       "name": "Get Anomalies",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [960, 400],
+      "position": [
+        960,
+        400
+      ],
       "onError": "continueRegularOutput"
     },
     {
@@ -84,7 +99,7 @@
             {
               "id": "slack_text",
               "name": "slack_text",
-              "value": "=:brain: *DataPulse AI Daily Digest*\n\n*Executive Summary:*\n{{ $('Get AI Summary').item.json.narrative }}\n\n*Highlights:*\n{{ $('Get AI Summary').item.json.highlights.map(h => '• ' + h).join('\\n') }}\n\n*Anomalies Detected:* {{ $('Get Anomalies').item.json.total_checked }}\n{{ $('Get Anomalies').item.json.anomalies ? $('Get Anomalies').item.json.anomalies.map(a => '⚠ ' + a.description).join('\\n') : 'None' }}",
+              "value": "=:brain: *DataPulse AI Daily Digest*\n\n*Executive Summary:*\n{{ $('Get AI Summary').item.json.narrative }}\n\n*Highlights:*\n{{ $('Get AI Summary').item.json.highlights.map(h => '\u00e2\u20ac\u00a2 ' + h).join('\\n') }}\n\n*Anomalies Detected:* {{ $('Get Anomalies').item.json.total_checked }}\n{{ $('Get Anomalies').item.json.anomalies ? $('Get Anomalies').item.json.anomalies.map(a => '\u00e2\u0161\u00a0 ' + a.description).join('\\n') : 'None' }}",
               "type": "string"
             }
           ]
@@ -95,7 +110,10 @@
       "name": "Format AI Digest",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
-      "position": [1200, 300]
+      "position": [
+        1200,
+        300
+      ]
     },
     {
       "parameters": {
@@ -112,7 +130,10 @@
       "name": "Send AI Digest",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1440, 300],
+      "position": [
+        1440,
+        300
+      ],
       "onError": "continueRegularOutput"
     }
   ],
@@ -198,8 +219,10 @@
   },
   "tags": [
     {
-      "name": "phase-2.8"
+      "name": "phase-2.8",
+      "id": "0482070a-970d-4689-9d46-df409a000148"
     }
   ],
-  "active": false
+  "active": false,
+  "id": "91fe59c4-b287-4541-9f2d-49672959bf7b"
 }

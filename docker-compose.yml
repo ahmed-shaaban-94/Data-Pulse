@@ -107,7 +107,14 @@ services:
       KEYCLOAK_REALM: ${KEYCLOAK_REALM:-datapulse}
       KEYCLOAK_CLIENT_ID: ${KEYCLOAK_CLIENT_ID:-datapulse-frontend}
       KEYCLOAK_CLIENT_SECRET: ${KEYCLOAK_CLIENT_SECRET:-}
+      # Issuer URL — must match the `iss` claim in tokens.
+      # Token exchange is server-side via keycloak:8080, so tokens carry this as `iss`.
+      KEYCLOAK_PUBLIC_URL: http://keycloak:8080
       API_KEY: ${API_KEY:-}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      OPENROUTER_MODEL: ${OPENROUTER_MODEL:-openai/gpt-4o-mini:free}
+    ports:
+      - "127.0.0.1:8000:8000"
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.api.rule=PathPrefix(`/api`) || PathPrefix(`/health`)"
@@ -181,6 +188,8 @@ services:
       target: production
     container_name: datapulse-frontend
     restart: unless-stopped
+    ports:
+      - "127.0.0.1:3000:3000"
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.frontend.rule=PathPrefix(`/`)"
@@ -188,12 +197,20 @@ services:
       - "traefik.http.routers.frontend.priority=1"
       - "traefik.http.services.frontend.loadbalancer.server.port=3000"
     environment:
+      # NEXT_PUBLIC_API_URL is intentionally empty — browser calls use same-origin
+      # paths (e.g. /api/v1/summary) that are proxied by Next.js rewrites to
+      # INTERNAL_API_URL below.  Setting a cross-origin URL here has no effect
+      # because NEXT_PUBLIC_* vars are baked in at build time, not runtime.
       - NEXT_PUBLIC_API_URL=
+      # Server-side rewrite target — the API container hostname inside Docker.
+      - INTERNAL_API_URL=http://api:8000
       - KEYCLOAK_CLIENT_ID=datapulse-frontend
       - KEYCLOAK_CLIENT_SECRET=${KEYCLOAK_CLIENT_SECRET:-}
       - KEYCLOAK_ISSUER=http://keycloak:8080/realms/datapulse
+      - KEYCLOAK_PUBLIC_URL=http://localhost:8081/realms/datapulse
       - NEXTAUTH_URL=http://localhost:3000
       - NEXTAUTH_SECRET=${NEXTAUTH_SECRET:-change-me-to-a-random-secret}
+      - NEXTAUTH_DEBUG=true
     depends_on:
       api:
         condition: service_healthy
@@ -310,7 +327,7 @@ services:
     restart: unless-stopped
     command: start --import-realm --hostname-strict=false --http-enabled=true
     ports:
-      - "127.0.0.1:8080:8080"
+      - "127.0.0.1:8081:8080"
     environment:
       KC_DB: postgres
       KC_DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-datapulse}
@@ -321,7 +338,8 @@ services:
       KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?KEYCLOAK_ADMIN_PASSWORD must be set}
       KC_HEALTH_ENABLED: "true"
       KC_METRICS_ENABLED: "true"
-      KC_HOSTNAME: ${KEYCLOAK_HOSTNAME:-localhost}
+      KC_HOSTNAME_URL: "http://keycloak:8080"
+      KC_HOSTNAME_ADMIN_URL: "http://localhost:8081"
       KC_HTTP_PORT: "8080"
     volumes:
       - ./keycloak:/opt/keycloak/data/import:ro
@@ -329,7 +347,7 @@ services:
       postgres:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "exec 3<>/dev/tcp/localhost/8080 && echo -e 'GET /health/ready HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n' >&3 && cat <&3 | grep -q '200'"]
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/localhost/9000 && echo -e 'GET /health/ready HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n' >&3 && cat <&3 | grep -q 'UP'"]
       interval: 30s
       timeout: 10s
       retries: 5
@@ -340,6 +358,7 @@ services:
           memory: 512M
     networks:
       - backend
+      - frontend-net
 
 volumes:
   pgdata:
