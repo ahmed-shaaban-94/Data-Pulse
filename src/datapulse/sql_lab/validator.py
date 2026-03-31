@@ -72,9 +72,7 @@ def validate_sql(sql: str) -> str:
     # Check for blocked keywords
     match = _BLOCKED_KEYWORDS.search(sql)
     if match:
-        raise SQLValidationError(
-            f"SQL contains disallowed keyword: '{match.group()}'"
-        )
+        raise SQLValidationError(f"SQL contains disallowed keyword: '{match.group()}'")
 
     # Normalise: strip trailing semicolons
     normalised = str(stmt).strip().rstrip(";").strip()
@@ -82,9 +80,7 @@ def validate_sql(sql: str) -> str:
     # Basic sanity check: must start with SELECT or WITH
     upper = normalised.upper().lstrip()
     if not (upper.startswith("SELECT") or upper.startswith("WITH") or upper.startswith("EXPLAIN")):
-        raise SQLValidationError(
-            "Only SELECT, WITH (CTE), and EXPLAIN statements are allowed."
-        )
+        raise SQLValidationError("Only SELECT, WITH (CTE), and EXPLAIN statements are allowed.")
 
     log.debug("sql_validated", length=len(normalised))
     return normalised
@@ -119,13 +115,12 @@ def get_schema_tables(session) -> list[dict]:
         table_name = row[0]
         if table_name not in tables:
             tables[table_name] = []
-        tables[table_name].append({
-            "column_name": row[1],
-            "data_type": row[2],
-            "is_nullable": row[3] == "YES",
-        })
+        tables[table_name].append(
+            {
+                "column_name": row[1],
+                "data_type": row[2],
+                "is_nullable": row[3] == "YES",
+            }
+        )
 
-    return [
-        {"table_name": name, "columns": cols}
-        for name, cols in tables.items()
-    ]
+    return [{"table_name": name, "columns": cols} for name, cols in tables.items()]
