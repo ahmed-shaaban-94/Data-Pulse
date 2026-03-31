@@ -220,6 +220,16 @@ frontend/                            # Next.js 14 dashboard (Phase 1.5)
 │       ├── constants.ts             # Chart colors, nav items, API URL
 │       └── utils.ts                 # cn() helper
 
+android/                             # Android app (Kotlin + Jetpack Compose)
+├── app/
+│   └── src/main/kotlin/com/datapulse/android/
+│       ├── data/                    # Remote (Ktor) + Local (Room) + Auth (AppAuth)
+│       ├── domain/                  # Use cases + Repository interfaces + Models
+│       ├── presentation/            # Compose screens + ViewModels + Theme
+│       └── di/                      # Hilt DI modules
+├── build.gradle.kts
+└── gradle/libs.versions.toml
+
 tests/
 ├── conftest.py
 ├── test_reader.py
