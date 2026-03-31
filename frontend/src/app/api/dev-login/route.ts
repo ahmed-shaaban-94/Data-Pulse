@@ -29,8 +29,8 @@ export async function GET() {
       body: new URLSearchParams({
         client_id: process.env.KEYCLOAK_CLIENT_ID || "datapulse-frontend",
         grant_type: "password",
-        username: "demo-admin",
-        password: "Test1234!",
+        username: process.env.DEV_LOGIN_USERNAME || "demo-admin",
+        password: process.env.DEV_LOGIN_PASSWORD || "",
       }).toString(),
     });
 

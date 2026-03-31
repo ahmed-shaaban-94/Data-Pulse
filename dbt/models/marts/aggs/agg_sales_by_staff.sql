@@ -70,4 +70,4 @@ SELECT
     s.return_count,
     s.avg_transaction_value
 FROM staff_monthly s
-INNER JOIN {{ ref('dim_staff') }} st ON s.staff_key = st.staff_key
+INNER JOIN {{ ref('dim_staff') }} st ON s.staff_key = st.staff_key AND s.tenant_id = st.tenant_id

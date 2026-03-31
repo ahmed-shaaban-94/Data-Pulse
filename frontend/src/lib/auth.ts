@@ -96,7 +96,7 @@ const keycloakProvider: any = {
 
 export const authOptions: AuthOptions = {
   providers: [keycloakProvider],
-  debug: true,
+  debug: process.env.NODE_ENV === "development",
 
   logger: {
     error(code, metadata) {
