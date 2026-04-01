@@ -76,7 +76,12 @@ def read_and_concat(files: list[Path]) -> pl.DataFrame:
         )
 
         elapsed = time.perf_counter() - t0
-        log.info("file_read", file=file_path.name, rows=df.shape[0], seconds=round(elapsed, 2))
+        log.info(
+            "file_read",
+            file=file_path.name,
+            rows=df.shape[0],
+            seconds=round(elapsed, 2),
+        )
         frames.append(df)
 
     combined = pl.concat(frames, how="diagonal_relaxed")

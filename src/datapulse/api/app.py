@@ -40,7 +40,7 @@ def create_app() -> FastAPI:
         version="0.1.0",
     )
     app.state.limiter = limiter
-    app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+    app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)  # type: ignore[arg-type]
 
     # CORS for Next.js dev server
     app.add_middleware(
@@ -48,7 +48,12 @@ def create_app() -> FastAPI:
         allow_origins=settings.cors_origins,
         allow_credentials=True,
         allow_methods=["GET", "POST", "PATCH"],
-        allow_headers=["Content-Type", "Authorization", "X-API-Key", "X-Pipeline-Token"],
+        allow_headers=[
+            "Content-Type",
+            "Authorization",
+            "X-API-Key",
+            "X-Pipeline-Token",
+        ],
     )
 
     # Security headers middleware

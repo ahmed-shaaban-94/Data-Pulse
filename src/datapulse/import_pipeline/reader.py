@@ -66,7 +66,7 @@ def read_excel(
     if sheet_name is not None:
         kwargs["sheet_name"] = sheet_name
 
-    return pl.read_excel(**kwargs)
+    return pl.read_excel(**kwargs)  # type: ignore[call-overload]
 
 
 def read_file(

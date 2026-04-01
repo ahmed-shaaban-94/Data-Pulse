@@ -75,7 +75,7 @@ class AnalyticsRepository:
             LIMIT :limit
         """)
         rows = self._session.execute(stmt, params).fetchall()
-        return build_ranking(rows)
+        return build_ranking(list(rows))
 
     # ------------------------------------------------------------------
     # Public query methods
@@ -156,26 +156,27 @@ class AnalyticsRepository:
     def get_kpi_summary(self, target_date: date) -> KPISummary:
         """Return executive KPI snapshot for *target_date*.
 
-        Uses a single CTE query to fetch daily totals, basket size, and
-        previous-period comparisons from ``public_marts.metrics_summary``
-        and ``public_marts.agg_sales_daily``.  Sparkline is a separate query.
+        Uses a single unified CTE query to fetch daily KPIs, basket size,
+        and previous-period comparisons in ONE database round-trip.
+        Sparkline is a separate lightweight query.
         """
         log.info("get_kpi_summary", target_date=str(target_date))
 
         date_key = target_date.year * 10000 + target_date.month * 100 + target_date.day
 
-        # --- Single CTE: daily + basket + prev_month + prev_year --------
-        cte_stmt = text("""
+        stmt = text("""
             WITH daily AS (
                 SELECT daily_net_amount, mtd_net_amount, ytd_net_amount,
-                       daily_transactions, daily_unique_customers, daily_returns,
-                       mtd_transactions, ytd_transactions
+                       daily_transactions, daily_unique_customers,
+                       daily_returns, mtd_transactions, ytd_transactions
                 FROM public_marts.metrics_summary
                 WHERE full_date = :target_date
             ),
             basket AS (
-                SELECT SUM(total_net_amount)
-                       / NULLIF(SUM(transaction_count), 0) AS avg_basket
+                SELECT ROUND(
+                    SUM(total_net_amount) / NULLIF(SUM(transaction_count), 0),
+                    2
+                ) AS avg_basket_size
                 FROM public_marts.agg_sales_daily
                 WHERE date_key = :date_key
             ),
@@ -193,20 +194,29 @@ class AnalyticsRepository:
                     CAST(:target_date AS date) - INTERVAL '1 year'
                 AS date)
             )
-            SELECT d.daily_net_amount, d.mtd_net_amount, d.ytd_net_amount,
-                   d.daily_transactions, d.daily_unique_customers, d.daily_returns,
-                   d.mtd_transactions, d.ytd_transactions,
-                   b.avg_basket,
-                   pm.mtd_net_amount AS prev_mtd,
-                   py.ytd_net_amount AS prev_ytd
+            SELECT
+                d.daily_net_amount,
+                d.mtd_net_amount,
+                d.ytd_net_amount,
+                d.daily_transactions,
+                d.daily_unique_customers,
+                d.daily_returns,
+                d.mtd_transactions,
+                d.ytd_transactions,
+                b.avg_basket_size,
+                pm.mtd_net_amount AS prev_month_mtd,
+                py.ytd_net_amount AS prev_year_ytd
             FROM daily d
             LEFT JOIN basket b ON TRUE
             LEFT JOIN prev_month pm ON TRUE
             LEFT JOIN prev_year py ON TRUE
         """)
-        row = self._session.execute(
-            cte_stmt, {"target_date": target_date, "date_key": date_key}
-        ).fetchone()
+
+        row = (
+            self._session.execute(stmt, {"target_date": target_date, "date_key": date_key})
+            .mappings()
+            .fetchone()
+        )
 
         if row is None:
             log.warning("kpi_no_data", target_date=str(target_date))
@@ -225,30 +235,32 @@ class AnalyticsRepository:
                 sparkline=[],
             )
 
-        today_net = Decimal(str(row[0]))
-        mtd_net = Decimal(str(row[1]))
-        ytd_net = Decimal(str(row[2]))
-        daily_transactions = int(row[3])
-        daily_customers = int(row[4])
-        daily_returns = int(row[5]) if row[5] is not None else 0
-        mtd_transactions = int(row[6]) if row[6] is not None else 0
-        ytd_transactions = int(row[7]) if row[7] is not None else 0
-
+        today_net = Decimal(str(row["daily_net_amount"]))
+        mtd_net = Decimal(str(row["mtd_net_amount"]))
+        ytd_net = Decimal(str(row["ytd_net_amount"]))
+        daily_transactions = int(row["daily_transactions"])
+        daily_customers = int(row["daily_unique_customers"])
+        daily_returns = int(row["daily_returns"]) if row["daily_returns"] is not None else 0
+        mtd_transactions = (
+            int(row["mtd_transactions"]) if row["mtd_transactions"] is not None else 0
+        )
+        ytd_transactions = (
+            int(row["ytd_transactions"]) if row["ytd_transactions"] is not None else 0
+        )
         avg_basket = (
-            Decimal(str(row[8])).quantize(Decimal("0.01"))
-            if row[8] is not None
+            Decimal(str(row["avg_basket_size"])).quantize(Decimal("0.01"))
+            if row["avg_basket_size"] is not None
             else _ZERO
         )
 
         mom_growth: Decimal | None = None
-        if row[9] is not None:
-            mom_growth = safe_growth(mtd_net, Decimal(str(row[9])))
+        if row["prev_month_mtd"] is not None:
+            mom_growth = safe_growth(mtd_net, Decimal(str(row["prev_month_mtd"])))
 
         yoy_growth: Decimal | None = None
-        if row[10] is not None:
-            yoy_growth = safe_growth(ytd_net, Decimal(str(row[10])))
+        if row["prev_year_ytd"] is not None:
+            yoy_growth = safe_growth(ytd_net, Decimal(str(row["prev_year_ytd"])))
 
-        # --- Sparkline (last 7 days) — separate query -------------------
         sparkline = self.get_kpi_sparkline(target_date)
 
         return KPISummary(
@@ -294,7 +306,7 @@ class AnalyticsRepository:
             ORDER BY date_key
         """)
         rows = self._session.execute(stmt, params).fetchall()
-        return build_trend(rows)
+        return build_trend(list(rows))
 
     def get_monthly_trend(self, filters: AnalyticsFilter) -> TrendResult:
         """Return net-sales trend grouped by year-month."""
@@ -311,7 +323,7 @@ class AnalyticsRepository:
             ORDER BY year, month
         """)
         rows = self._session.execute(stmt, params).fetchall()
-        return build_trend(rows)
+        return build_trend(list(rows))
 
     def get_top_products(self, filters: AnalyticsFilter) -> RankingResult:
         """Return top-N products by net sales."""

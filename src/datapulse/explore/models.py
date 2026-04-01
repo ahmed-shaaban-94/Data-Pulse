@@ -30,10 +30,10 @@ class MetricType(StrEnum):
 
     sum = "sum"
     average = "average"
-    count = "count"
+    count = "count"  # type: ignore[assignment]
     count_distinct = "count_distinct"
-    min = "min"
-    max = "max"
+    min = "min"  # type: ignore[assignment]
+    max = "max"  # type: ignore[assignment]
 
 
 class Dimension(BaseModel):

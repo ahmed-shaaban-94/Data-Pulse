@@ -13,8 +13,11 @@ from sqlalchemy.orm import Session
 
 from datapulse.logging import get_logger
 from datapulse.reports.models import (
+    ParameterType,
     RenderedReport,
     RenderedSection,
+    ReportParameter,
+    ReportSection,
     ReportTemplate,
     SectionType,
 )
@@ -31,56 +34,61 @@ BUILTIN_TEMPLATES: list[ReportTemplate] = [
         name="Monthly Sales Overview",
         description="Sales performance summary for a given month",
         parameters=[
-            {"name": "year", "label": "Year", "param_type": "number", "default": 2025},
-            {
-                "name": "month",
-                "label": "Month",
-                "param_type": "select",
-                "default": "1",
-                "options": [str(i) for i in range(1, 13)],
-            },
+            ReportParameter(
+                name="year",
+                label="Year",
+                param_type=ParameterType.number,
+                default=2025,
+            ),
+            ReportParameter(
+                name="month",
+                label="Month",
+                param_type=ParameterType.select,
+                default="1",
+                options=[str(i) for i in range(1, 13)],
+            ),
         ],
         sections=[
-            {
-                "section_type": "text",
-                "title": "Report Period",
-                "text": "Monthly overview for :year-:month",
-            },
-            {
-                "section_type": "query",
-                "title": "Monthly KPIs",
-                "sql": """
+            ReportSection(
+                section_type=SectionType.text,
+                title="Report Period",
+                text="Monthly overview for :year-:month",
+            ),
+            ReportSection(
+                section_type=SectionType.query,
+                title="Monthly KPIs",
+                sql="""
                     SELECT total_net_amount, transaction_count, unique_customers,
                            unique_products, return_rate, mom_growth_pct, yoy_growth_pct
                     FROM public_marts.agg_sales_monthly
                     WHERE year = :year AND month = :month
                 """,
-                "chart_type": "table",
-            },
-            {
-                "section_type": "query",
-                "title": "Top 10 Products",
-                "sql": """
+                chart_type="table",
+            ),
+            ReportSection(
+                section_type=SectionType.query,
+                title="Top 10 Products",
+                sql="""
                     SELECT drug_name, total_net_amount, transaction_count, unique_customers
                     FROM public_marts.agg_sales_by_product
                     WHERE year = :year AND month = :month
                     ORDER BY total_net_amount DESC
                     LIMIT 10
                 """,
-                "chart_type": "horizontal-bar",
-            },
-            {
-                "section_type": "query",
-                "title": "Top 10 Customers",
-                "sql": """
+                chart_type="horizontal-bar",
+            ),
+            ReportSection(
+                section_type=SectionType.query,
+                title="Top 10 Customers",
+                sql="""
                     SELECT customer_name, total_net_amount, transaction_count
                     FROM public_marts.agg_sales_by_customer
                     WHERE year = :year AND month = :month
                     ORDER BY total_net_amount DESC
                     LIMIT 10
                 """,
-                "chart_type": "bar",
-            },
+                chart_type="bar",
+            ),
         ],
     ),
     ReportTemplate(
@@ -88,26 +96,31 @@ BUILTIN_TEMPLATES: list[ReportTemplate] = [
         name="Product Deep Dive",
         description="Detailed analysis of a specific product over time",
         parameters=[
-            {"name": "drug_name", "label": "Product Name", "param_type": "text", "default": ""},
+            ReportParameter(
+                name="drug_name",
+                label="Product Name",
+                param_type=ParameterType.text,
+                default="",
+            ),
         ],
         sections=[
-            {
-                "section_type": "text",
-                "title": "Product Analysis",
-                "text": "Deep dive for product: :drug_name",
-            },
-            {
-                "section_type": "query",
-                "title": "Monthly Trend",
-                "sql": """
+            ReportSection(
+                section_type=SectionType.text,
+                title="Product Analysis",
+                text="Deep dive for product: :drug_name",
+            ),
+            ReportSection(
+                section_type=SectionType.query,
+                title="Monthly Trend",
+                sql="""
                     SELECT year, month, month_name, total_net_amount,
                            transaction_count, unique_customers, return_rate
                     FROM public_marts.agg_sales_by_product
                     WHERE drug_name ILIKE :drug_name
                     ORDER BY year, month
                 """,
-                "chart_type": "line",
-            },
+                chart_type="line",
+            ),
         ],
     ),
     ReportTemplate(
@@ -115,13 +128,18 @@ BUILTIN_TEMPLATES: list[ReportTemplate] = [
         name="Returns Analysis",
         description="Top returns by product and customer",
         parameters=[
-            {"name": "year", "label": "Year", "param_type": "number", "default": 2025},
+            ReportParameter(
+                name="year",
+                label="Year",
+                param_type=ParameterType.number,
+                default=2025,
+            ),
         ],
         sections=[
-            {
-                "section_type": "query",
-                "title": "Top Returns by Product",
-                "sql": """
+            ReportSection(
+                section_type=SectionType.query,
+                title="Top Returns by Product",
+                sql="""
                     SELECT drug_name, SUM(return_amount) as total_return_amount,
                            SUM(return_count) as total_returns
                     FROM public_marts.agg_returns
@@ -130,12 +148,12 @@ BUILTIN_TEMPLATES: list[ReportTemplate] = [
                     ORDER BY total_return_amount DESC
                     LIMIT 15
                 """,
-                "chart_type": "horizontal-bar",
-            },
-            {
-                "section_type": "query",
-                "title": "Top Returns by Customer",
-                "sql": """
+                chart_type="horizontal-bar",
+            ),
+            ReportSection(
+                section_type=SectionType.query,
+                title="Top Returns by Customer",
+                sql="""
                     SELECT customer_name, SUM(return_amount) as total_return_amount,
                            SUM(return_count) as total_returns
                     FROM public_marts.agg_returns
@@ -144,8 +162,8 @@ BUILTIN_TEMPLATES: list[ReportTemplate] = [
                     ORDER BY total_return_amount DESC
                     LIMIT 15
                 """,
-                "chart_type": "bar",
-            },
+                chart_type="bar",
+            ),
         ],
     ),
 ]

@@ -103,7 +103,12 @@ class PipelineExecutor:
             "--select",
             selector,
         ]
-        log.info("executor_dbt_start", run_id=str(run_id), selector=selector, cmd=" ".join(cmd))
+        log.info(
+            "executor_dbt_start",
+            run_id=str(run_id),
+            selector=selector,
+            cmd=" ".join(cmd),
+        )
         t0 = time.perf_counter()
 
         try:
@@ -128,7 +133,12 @@ class PipelineExecutor:
                     duration_seconds=elapsed,
                 )
 
-            log.info("executor_dbt_done", run_id=str(run_id), selector=selector, seconds=elapsed)
+            log.info(
+                "executor_dbt_done",
+                run_id=str(run_id),
+                selector=selector,
+                seconds=elapsed,
+            )
             return ExecutionResult(
                 success=True,
                 duration_seconds=elapsed,

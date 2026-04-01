@@ -55,7 +55,9 @@ def require_pipeline_token(
 
 
 def get_current_user(
-    credentials: HTTPAuthorizationCredentials | None = Security(_bearer_scheme),  # noqa: B008
+    credentials: HTTPAuthorizationCredentials | None = Security(  # noqa: B008
+        _bearer_scheme
+    ),
     api_key: str | None = Security(_api_key_header),  # noqa: B008
     settings: Settings = Depends(get_settings),  # noqa: B008
 ) -> dict[str, Any]:
@@ -119,7 +121,9 @@ def get_current_user(
 
 
 def get_optional_user(
-    credentials: HTTPAuthorizationCredentials | None = Security(_bearer_scheme),  # noqa: B008
+    credentials: HTTPAuthorizationCredentials | None = Security(  # noqa: B008
+        _bearer_scheme
+    ),
     api_key: str | None = Security(_api_key_header),  # noqa: B008
     settings: Settings = Depends(get_settings),  # noqa: B008
 ) -> dict[str, Any] | None:

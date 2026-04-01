@@ -7,6 +7,7 @@ Financial values use Decimal for precision.
 from __future__ import annotations
 
 from datetime import date
+from decimal import Decimal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -99,7 +100,7 @@ class KPISummary(BaseModel):
     yoy_growth_pct: JsonDecimal | None = None
     daily_transactions: int
     daily_customers: int
-    avg_basket_size: JsonDecimal = Field(default=0)
+    avg_basket_size: JsonDecimal = Field(default=Decimal("0"))
     daily_returns: int = 0
     mtd_transactions: int = 0
     ytd_transactions: int = 0

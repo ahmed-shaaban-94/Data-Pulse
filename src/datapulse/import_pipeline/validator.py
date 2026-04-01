@@ -39,5 +39,9 @@ def validate_file(path: Path) -> FileFormat:
             f"File too large: {size_mb:.1f}MB (max {get_settings().max_file_size_mb}MB)"
         )
 
-    format_map = {".csv": FileFormat.CSV, ".xlsx": FileFormat.XLSX, ".xls": FileFormat.XLS}
+    format_map = {
+        ".csv": FileFormat.CSV,
+        ".xlsx": FileFormat.XLSX,
+        ".xls": FileFormat.XLS,
+    }
     return format_map[suffix]

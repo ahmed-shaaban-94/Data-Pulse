@@ -140,6 +140,6 @@ class Settings(BaseSettings):
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
     """Return the cached application settings singleton."""
-    settings = Settings()
+    settings = Settings()  # type: ignore[call-arg]
     settings.warn_if_auth_disabled()
     return settings
