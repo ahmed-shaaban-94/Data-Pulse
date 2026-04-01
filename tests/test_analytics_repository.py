@@ -192,6 +192,73 @@ def test_get_kpi_summary_with_data(analytics_repo, mock_session):
     assert result.yoy_growth_pct == Decimal("20.00")
 
 
+def test_get_kpi_summary_nulls_in_optional_fields(analytics_repo, mock_session):
+    """CTE returns data but optional fields (basket, prev_month, prev_year) are NULL."""
+    row = {
+        "daily_net_amount": 500,
+        "mtd_net_amount": 1500,
+        "ytd_net_amount": 10000,
+        "daily_transactions": 10,
+        "daily_unique_customers": 5,
+        "daily_returns": None,
+        "mtd_transactions": None,
+        "ytd_transactions": None,
+        "avg_basket_size": None,
+        "prev_month_mtd": None,
+        "prev_year_ytd": None,
+    }
+    mock_session.execute.return_value.mappings.return_value.fetchone.return_value = row
+    mock_session.execute.return_value.fetchall.return_value = []
+
+    result = analytics_repo.get_kpi_summary(date(2025, 1, 1))
+    assert result.today_net == Decimal("500")
+    assert result.daily_returns == 0
+    assert result.mtd_transactions == 0
+    assert result.ytd_transactions == 0
+    assert result.avg_basket_size == Decimal("0")
+    assert result.mom_growth_pct is None
+    assert result.yoy_growth_pct is None
+    assert result.sparkline == []
+
+
+def test_get_filter_options(analytics_repo, mock_session):
+    """UNION ALL filter options query returns mixed types correctly."""
+    mock_session.execute.return_value.fetchall.return_value = [
+        ("brand", "BrandA", None),
+        ("brand", "BrandB", None),
+        ("category", "Analgesic", None),
+        ("site", "Cairo", 1),
+        ("staff", "Ahmed", 10),
+    ]
+    result = analytics_repo.get_filter_options()
+    assert len(result.brands) == 2
+    assert len(result.categories) == 1
+    assert len(result.sites) == 1
+    assert result.sites[0].key == 1
+    assert result.sites[0].label == "Cairo"
+    assert len(result.staff) == 1
+    assert result.staff[0].key == 10
+
+
+def test_get_data_date_range(analytics_repo, mock_session):
+    """Date range returns min/max from metrics_summary."""
+    mock_session.execute.return_value.fetchone.return_value = (
+        date(2023, 1, 1),
+        date(2025, 12, 31),
+    )
+    min_d, max_d = analytics_repo.get_data_date_range()
+    assert min_d == date(2023, 1, 1)
+    assert max_d == date(2025, 12, 31)
+
+
+def test_get_data_date_range_empty(analytics_repo, mock_session):
+    """Date range returns None when no data."""
+    mock_session.execute.return_value.fetchone.return_value = (None, None)
+    min_d, max_d = analytics_repo.get_data_date_range()
+    assert min_d is None
+    assert max_d is None
+
+
 # ------------------------------------------------------------------
 # get_kpi_sparkline
 # ------------------------------------------------------------------
