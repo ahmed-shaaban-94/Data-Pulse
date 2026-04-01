@@ -63,15 +63,15 @@ export function RankingTable({ items, entityLabel, className }: RankingTableProp
               <td className="py-3 pr-4">
                 <RankBadge rank={item.rank} />
               </td>
-              <td className="py-3 pr-4">
+              <td className="py-3 pr-4 max-w-[200px]">
                 <span className={cn(
-                  "font-medium text-text-primary",
+                  "block font-medium text-text-primary truncate",
                   index === 0 && "text-accent",
-                )}>
+                )} title={item.name}>
                   {item.name}
                 </span>
               </td>
-              <td className="py-3 pr-4 text-right font-semibold text-text-primary">
+              <td className="py-3 pr-4 text-right font-semibold text-text-primary whitespace-nowrap">
                 {formatCurrency(item.value)}
               </td>
               <td className="py-3 text-right">

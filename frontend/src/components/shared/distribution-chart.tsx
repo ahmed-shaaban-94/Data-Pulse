@@ -33,14 +33,14 @@ export default function DistributionChart({
           {title}
         </h3>
       )}
-      <ResponsiveContainer width="100%" height={300}>
+      <ResponsiveContainer width="100%" height={320}>
         <PieChart>
           <Pie
             data={data}
             cx="50%"
-            cy="50%"
-            innerRadius={60}
-            outerRadius={100}
+            cy="45%"
+            innerRadius={55}
+            outerRadius={95}
             paddingAngle={2}
             dataKey="value"
             nameKey="name"
@@ -67,8 +67,12 @@ export default function DistributionChart({
             iconSize={8}
             wrapperStyle={{
               color: CHART_THEME.tickFill,
-              fontSize: CHART_THEME.tickFontSize,
+              fontSize: 10,
+              lineHeight: "18px",
+              maxHeight: "54px",
+              overflow: "hidden",
             }}
+            formatter={(value: string) => value.length > 20 ? `${value.slice(0, 20)}...` : value}
           />
         </PieChart>
       </ResponsiveContainer>

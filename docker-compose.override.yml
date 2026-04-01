@@ -1,6 +1,6 @@
 # Dev overrides — automatically merged by `docker compose up`
-# Production base: docker-compose.yml
-# To run prod only: docker compose -f docker-compose.yml up
+# Base file (docker-compose.yml) uses bare PORT:PORT (binds 0.0.0.0).
+# Production should use docker-compose.prod.yml with 127.0.0.1 bindings.
 services:
   app:
     volumes:

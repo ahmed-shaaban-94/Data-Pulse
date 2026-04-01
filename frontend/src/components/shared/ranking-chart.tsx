@@ -39,7 +39,7 @@ export function RankingChart({ items, className }: RankingChartProps) {
   const chartData = useMemo(
     () =>
       items.map((item, i) => ({
-        name: truncate(item.name),
+        name: truncate(item.name, 25),
         value: item.value,
         fill: CHART_COLORS[i % CHART_COLORS.length],
       })),
@@ -60,10 +60,10 @@ export function RankingChart({ items, className }: RankingChartProps) {
           <YAxis
             type="category"
             dataKey="name"
-            tick={{ fill: CHART_THEME.tickFill, fontSize: CHART_THEME.tickFontSize }}
+            tick={{ fill: CHART_THEME.tickFill, fontSize: 10 }}
             tickLine={false}
             axisLine={false}
-            width={150}
+            width={170}
           />
           <Tooltip content={<CustomTooltip />} cursor={{ fill: CHART_THEME.gridStroke, radius: 4 }} />
           <Bar

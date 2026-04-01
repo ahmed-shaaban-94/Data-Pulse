@@ -38,7 +38,7 @@ export function SummaryStats({ stats, className }: SummaryStatsProps) {
                 </div>
               )}
             </div>
-            <p className="mt-2 text-xl font-bold tracking-tight text-text-primary">
+            <p className="mt-2 text-lg font-bold tracking-tight text-text-primary truncate" title={stat.value}>
               {stat.value}
             </p>
           </div>

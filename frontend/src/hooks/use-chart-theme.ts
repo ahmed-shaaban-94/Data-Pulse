@@ -26,7 +26,7 @@ const DARK_CHART_THEME: ChartTheme = {
   tooltipBorder: "#30363D",
   tooltipColor: "#E6EDF3",
   accentColor: "#00BFA5",
-  chartBlue: "#2196F3",
+  chartBlue: "#26A69A",
   chartAmber: "#FFB300",
   cardBg: "#161B22",
 };
@@ -40,7 +40,7 @@ const LIGHT_CHART_THEME: ChartTheme = {
   tooltipBorder: "#D0D7DE",
   tooltipColor: "#1F2328",
   accentColor: "#00897B",
-  chartBlue: "#1976D2",
+  chartBlue: "#00897B",
   chartAmber: "#F9A825",
   cardBg: "#FFFFFF",
 };

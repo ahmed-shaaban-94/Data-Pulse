@@ -77,9 +77,11 @@ export function PipelineOverview() {
       {kpis.map((kpi) => (
         <div
           key={kpi.label}
-          className="rounded-xl border border-border bg-card p-5 transition-colors hover:border-accent/30"
+          className="group relative overflow-hidden rounded-xl border border-border bg-card p-5 transition-all duration-300 hover:border-accent/30 hover:shadow-md hover:shadow-accent/5"
         >
-          <p className="text-sm font-medium text-text-secondary">{kpi.label}</p>
+          {/* Top accent line — consistent with analytics cards */}
+          <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-accent to-accent/50" />
+          <p className="text-xs font-semibold uppercase tracking-wider text-text-secondary">{kpi.label}</p>
           <p className="mt-2 text-2xl font-bold text-text-primary">{kpi.value}</p>
         </div>
       ))}

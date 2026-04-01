@@ -11,7 +11,7 @@ services:
       - "--api.insecure=false"
       - "--log.level=WARN"
     ports:
-      - "127.0.0.1:80:80"
+      - "80:80"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
     depends_on:
@@ -56,7 +56,7 @@ services:
       prestart:
         condition: service_completed_successfully
     ports:
-      - "127.0.0.1:8888:8888"
+      - "8888:8888"
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-datapulse}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@postgres:5432/${POSTGRES_DB:-datapulse}
       DBT_HOST: postgres
@@ -108,13 +108,14 @@ services:
       KEYCLOAK_CLIENT_ID: ${KEYCLOAK_CLIENT_ID:-datapulse-frontend}
       KEYCLOAK_CLIENT_SECRET: ${KEYCLOAK_CLIENT_SECRET:-}
       # Issuer URL — must match the `iss` claim in tokens.
-      # Token exchange is server-side via keycloak:8080, so tokens carry this as `iss`.
-      KEYCLOAK_PUBLIC_URL: http://keycloak:8080
+      # Keycloak stamps tokens with its public hostname (KC_HOSTNAME_URL),
+      # which differs from the internal Docker hostname (keycloak:8080).
+      KEYCLOAK_PUBLIC_URL: http://localhost:8081
       API_KEY: ${API_KEY:-}
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
       OPENROUTER_MODEL: ${OPENROUTER_MODEL:-openai/gpt-4o-mini:free}
     ports:
-      - "127.0.0.1:8000:8000"
+      - "8000:8000"
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.api.rule=PathPrefix(`/api`) || PathPrefix(`/health`)"
@@ -140,7 +141,7 @@ services:
     container_name: datapulse-db
     restart: unless-stopped
     ports:
-      - "127.0.0.1:5432:5432"
+      - "5432:5432"
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-datapulse}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
@@ -167,7 +168,7 @@ services:
       postgres:
         condition: service_healthy
     ports:
-      - "127.0.0.1:5050:80"
+      - "5050:80"
     environment:
       PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@datapulse.dev}
       PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:?PGADMIN_PASSWORD must be set}
@@ -189,7 +190,7 @@ services:
     container_name: datapulse-frontend
     restart: unless-stopped
     ports:
-      - "127.0.0.1:3000:3000"
+      - "3000:3000"
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.frontend.rule=PathPrefix(`/`)"
@@ -285,7 +286,7 @@ services:
     container_name: datapulse-n8n
     restart: unless-stopped
     ports:
-      - "127.0.0.1:5678:5678"
+      - "5678:5678"
     environment:
       DB_TYPE: postgresdb
       DB_POSTGRESDB_HOST: postgres
@@ -324,7 +325,7 @@ services:
     container_name: datapulse-lightdash
     restart: unless-stopped
     ports:
-      - "127.0.0.1:8085:8080"
+      - "8085:8080"
     environment:
       PGHOST: postgres
       PGPORT: "5432"
@@ -361,7 +362,7 @@ services:
     restart: unless-stopped
     command: start --import-realm --hostname-strict=false --http-enabled=true
     ports:
-      - "127.0.0.1:8081:8080"
+      - "8081:8080"
     environment:
       KC_DB: postgres
       KC_DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-datapulse}
@@ -372,7 +373,7 @@ services:
       KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?KEYCLOAK_ADMIN_PASSWORD must be set}
       KC_HEALTH_ENABLED: "true"
       KC_METRICS_ENABLED: "true"
-      KC_HOSTNAME_URL: "http://keycloak:8080"
+      KC_HOSTNAME_URL: "http://localhost:8081"
       KC_HOSTNAME_ADMIN_URL: "http://localhost:8081"
       KC_HTTP_PORT: "8080"
     volumes:

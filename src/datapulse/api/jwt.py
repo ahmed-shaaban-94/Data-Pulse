@@ -116,23 +116,26 @@ def verify_jwt(token: str, settings: Settings | None = None) -> dict[str, Any]:
             token,
             signing_key.key,
             algorithms=["RS256"],
-            audience=settings.keycloak_client_id,
             issuer=settings.keycloak_token_issuer_url,
             options={
                 "verify_exp": True,
-                "verify_aud": True,
+                "verify_aud": False,
                 "verify_iss": True,
             },
         )
     except jwt.ExpiredSignatureError as exc:
         raise HTTPException(status_code=401, detail="Token has expired") from exc
-    except jwt.InvalidAudienceError as exc:
-        raise HTTPException(status_code=401, detail="Invalid token audience") from exc
     except jwt.InvalidIssuerError as exc:
         raise HTTPException(status_code=401, detail="Invalid token issuer") from exc
     except jwt.InvalidTokenError as exc:
         logger.warning("jwt_validation_failed", error=str(exc))
         raise HTTPException(status_code=401, detail="Invalid token") from exc
+
+    # Verify authorized party (azp) matches expected client — Keycloak always
+    # sets azp even when aud is absent (default for public clients).
+    azp = claims.get("azp")
+    if azp and azp != settings.keycloak_client_id:
+        raise HTTPException(status_code=401, detail="Invalid token client")
 
     return claims
 

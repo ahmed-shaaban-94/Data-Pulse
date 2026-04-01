@@ -76,10 +76,10 @@ const keycloakProvider: any = {
   userinfo: `${KC_INTERNAL}/protocol/openid-connect/userinfo`,
   jwks_endpoint: `${KC_INTERNAL}/protocol/openid-connect/certs`,
   // issuer must match the `iss` claim Keycloak puts in tokens.
-  // Token exchange happens server-to-server via KC_INTERNAL (keycloak:8080),
-  // so Keycloak embeds the internal hostname in the `iss` claim.
-  // The authorization redirect still uses KC_PUBLIC (set in authorization.url above).
-  issuer: KC_INTERNAL,
+  // With hostname-strict=false, Keycloak uses the browser-facing URL as `iss`,
+  // so we must use KC_PUBLIC here (not KC_INTERNAL).
+  // Token/userinfo/jwks endpoints still use KC_INTERNAL for server-to-server calls.
+  issuer: KC_PUBLIC,
   checks: ["pkce", "state"],
   idToken: true,
   profile(profile: any) {
