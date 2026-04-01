@@ -136,6 +136,7 @@ def test_build_ranking_items():
 
 def test_get_kpi_summary_no_data(analytics_repo, mock_session):
     mock_session.execute.return_value.mappings.return_value.fetchone.return_value = None
+    mock_session.execute.return_value.fetchall.return_value = []
     result = analytics_repo.get_kpi_summary(date(2025, 1, 15))
     assert result.today_net == Decimal("0")
     assert result.mtd_net == Decimal("0")

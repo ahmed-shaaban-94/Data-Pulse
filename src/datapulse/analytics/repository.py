@@ -93,52 +93,72 @@ class AnalyticsRepository:
         return row[0], row[1]
 
     def get_filter_options(self) -> FilterOptions:
-        """Return distinct values for all slicer/dropdown filters."""
+        """Return distinct values for all slicer/dropdown filters.
+
+        Uses a single UNION ALL query instead of 4 separate round-trips.
+        """
         log.info("get_filter_options")
 
-        cat_rows = self._session.execute(
-            text(
-                "SELECT DISTINCT drug_category FROM public_marts.agg_sales_by_product "
-                "WHERE drug_category IS NOT NULL ORDER BY drug_category"
-            )
-        ).fetchall()
+        stmt = text("""
+            SELECT 'category' AS type, drug_category AS value, NULL::int AS key
+            FROM public_marts.agg_sales_by_product
+            WHERE drug_category IS NOT NULL
+            GROUP BY drug_category
 
-        brand_rows = self._session.execute(
-            text(
-                "SELECT DISTINCT drug_brand FROM public_marts.agg_sales_by_product "
-                "WHERE drug_brand IS NOT NULL ORDER BY drug_brand"
-            )
-        ).fetchall()
+            UNION ALL
 
-        site_rows = self._session.execute(
-            text(
-                "SELECT DISTINCT site_key, site_name "
-                "FROM public_marts.agg_sales_by_site "
-                "WHERE site_key > 0 ORDER BY site_name"
-            )
-        ).fetchall()
+            SELECT 'brand', drug_brand, NULL
+            FROM public_marts.agg_sales_by_product
+            WHERE drug_brand IS NOT NULL
+            GROUP BY drug_brand
 
-        staff_rows = self._session.execute(
-            text(
-                "SELECT DISTINCT staff_key, staff_name "
-                "FROM public_marts.agg_sales_by_staff "
-                "WHERE staff_key > 0 ORDER BY staff_name"
-            )
-        ).fetchall()
+            UNION ALL
+
+            SELECT 'site', site_name, site_key
+            FROM public_marts.agg_sales_by_site
+            WHERE site_key > 0
+            GROUP BY site_key, site_name
+
+            UNION ALL
+
+            SELECT 'staff', staff_name, staff_key
+            FROM public_marts.agg_sales_by_staff
+            WHERE staff_key > 0
+            GROUP BY staff_key, staff_name
+
+            ORDER BY type, value
+        """)
+        rows = self._session.execute(stmt).fetchall()
+
+        categories: list[str] = []
+        brands: list[str] = []
+        sites: list[FilterOption] = []
+        staff: list[FilterOption] = []
+
+        for r in rows:
+            rtype, value, key = str(r[0]), str(r[1]), r[2]
+            if rtype == "category":
+                categories.append(value)
+            elif rtype == "brand":
+                brands.append(value)
+            elif rtype == "site":
+                sites.append(FilterOption(key=int(key), label=value))
+            elif rtype == "staff":
+                staff.append(FilterOption(key=int(key), label=value))
 
         return FilterOptions(
-            categories=[str(r[0]) for r in cat_rows],
-            brands=[str(r[0]) for r in brand_rows],
-            sites=[FilterOption(key=int(r[0]), label=str(r[1])) for r in site_rows],
-            staff=[FilterOption(key=int(r[0]), label=str(r[1])) for r in staff_rows],
+            categories=categories,
+            brands=brands,
+            sites=sites,
+            staff=staff,
         )
 
     def get_kpi_summary(self, target_date: date) -> KPISummary:
         """Return executive KPI snapshot for *target_date*.
 
         Uses a single unified CTE query to fetch daily KPIs, basket size,
-        MoM/YoY growth comparisons, and sparkline data in ONE database
-        round-trip (previously 5 separate queries).
+        and previous-period comparisons in ONE database round-trip.
+        Sparkline is a separate lightweight query.
         """
         log.info("get_kpi_summary", target_date=str(target_date))
 
