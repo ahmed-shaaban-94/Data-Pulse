@@ -239,8 +239,12 @@ class AnalyticsRepository:
         daily_transactions = int(row["daily_transactions"])
         daily_customers = int(row["daily_unique_customers"])
         daily_returns = int(row["daily_returns"]) if row["daily_returns"] is not None else 0
-        mtd_transactions = int(row["mtd_transactions"]) if row["mtd_transactions"] is not None else 0
-        ytd_transactions = int(row["ytd_transactions"]) if row["ytd_transactions"] is not None else 0
+        mtd_transactions = (
+            int(row["mtd_transactions"]) if row["mtd_transactions"] is not None else 0
+        )
+        ytd_transactions = (
+            int(row["ytd_transactions"]) if row["ytd_transactions"] is not None else 0
+        )
         avg_basket = (
             Decimal(str(row["avg_basket_size"])).quantize(Decimal("0.01"))
             if row["avg_basket_size"] is not None
