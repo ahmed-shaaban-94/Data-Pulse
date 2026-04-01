@@ -22,7 +22,9 @@ log = get_logger(__name__)
 _PATH_RE = _re.compile(r"(/[\w./-]+)+")
 _CONN_STR_RE = _re.compile(r"postgresql://[^\s]+")
 _CLASS_NAME_RE = _re.compile(r"\b[\w.]+(?:Error|Exception|Warning)\b")
-_TRACEBACK_RE = _re.compile(r"Traceback \(most recent call last\):.*?(?=\n\S|\Z)", _re.DOTALL)
+_TRACEBACK_RE = _re.compile(
+    r"Traceback \(most recent call last\):.*?(?=\n\S|\Z)", _re.DOTALL
+)
 _FILE_LINE_RE = _re.compile(r'File "[^"]+", line \d+.*')
 
 
@@ -69,7 +71,9 @@ class PipelineExecutor:
             )
             elapsed = round(time.perf_counter() - t0, 2)
             rows = df.shape[0]
-            log.info("executor_bronze_done", run_id=str(run_id), rows=rows, seconds=elapsed)
+            log.info(
+                "executor_bronze_done", run_id=str(run_id), rows=rows, seconds=elapsed
+            )
             return ExecutionResult(
                 success=True,
                 rows_loaded=rows,
@@ -103,7 +107,12 @@ class PipelineExecutor:
             "--select",
             selector,
         ]
-        log.info("executor_dbt_start", run_id=str(run_id), selector=selector, cmd=" ".join(cmd))
+        log.info(
+            "executor_dbt_start",
+            run_id=str(run_id),
+            selector=selector,
+            cmd=" ".join(cmd),
+        )
         t0 = time.perf_counter()
 
         try:
@@ -128,14 +137,21 @@ class PipelineExecutor:
                     duration_seconds=elapsed,
                 )
 
-            log.info("executor_dbt_done", run_id=str(run_id), selector=selector, seconds=elapsed)
+            log.info(
+                "executor_dbt_done",
+                run_id=str(run_id),
+                selector=selector,
+                seconds=elapsed,
+            )
             return ExecutionResult(
                 success=True,
                 duration_seconds=elapsed,
             )
         except subprocess.TimeoutExpired:
             elapsed = round(time.perf_counter() - t0, 2)
-            error_msg = f"dbt {selector} timed out after {self._settings.pipeline_dbt_timeout}s"
+            error_msg = (
+                f"dbt {selector} timed out after {self._settings.pipeline_dbt_timeout}s"
+            )
             log.error("executor_dbt_timeout", run_id=str(run_id), error=error_msg)
             return ExecutionResult(
                 success=False,

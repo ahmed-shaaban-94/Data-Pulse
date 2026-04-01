@@ -17,7 +17,11 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 
 from datapulse.api.auth import get_current_user, require_pipeline_token
-from datapulse.api.deps import get_pipeline_executor, get_pipeline_service, get_quality_service
+from datapulse.api.deps import (
+    get_pipeline_executor,
+    get_pipeline_service,
+    get_quality_service,
+)
 from datapulse.cache import cache_invalidate_pattern
 from datapulse.config import get_settings
 from datapulse.logging import get_logger
@@ -138,7 +142,9 @@ async def stream_run_progress(
                 current = await loop.run_in_executor(None, service.get_run, run_id)
             except Exception as exc:
                 log.error("sse_poll_error", run_id=str(run_id), error=str(exc))
-                yield _sse_event("error", {"message": "Internal error polling run status"})
+                yield _sse_event(
+                    "error", {"message": "Internal error polling run status"}
+                )
                 return
 
             if current is None:
@@ -149,10 +155,14 @@ async def stream_run_progress(
                 "run_id": str(current.id),
                 "status": current.status,
                 "started_at": str(current.started_at),
-                "finished_at": str(current.finished_at) if current.finished_at else None,
-                "duration_seconds": float(current.duration_seconds)
-                if current.duration_seconds
-                else None,
+                "finished_at": (
+                    str(current.finished_at) if current.finished_at else None
+                ),
+                "duration_seconds": (
+                    float(current.duration_seconds)
+                    if current.duration_seconds
+                    else None
+                ),
                 "rows_loaded": current.rows_loaded,
                 "error_message": current.error_message,
             }

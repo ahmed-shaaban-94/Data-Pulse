@@ -40,7 +40,7 @@ def create_app() -> FastAPI:
         version="0.1.0",
     )
     app.state.limiter = limiter
-    app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+    app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)  # type: ignore[arg-type]
 
     # CORS for Next.js dev server
     app.add_middleware(
@@ -48,7 +48,12 @@ def create_app() -> FastAPI:
         allow_origins=settings.cors_origins,
         allow_credentials=True,
         allow_methods=["GET", "POST", "PATCH"],
-        allow_headers=["Content-Type", "Authorization", "X-API-Key", "X-Pipeline-Token"],
+        allow_headers=[
+            "Content-Type",
+            "Authorization",
+            "X-API-Key",
+            "X-Pipeline-Token",
+        ],
     )
 
     # Security headers middleware
@@ -58,7 +63,10 @@ def create_app() -> FastAPI:
         response = await call_next(request)
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
-        if request.url.path.startswith("/api/v1/embed/") and "/token" not in request.url.path:
+        if (
+            request.url.path.startswith("/api/v1/embed/")
+            and "/token" not in request.url.path
+        ):
             embed_origins = " ".join(settings.embed_allowed_origins)
             if embed_origins:
                 response.headers["Content-Security-Policy"] = (
@@ -72,7 +80,9 @@ def create_app() -> FastAPI:
 
     # Global exception handler
     @app.exception_handler(Exception)
-    async def global_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    async def global_exception_handler(
+        request: Request, exc: Exception
+    ) -> JSONResponse:
         logger.error(
             "unhandled_exception",
             method=request.method,

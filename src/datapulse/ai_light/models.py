@@ -14,7 +14,9 @@ class InsightRequest(BaseModel):
 
     model_config = ConfigDict(frozen=True)
 
-    insight_type: str = Field(description="Type of insight: 'summary', 'anomalies', or 'changes'")
+    insight_type: str = Field(
+        description="Type of insight: 'summary', 'anomalies', or 'changes'"
+    )
     start_date: date | None = None
     end_date: date | None = None
 

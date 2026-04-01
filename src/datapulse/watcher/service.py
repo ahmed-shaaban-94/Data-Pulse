@@ -8,6 +8,7 @@ from pathlib import Path
 import httpx
 from httpx import HTTPError
 from watchdog.observers import Observer
+from watchdog.observers.api import BaseObserver
 
 from datapulse.config import Settings, get_settings
 from datapulse.logging import get_logger
@@ -21,7 +22,7 @@ class FileWatcherService:
 
     def __init__(self, settings: Settings | None = None) -> None:
         self._settings = settings or get_settings()
-        self._observer: Observer | None = None
+        self._observer: BaseObserver | None = None
         self._handler: DataFileHandler | None = None
 
     def _trigger_pipeline(self, files: list[str]) -> None:

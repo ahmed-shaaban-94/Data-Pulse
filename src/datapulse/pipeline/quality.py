@@ -178,7 +178,9 @@ def check_row_delta(session: Session, run_id: UUID) -> QualityCheckResult:
         severity="warn",
         passed=passed,
         message=(
-            None if passed else f"Row count dropped {delta_pct}% vs previous run (threshold 50%)"
+            None
+            if passed
+            else f"Row count dropped {delta_pct}% vs previous run (threshold 50%)"
         ),
         details={"current": current, "previous": previous, "delta_pct": delta_pct},
     )
@@ -248,7 +250,7 @@ def check_null_rate(
 
     null_pcts: dict[str, float] = {}
     for i, col in enumerate(CRITICAL_COLUMNS):
-        null_pcts[col] = round(float(row[i] or 0.0), 4)
+        null_pcts[col] = round(float(row[i] or 0.0) if row is not None else 0.0, 4)
 
     failing = {col: pct for col, pct in null_pcts.items() if pct >= threshold}
     passed = len(failing) == 0

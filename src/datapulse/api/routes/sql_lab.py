@@ -20,7 +20,11 @@ from datapulse.api.auth import get_current_user
 from datapulse.api.deps import get_tenant_session
 from datapulse.api.limiter import limiter
 from datapulse.logging import get_logger
-from datapulse.sql_lab.validator import SQLValidationError, get_schema_tables, validate_sql
+from datapulse.sql_lab.validator import (
+    SQLValidationError,
+    get_schema_tables,
+    validate_sql,
+)
 
 log = get_logger(__name__)
 

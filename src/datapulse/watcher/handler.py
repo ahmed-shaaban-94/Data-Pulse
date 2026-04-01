@@ -6,7 +6,10 @@ import threading
 from collections.abc import Callable
 from pathlib import Path
 
-from watchdog.events import FileCreatedEvent, FileMovedEvent, FileSystemEventHandler
+from watchdog.events import (
+    FileSystemEvent,
+    FileSystemEventHandler,
+)
 
 from datapulse.logging import get_logger
 
@@ -48,19 +51,20 @@ class DataFileHandler(FileSystemEventHandler):
         except (OSError, ValueError):
             return False
 
-    def on_created(self, event: FileCreatedEvent) -> None:
+    def on_created(self, event: FileSystemEvent) -> None:
         if event.is_directory:
             return
         if self._is_data_file(event.src_path) and self._is_safe_path(event.src_path):
             log.info("file_detected", path=event.src_path, event_type="created")
             self._schedule_trigger(event.src_path)
 
-    def on_moved(self, event: FileMovedEvent) -> None:
+    def on_moved(self, event: FileSystemEvent) -> None:
         if event.is_directory:
             return
-        if self._is_data_file(event.dest_path) and self._is_safe_path(event.dest_path):
-            log.info("file_detected", path=event.dest_path, event_type="moved")
-            self._schedule_trigger(event.dest_path)
+        dest_path = getattr(event, "dest_path", event.src_path)
+        if self._is_data_file(dest_path) and self._is_safe_path(dest_path):
+            log.info("file_detected", path=dest_path, event_type="moved")
+            self._schedule_trigger(dest_path)
 
     def _schedule_trigger(self, file_path: str) -> None:
         """Debounce: reset timer each time a new file arrives."""

@@ -75,7 +75,7 @@ class AnalyticsRepository:
             LIMIT :limit
         """)
         rows = self._session.execute(stmt, params).fetchall()
-        return build_ranking(rows)
+        return build_ranking(list(rows))
 
     # ------------------------------------------------------------------
     # Public query methods
@@ -314,7 +314,7 @@ class AnalyticsRepository:
             ORDER BY date_key
         """)
         rows = self._session.execute(stmt, params).fetchall()
-        return build_trend(rows)
+        return build_trend(list(rows))
 
     def get_monthly_trend(self, filters: AnalyticsFilter) -> TrendResult:
         """Return net-sales trend grouped by year-month."""
@@ -331,7 +331,7 @@ class AnalyticsRepository:
             ORDER BY year, month
         """)
         rows = self._session.execute(stmt, params).fetchall()
-        return build_trend(rows)
+        return build_trend(list(rows))
 
     def get_top_products(self, filters: AnalyticsFilter) -> RankingResult:
         """Return top-N products by net sales."""
