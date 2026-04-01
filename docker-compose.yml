@@ -106,6 +106,8 @@ services:
       AUTH0_CLIENT_SECRET: ${AUTH0_CLIENT_SECRET:-}
       AUTH0_AUDIENCE: ${AUTH0_AUDIENCE:-}
       API_KEY: ${API_KEY:-}
+      SENTRY_DSN: ${SENTRY_DSN:-}
+      SENTRY_ENVIRONMENT: ${SENTRY_ENVIRONMENT:-development}
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
       OPENROUTER_MODEL: ${OPENROUTER_MODEL:-openai/gpt-4o-mini:free}
     ports:
@@ -206,6 +208,8 @@ services:
       - NEXTAUTH_URL=http://localhost:3000
       - NEXTAUTH_SECRET=${NEXTAUTH_SECRET:-change-me-to-a-random-secret}
       - NEXTAUTH_DEBUG=true
+      - NEXT_PUBLIC_SENTRY_DSN=${SENTRY_DSN:-}
+      - NEXT_PUBLIC_SENTRY_ENVIRONMENT=${SENTRY_ENVIRONMENT:-development}
     depends_on:
       api:
         condition: service_healthy

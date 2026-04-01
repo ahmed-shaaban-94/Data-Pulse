@@ -74,6 +74,11 @@ class Settings(BaseSettings):
     # Embed (iframe white-label)
     embed_allowed_origins: list[str] = []  # Domains allowed to iframe embed
 
+    # Sentry (error tracking)
+    sentry_dsn: str = ""
+    sentry_environment: str = "development"
+    sentry_traces_sample_rate: float = 0.1  # 10% performance monitoring
+
     # Logging
     log_format: str = "console"
 
