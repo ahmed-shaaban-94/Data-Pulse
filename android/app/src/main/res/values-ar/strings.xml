@@ -8,6 +8,7 @@
     <string name="nav_sites">المواقع</string>
     <string name="nav_returns">المرتجعات</string>
     <string name="nav_pipeline">خط الأنابيب</string>
+    <string name="nav_settings">الإعدادات</string>
     <string name="nav_more">المزيد</string>
     <string name="login_title">داتا بالس</string>
     <string name="login_subtitle">تحليلات الأعمال</string>

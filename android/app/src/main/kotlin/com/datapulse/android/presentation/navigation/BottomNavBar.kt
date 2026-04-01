@@ -21,6 +21,7 @@ import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.LocationOn
 import androidx.compose.material.icons.outlined.AssignmentReturn
 import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material.icons.outlined.Terminal
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -52,7 +53,8 @@ val moreNavItems = listOf(
     BottomNavItem(NavRoute.Staff, Icons.Outlined.Person, R.string.nav_staff),
     BottomNavItem(NavRoute.Sites, Icons.Outlined.LocationOn, R.string.nav_sites),
     BottomNavItem(NavRoute.Returns, Icons.Outlined.AssignmentReturn, R.string.nav_returns),
-    BottomNavItem(NavRoute.Pipeline, Icons.Outlined.Settings, R.string.nav_pipeline),
+    BottomNavItem(NavRoute.Pipeline, Icons.Outlined.Terminal, R.string.nav_pipeline),
+    BottomNavItem(NavRoute.Settings, Icons.Outlined.Settings, R.string.nav_settings),
 )
 
 @OptIn(ExperimentalMaterial3Api::class)

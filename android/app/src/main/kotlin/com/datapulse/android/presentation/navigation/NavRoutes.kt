@@ -11,4 +11,5 @@ sealed interface NavRoute {
     @Serializable data object Sites : NavRoute
     @Serializable data object Returns : NavRoute
     @Serializable data object Pipeline : NavRoute
+    @Serializable data object Settings : NavRoute
 }

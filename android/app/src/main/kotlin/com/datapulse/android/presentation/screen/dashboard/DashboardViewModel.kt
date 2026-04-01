@@ -11,6 +11,7 @@ import com.datapulse.android.domain.usecase.GetDashboardUseCase
 import com.datapulse.android.domain.usecase.GetHealthUseCase
 import com.datapulse.android.domain.usecase.GetMonthlyTrendUseCase
 import com.datapulse.android.presentation.common.UiState
+import com.datapulse.android.presentation.util.DatePreset
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -25,6 +26,9 @@ data class DashboardUiState(
     val monthlyTrend: UiState<TrendResult> = UiState.Loading,
     val health: HealthStatus? = null,
     val isRefreshing: Boolean = false,
+    val selectedPreset: String = "All",
+    val startDate: String? = null,
+    val endDate: String? = null,
 )
 
 @HiltViewModel
@@ -48,6 +52,17 @@ class DashboardViewModel @Inject constructor(
         loadAll(forceRefresh = true)
     }
 
+    fun selectPreset(preset: DatePreset) {
+        val start = preset.startDate.ifBlank { null }
+        val end = preset.endDate.ifBlank { null }
+        _state.value = _state.value.copy(
+            selectedPreset = preset.label,
+            startDate = start,
+            endDate = end,
+        )
+        loadAll(forceRefresh = true)
+    }
+
     private fun loadAll(forceRefresh: Boolean = false) {
         loadKpi(forceRefresh)
         loadDailyTrend(forceRefresh)
@@ -56,7 +71,11 @@ class DashboardViewModel @Inject constructor(
 
     private fun loadKpi(forceRefresh: Boolean = false) {
         viewModelScope.launch {
-            getDashboard(forceRefresh = forceRefresh).collect { resource ->
+            getDashboard(
+                startDate = _state.value.startDate,
+                endDate = _state.value.endDate,
+                forceRefresh = forceRefresh,
+            ).collect { resource ->
                 _state.value = _state.value.copy(
                     kpi = resource.toUiState(),
                     isRefreshing = if (resource !is Resource.Loading) false else _state.value.isRefreshing,
@@ -67,7 +86,11 @@ class DashboardViewModel @Inject constructor(
 
     private fun loadDailyTrend(forceRefresh: Boolean = false) {
         viewModelScope.launch {
-            getDailyTrend(forceRefresh = forceRefresh).collect { resource ->
+            getDailyTrend(
+                startDate = _state.value.startDate,
+                endDate = _state.value.endDate,
+                forceRefresh = forceRefresh,
+            ).collect { resource ->
                 _state.value = _state.value.copy(dailyTrend = resource.toUiState())
             }
         }
@@ -75,7 +98,11 @@ class DashboardViewModel @Inject constructor(
 
     private fun loadMonthlyTrend(forceRefresh: Boolean = false) {
         viewModelScope.launch {
-            getMonthlyTrend(forceRefresh = forceRefresh).collect { resource ->
+            getMonthlyTrend(
+                startDate = _state.value.startDate,
+                endDate = _state.value.endDate,
+                forceRefresh = forceRefresh,
+            ).collect { resource ->
                 _state.value = _state.value.copy(monthlyTrend = resource.toUiState())
             }
         }

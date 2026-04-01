@@ -17,6 +17,7 @@ import com.datapulse.android.presentation.screen.pipeline.PipelineScreen
 import com.datapulse.android.presentation.screen.products.ProductsScreen
 import com.datapulse.android.presentation.screen.returns.ReturnsScreen
 import com.datapulse.android.presentation.screen.sites.SitesScreen
+import com.datapulse.android.presentation.screen.settings.SettingsScreen
 import com.datapulse.android.presentation.screen.staff.StaffScreen
 
 @Composable
@@ -33,6 +34,7 @@ fun DataPulseNavGraph(
         NavRoute.Sites::class.qualifiedName -> NavRoute.Sites
         NavRoute.Returns::class.qualifiedName -> NavRoute.Returns
         NavRoute.Pipeline::class.qualifiedName -> NavRoute.Pipeline
+        NavRoute.Settings::class.qualifiedName -> NavRoute.Settings
         else -> null
     }
 
@@ -76,6 +78,15 @@ fun DataPulseNavGraph(
             composable<NavRoute.Sites> { SitesScreen() }
             composable<NavRoute.Returns> { ReturnsScreen() }
             composable<NavRoute.Pipeline> { PipelineScreen() }
+            composable<NavRoute.Settings> {
+                SettingsScreen(
+                    onLoggedOut = {
+                        navController.navigate(NavRoute.Login) {
+                            popUpTo(0) { inclusive = true }
+                        }
+                    },
+                )
+            }
         }
     }
 }

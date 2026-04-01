@@ -27,4 +27,5 @@ abstract class DataPulseDatabase : RoomDatabase() {
     abstract fun rankingDao(): RankingDao
     abstract fun returnDao(): ReturnDao
     abstract fun pipelineDao(): PipelineDao
+    abstract fun cacheMetadataDao(): CacheMetadataDao
 }

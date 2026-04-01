@@ -30,6 +30,7 @@ import com.datapulse.android.presentation.common.HealthIndicator
 import com.datapulse.android.presentation.common.HealthLevel
 import com.datapulse.android.presentation.common.KpiCard
 import com.datapulse.android.presentation.common.KpiGridSkeleton
+import com.datapulse.android.presentation.common.DateFilterBar
 import com.datapulse.android.presentation.common.PullRefreshWrapper
 import com.datapulse.android.presentation.common.TrendChart
 import com.datapulse.android.presentation.common.UiState
@@ -77,6 +78,11 @@ fun DashboardScreen(
                     .verticalScroll(rememberScrollState())
                     .padding(bottom = 16.dp),
             ) {
+                DateFilterBar(
+                    selectedPreset = state.selectedPreset,
+                    onPresetSelected = { viewModel.selectPreset(it) },
+                )
+
                 when (val kpi = state.kpi) {
                     is UiState.Loading -> KpiGridSkeleton()
                     is UiState.Error -> ErrorState(

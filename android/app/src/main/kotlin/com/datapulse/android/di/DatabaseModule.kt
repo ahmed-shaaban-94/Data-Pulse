@@ -27,4 +27,5 @@ object DatabaseModule {
     @Provides fun provideRankingDao(db: DataPulseDatabase): RankingDao = db.rankingDao()
     @Provides fun provideReturnDao(db: DataPulseDatabase): ReturnDao = db.returnDao()
     @Provides fun providePipelineDao(db: DataPulseDatabase): PipelineDao = db.pipelineDao()
+    @Provides fun provideCacheMetadataDao(db: DataPulseDatabase): CacheMetadataDao = db.cacheMetadataDao()
 }

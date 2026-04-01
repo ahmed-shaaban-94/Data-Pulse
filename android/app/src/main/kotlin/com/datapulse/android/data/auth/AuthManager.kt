@@ -139,6 +139,22 @@ class AuthManager @Inject constructor(
         }
     }
 
+    fun extractUserClaims(accessToken: String): Map<String, String> {
+        return try {
+            val parts = accessToken.split(".")
+            if (parts.size != 3) return emptyMap()
+            val payload = String(android.util.Base64.decode(parts[1], android.util.Base64.URL_SAFE))
+            val json = kotlinx.serialization.json.Json.parseToJsonElement(payload).jsonObject
+            mapOf(
+                "sub" to (json["sub"]?.jsonPrimitive?.content ?: ""),
+                "email" to (json["email"]?.jsonPrimitive?.content ?: ""),
+                "preferred_username" to (json["preferred_username"]?.jsonPrimitive?.content ?: ""),
+            )
+        } catch (_: Exception) {
+            emptyMap()
+        }
+    }
+
     companion object {
         private const val CLIENT_ID = "datapulse-frontend"
         private const val REDIRECT_URI = "com.datapulse.android:/oauth2callback"

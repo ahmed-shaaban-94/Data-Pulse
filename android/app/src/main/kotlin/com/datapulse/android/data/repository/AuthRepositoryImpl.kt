@@ -5,7 +5,6 @@ import com.datapulse.android.data.auth.AuthManager
 import com.datapulse.android.domain.model.UserSession
 import com.datapulse.android.domain.repository.AuthRepository
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flow
 import net.openid.appauth.AuthorizationResponse
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -15,9 +14,7 @@ class AuthRepositoryImpl @Inject constructor(
     private val authManager: AuthManager,
 ) : AuthRepository {
 
-    override fun observeAuthState(): Flow<Boolean> = flow {
-        emit(authManager.isAuthenticated())
-    }
+    override fun observeAuthState(): Flow<Boolean> = authManager.authState
 
     override suspend fun createLoginIntent(): Intent = authManager.createAuthIntent()
 
@@ -26,10 +23,11 @@ class AuthRepositoryImpl @Inject constructor(
             ?: throw RuntimeException("Authorization failed")
         val tokens = authManager.handleAuthResponse(response)
         val roles = authManager.extractUserRoles(tokens.accessToken)
+        val claims = authManager.extractUserClaims(tokens.accessToken)
         return UserSession(
-            sub = "",
-            email = "",
-            preferredUsername = "",
+            sub = claims["sub"] ?: "",
+            email = claims["email"] ?: "",
+            preferredUsername = claims["preferred_username"] ?: "",
             tenantId = "1",
             roles = roles,
         )
@@ -42,10 +40,11 @@ class AuthRepositoryImpl @Inject constructor(
     override suspend fun getUserSession(): UserSession? {
         val token = authManager.getAccessToken() ?: return null
         val roles = authManager.extractUserRoles(token)
+        val claims = authManager.extractUserClaims(token)
         return UserSession(
-            sub = "",
-            email = "",
-            preferredUsername = "",
+            sub = claims["sub"] ?: "",
+            email = claims["email"] ?: "",
+            preferredUsername = claims["preferred_username"] ?: "",
             tenantId = "1",
             roles = roles,
         )
