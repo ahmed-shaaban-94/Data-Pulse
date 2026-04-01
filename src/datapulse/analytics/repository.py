@@ -200,7 +200,7 @@ class AnalyticsRepository:
                    pm.mtd_net_amount AS prev_mtd,
                    py.ytd_net_amount AS prev_ytd
             FROM daily d
-            CROSS JOIN basket b
+            LEFT JOIN basket b ON TRUE
             LEFT JOIN prev_month pm ON TRUE
             LEFT JOIN prev_year py ON TRUE
         """)
