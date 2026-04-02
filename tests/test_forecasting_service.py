@@ -72,8 +72,7 @@ class TestGetProductForecast:
 class TestRunAllForecasts:
     def test_runs_daily_and_monthly(self, forecast_service, mock_forecast_repo):
         mock_forecast_repo.get_daily_revenue_series.return_value = [
-            (date(2026, 1, 1) + timedelta(days=i), 100.0 + i)
-            for i in range(100)
+            (date(2026, 1, 1) + timedelta(days=i), 100.0 + i) for i in range(100)
         ]
         mock_forecast_repo.get_monthly_revenue_series.return_value = [
             (f"2024-{m:02d}", 10000.0 + m * 100) for m in range(1, 13)
