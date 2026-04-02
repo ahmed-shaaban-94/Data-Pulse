@@ -12,27 +12,27 @@ interface RankingTableProps {
 function RankBadge({ rank }: { rank: number }) {
   if (rank === 1) {
     return (
-      <span className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-chart-amber/30 to-chart-amber/10 shadow-sm shadow-chart-amber/10">
-        <Trophy className="h-4 w-4 text-chart-amber" />
+      <span className="flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-chart-amber/30 to-chart-amber/10 shadow-sm shadow-chart-amber/10">
+        <Trophy className="h-3.5 w-3.5 text-chart-amber" />
       </span>
     );
   }
   if (rank === 2) {
     return (
-      <span className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-text-secondary/20 to-text-secondary/5">
-        <Medal className="h-4 w-4 text-text-secondary" />
+      <span className="flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-text-secondary/20 to-text-secondary/5">
+        <Medal className="h-3.5 w-3.5 text-text-secondary" />
       </span>
     );
   }
   if (rank === 3) {
     return (
-      <span className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-chart-amber/15 to-chart-amber/5">
-        <Award className="h-4 w-4 text-chart-amber/70" />
+      <span className="flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-chart-amber/15 to-chart-amber/5">
+        <Award className="h-3.5 w-3.5 text-chart-amber/70" />
       </span>
     );
   }
   return (
-    <span className="flex h-8 w-8 items-center justify-center rounded-full bg-divider/50 text-xs font-semibold text-text-secondary">
+    <span className="flex h-7 w-7 items-center justify-center rounded-full bg-divider/50 text-[11px] font-semibold text-text-secondary">
       {rank}
     </span>
   );
@@ -43,13 +43,13 @@ export function RankingTable({ items, entityLabel, className }: RankingTableProp
 
   return (
     <div className={cn("overflow-x-auto", className)}>
-      <table className="w-full min-w-[500px] text-left text-sm" aria-label="Rankings data">
+      <table className="w-full min-w-[500px] text-left text-[13px]" aria-label="Rankings data">
         <thead>
           <tr className="border-b border-border text-text-secondary">
-            <th className="pb-3 pr-4 font-medium">#</th>
-            <th className="pb-3 pr-4 font-medium">{entityLabel}</th>
-            <th className="pb-3 pr-4 text-right font-medium">Revenue</th>
-            <th className="pb-3 text-right font-medium">Share</th>
+            <th className="pb-2.5 pr-4 text-[11px] font-semibold uppercase tracking-wider">#</th>
+            <th className="pb-2.5 pr-4 text-[11px] font-semibold uppercase tracking-wider">{entityLabel}</th>
+            <th className="pb-2.5 pr-4 text-right text-[11px] font-semibold uppercase tracking-wider">Revenue</th>
+            <th className="pb-2.5 text-right text-[11px] font-semibold uppercase tracking-wider">Share</th>
           </tr>
         </thead>
         <tbody>
@@ -64,13 +64,13 @@ export function RankingTable({ items, entityLabel, className }: RankingTableProp
                   index < 3 && "bg-accent/[0.02]",
                 )}
               >
-                <td className="py-3.5 pr-4">
+                <td className="py-3 pr-3">
                   <RankBadge rank={item.rank} />
                 </td>
-                <td className="py-3.5 pr-4 max-w-[220px]">
+                <td className="py-3 pr-4 max-w-[220px]">
                   <div className="relative">
                     <span className={cn(
-                      "relative z-10 block font-medium text-text-primary truncate",
+                      "relative z-10 block text-[13px] font-medium text-text-primary truncate",
                       index === 0 && "text-accent font-semibold",
                     )} title={item.name}>
                       {item.name}
@@ -82,17 +82,17 @@ export function RankingTable({ items, entityLabel, className }: RankingTableProp
                     />
                   </div>
                 </td>
-                <td className="py-3.5 pr-4 text-right whitespace-nowrap">
-                  <span className="font-semibold text-text-primary" data-kpi-value>
+                <td className="py-3 pr-4 text-right whitespace-nowrap">
+                  <span className="text-[13px] font-semibold text-text-primary" data-kpi-value>
                     {formatCurrency(item.value)}
                   </span>
-                  <span className="ml-1.5 text-xs text-text-secondary hidden sm:inline">
+                  <span className="ml-1 text-[10px] text-text-secondary hidden sm:inline">
                     ({formatCompact(item.value)})
                   </span>
                 </td>
-                <td className="py-3.5 text-right">
-                  <div className="flex items-center justify-end gap-2.5">
-                    <div className="h-2 w-20 overflow-hidden rounded-full bg-divider">
+                <td className="py-3 text-right">
+                  <div className="flex items-center justify-end gap-2">
+                    <div className="h-1.5 w-16 overflow-hidden rounded-full bg-divider">
                       <div
                         className={cn(
                           "h-full rounded-full transition-all duration-700",
@@ -105,7 +105,7 @@ export function RankingTable({ items, entityLabel, className }: RankingTableProp
                         style={{ width: `${Math.min(item.pct_of_total, 100)}%` }}
                       />
                     </div>
-                    <span className="w-12 text-right text-xs font-semibold text-text-secondary tabular-nums">
+                    <span className="w-10 text-right text-[11px] font-semibold text-text-secondary tabular-nums">
                       {item.pct_of_total.toFixed(1)}%
                     </span>
                   </div>

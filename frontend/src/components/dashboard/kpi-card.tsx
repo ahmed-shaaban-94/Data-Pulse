@@ -69,7 +69,7 @@ export function KPICard({ label, value, numericValue, isCurrency, isPercent, tre
   return (
     <div
       className={cn(
-        "group relative overflow-hidden rounded-xl border border-border p-5",
+        "group relative overflow-hidden rounded-xl border border-border p-4 sm:p-5",
         // Glass morphism
         "bg-card/80 backdrop-blur-sm",
         "transition-all duration-300 hover:scale-[1.03] hover:shadow-lg",
@@ -93,19 +93,19 @@ export function KPICard({ label, value, numericValue, isCurrency, isPercent, tre
 
       <div className="relative flex items-start justify-between">
         <div className="flex items-center gap-1.5">
-          <p className="text-xs font-semibold uppercase tracking-wider text-text-secondary">
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-text-secondary">
             {label}
           </p>
           {tooltip && <MetricTooltip description={tooltip} />}
         </div>
         {Icon && (
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent/10 transition-all duration-300 group-hover:bg-accent/20 group-hover:scale-110 group-hover:rotate-3">
-            <Icon className="h-5 w-5 text-accent" />
+          <div className="flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-lg bg-accent/10 transition-all duration-300 group-hover:bg-accent/20 group-hover:scale-110 group-hover:rotate-3">
+            <Icon className="h-4 w-4 text-accent" />
           </div>
         )}
       </div>
 
-      <p className="relative mt-3 text-xl sm:text-2xl xl:text-3xl font-bold tracking-tight text-text-primary truncate" data-kpi-value>
+      <p className="relative mt-2 text-lg sm:text-xl font-bold tracking-tight text-text-primary truncate" data-kpi-value>
         <AnimatedValue
           value={value}
           numericValue={numericValue}
@@ -115,26 +115,26 @@ export function KPICard({ label, value, numericValue, isCurrency, isPercent, tre
       </p>
 
       {trend !== undefined && (
-        <div className="relative mt-3 flex items-center gap-2">
+        <div className="relative mt-2 flex items-center gap-1.5">
           <span
             className={cn(
-              "inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold",
+              "inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-[11px] font-semibold",
               "transition-all duration-300 group-hover:scale-105",
               pillBg,
             )}
           >
-            <TrendIcon className="h-3.5 w-3.5" />
+            <TrendIcon className="h-3 w-3" />
             {trend !== null ? `${isPositive ? "+" : ""}${trend.toFixed(1)}%` : "N/A"}
           </span>
           {trendLabel && (
-            <span className="text-xs text-text-secondary">{trendLabel}</span>
+            <span className="text-[10px] text-text-secondary hidden sm:inline">{trendLabel}</span>
           )}
         </div>
       )}
 
       {sparkline && sparkline.length > 1 && (
-        <div className="relative mt-3 h-8">
-          <ResponsiveContainer width="100%" height={32}>
+        <div className="relative mt-2 h-7">
+          <ResponsiveContainer width="100%" height={28}>
             <AreaChart data={sparkline.map((p) => ({ v: p.value }))}>
               <defs>
                 <linearGradient id={sparkId} x1="0" y1="0" x2="0" y2="1">
