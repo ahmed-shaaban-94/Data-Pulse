@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# prestart.sh — Run SQL migrations in order before the API starts,
-# then create auxiliary databases that services expect to exist.
+# prestart.sh — Run SQL migrations in order before the API starts.
 # Expects DATABASE_URL or individual PG* env vars to be set.
+# For migration 002: set DB_READER_PASSWORD env var for the reader role password.
 
 DB_HOST="${DB_HOST:-postgres}"
 DB_PORT="${DB_PORT:-5432}"
@@ -14,8 +14,8 @@ MIGRATIONS_DIR="${MIGRATIONS_DIR:-/app/migrations}"
 
 echo "[prestart] Running SQL migrations from ${MIGRATIONS_DIR}..."
 
-# schema_migrations table tracks which files have been applied
-psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -v ON_ERROR_STOP=1 <<'SQL'
+# Ensure schema_migrations table exists
+psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -v ON_ERROR_STOP=1 <<SQL
 CREATE TABLE IF NOT EXISTS public.schema_migrations (
     filename TEXT PRIMARY KEY,
     applied_at TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -38,8 +38,15 @@ for f in "${MIGRATIONS_DIR}"/*.sql; do
     fi
 
     echo "[prestart] Applying: ${fname}"
-    psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" \
-        -v ON_ERROR_STOP=1 -f "$f"
+
+    # Prepend GUC settings for migrations that need db_reader_password
+    if [ -n "${DB_READER_PASSWORD:-}" ]; then
+        (echo "SET app.db_reader_password = '${DB_READER_PASSWORD}';" ; cat "$f") | \
+            psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -v ON_ERROR_STOP=1
+    else
+        psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" \
+            -v ON_ERROR_STOP=1 -f "$f"
+    fi
 
     psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" \
         -c "INSERT INTO public.schema_migrations (filename) VALUES ('${fname}') ON CONFLICT (filename) DO NOTHING"
@@ -48,22 +55,4 @@ for f in "${MIGRATIONS_DIR}"/*.sql; do
 done
 
 echo "[prestart] Migrations done. Applied: ${applied}, Skipped: ${skipped}"
-
-# --- Create keycloak schema if it does not exist ---
-echo "[prestart] Ensuring 'keycloak' schema exists..."
-psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" \
-  -c "CREATE SCHEMA IF NOT EXISTS keycloak AUTHORIZATION ${DB_USER};"
-
-# --- Create lightdash database if it does not exist ---
-DB_EXISTS=$(psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d postgres -tAc \
-  "SELECT 1 FROM pg_database WHERE datname = 'lightdash'" 2>/dev/null || true)
-
-if [ "$DB_EXISTS" != "1" ]; then
-  echo "[prestart] Creating 'lightdash' database..."
-  psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d postgres -c "CREATE DATABASE lightdash OWNER ${DB_USER};"
-  echo "[prestart] 'lightdash' database created."
-else
-  echo "[prestart] 'lightdash' database already exists."
-fi
-
 echo "[prestart] Done."
