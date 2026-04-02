@@ -8,7 +8,7 @@ import jwt as pyjwt
 import pytest
 from fastapi import HTTPException
 
-from datapulse.api.jwt import _fetch_jwks, _get_signing_key, clear_jwks_cache, verify_jwt
+from datapulse.api.jwt import _fetch_jwks, clear_jwks_cache, verify_jwt
 
 
 @pytest.fixture(autouse=True)

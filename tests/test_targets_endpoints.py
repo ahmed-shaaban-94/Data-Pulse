@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from decimal import Decimal
-from unittest.mock import MagicMock, create_autospec, patch
+from unittest.mock import MagicMock, create_autospec
 
 import pytest
 from fastapi.testclient import TestClient
@@ -19,7 +19,6 @@ from datapulse.targets.models import (
     TargetSummary,
     TargetVsActual,
 )
-from datapulse.targets.repository import TargetsRepository
 from datapulse.targets.service import TargetsService
 
 NOW = datetime(2025, 6, 15, 12, 0, 0)
@@ -174,9 +173,7 @@ class TestAlertEndpoints:
 
     def test_toggle_alert_config(self, client: TestClient, mock_targets_service: MagicMock):
         mock_targets_service.toggle_alert.return_value = _alert_config_resp(enabled=False)
-        resp = client.patch(
-            "/api/v1/targets/alerts/configs/1", params={"enabled": False}
-        )
+        resp = client.patch("/api/v1/targets/alerts/configs/1", params={"enabled": False})
         assert resp.status_code == 200
 
     def test_toggle_alert_config_not_found(
@@ -209,9 +206,7 @@ class TestAlertEndpoints:
         assert resp.status_code == 200
         assert resp.json()["acknowledged"] is True
 
-    def test_acknowledge_alert_not_found(
-        self, client: TestClient, mock_targets_service: MagicMock
-    ):
+    def test_acknowledge_alert_not_found(self, client: TestClient, mock_targets_service: MagicMock):
         mock_targets_service.acknowledge_alert.return_value = False
         resp = client.post("/api/v1/targets/alerts/log/999/acknowledge")
         assert resp.status_code == 404

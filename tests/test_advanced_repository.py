@@ -46,7 +46,9 @@ class TestABCAnalysis:
         assert result.total == Decimal("160000")
         assert result.class_a_count >= 1
 
-    def test_customer_entity(self, repo: AdvancedRepository, mock_session: MagicMock, default_filters):
+    def test_customer_entity(
+        self, repo: AdvancedRepository, mock_session: MagicMock, default_filters
+    ):
         mock_session.execute.return_value.fetchall.return_value = []
         result = repo.get_abc_analysis(default_filters, entity="customer")
         assert result.items == []

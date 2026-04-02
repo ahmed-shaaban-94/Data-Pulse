@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 from unittest.mock import MagicMock, patch
 
 from datapulse.api.deps import (
@@ -29,10 +30,8 @@ class TestGetDbSession:
         mock_session.execute.assert_called_once()  # SET LOCAL
 
         # Exhaust generator (finally block)
-        try:
+        with contextlib.suppress(StopIteration):
             next(gen)
-        except StopIteration:
-            pass
 
         mock_session.commit.assert_called_once()
         mock_session.close.assert_called_once()
@@ -46,10 +45,8 @@ class TestGetDbSession:
         next(gen)  # get session
 
         # Simulate an exception during request handling
-        try:
+        with contextlib.suppress(ValueError):
             gen.throw(ValueError("test error"))
-        except ValueError:
-            pass
 
         mock_session.rollback.assert_called_once()
         mock_session.close.assert_called_once()
@@ -71,10 +68,8 @@ class TestGetTenantSession:
         call_args = mock_session.execute.call_args
         assert "42" in str(call_args)
 
-        try:
+        with contextlib.suppress(StopIteration):
             next(gen)
-        except StopIteration:
-            pass
 
         mock_session.commit.assert_called_once()
         mock_session.close.assert_called_once()
@@ -91,10 +86,8 @@ class TestGetTenantSession:
         call_args = mock_session.execute.call_args
         assert "1" in str(call_args)
 
-        try:
+        with contextlib.suppress(StopIteration):
             next(gen)
-        except StopIteration:
-            pass
 
     @patch("datapulse.api.deps.get_session_factory")
     def test_rollback_on_exception(self, mock_factory):
@@ -105,10 +98,8 @@ class TestGetTenantSession:
         gen = get_tenant_session(user=user)
         next(gen)
 
-        try:
+        with contextlib.suppress(RuntimeError):
             gen.throw(RuntimeError("db error"))
-        except RuntimeError:
-            pass
 
         mock_session.rollback.assert_called_once()
         mock_session.close.assert_called_once()

@@ -61,9 +61,7 @@ class TestRequirePipelineToken:
         require_pipeline_token(token=None, settings=_settings(pipeline_webhook_secret=""))
 
     def test_valid_token(self):
-        require_pipeline_token(
-            token="tok123", settings=_settings(pipeline_webhook_secret="tok123")
-        )
+        require_pipeline_token(token="tok123", settings=_settings(pipeline_webhook_secret="tok123"))
 
     def test_invalid_token_raises_403(self):
         with pytest.raises(HTTPException) as exc_info:
@@ -74,16 +72,12 @@ class TestRequirePipelineToken:
 
     def test_missing_token_raises_403(self):
         with pytest.raises(HTTPException) as exc_info:
-            require_pipeline_token(
-                token=None, settings=_settings(pipeline_webhook_secret="tok123")
-            )
+            require_pipeline_token(token=None, settings=_settings(pipeline_webhook_secret="tok123"))
         assert exc_info.value.status_code == 403
 
     def test_empty_token_raises_403(self):
         with pytest.raises(HTTPException) as exc_info:
-            require_pipeline_token(
-                token="", settings=_settings(pipeline_webhook_secret="tok123")
-            )
+            require_pipeline_token(token="", settings=_settings(pipeline_webhook_secret="tok123"))
         assert exc_info.value.status_code == 403
 
 

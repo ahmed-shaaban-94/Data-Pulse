@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import subprocess
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 from uuid import uuid4
 
@@ -27,7 +26,9 @@ class TestSanitizeError:
         assert result.endswith("...")
 
     def test_strips_tracebacks(self):
-        error = "Traceback (most recent call last):\n  File \"/app/main.py\", line 10\nValueError: bad"
+        error = (
+            'Traceback (most recent call last):\n  File "/app/main.py", line 10\nValueError: bad'
+        )
         result = _sanitize_error(error)
         assert "Traceback" not in result
 

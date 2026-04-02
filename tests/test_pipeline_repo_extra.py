@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 from decimal import Decimal
 from unittest.mock import MagicMock
 from uuid import uuid4
@@ -84,7 +83,7 @@ class TestUpdateRun:
         assert result is not None
 
     def test_update_unsafe_column_raises(self, repo: PipelineRepository):
-        run_id = uuid4()
+        uuid4()
         data = PipelineRunUpdate()
         # Manually inject an unsafe field
         data.__dict__["status"] = "hacked; DROP TABLE"
@@ -108,7 +107,7 @@ class TestUpdateRun:
 
     def test_list_runs(self, repo: PipelineRepository, mock_session: MagicMock):
         # list_runs needs scalar for count + fetchall for rows
-        mock_execute = MagicMock()
+        MagicMock()
         mock_session.execute.side_effect = [
             MagicMock(scalar=MagicMock(return_value=2)),  # COUNT
             MagicMock(fetchall=MagicMock(return_value=[_mock_row(), _mock_row()])),  # SELECT

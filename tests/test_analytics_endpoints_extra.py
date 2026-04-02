@@ -2,52 +2,47 @@
 
 from __future__ import annotations
 
-from datetime import date
 from decimal import Decimal
 
 from datapulse.analytics.models import (
-    ABCAnalysis,
-    BillingBreakdown,
-    BillingBreakdownItem,
     CustomerAnalytics,
-    CustomerTypeBreakdown,
-    DashboardData,
-    DataDateRange,
     FilterOptions,
-    HeatmapData,
     KPISummary,
-    ProductHierarchy,
     ProductPerformance,
     RankingItem,
     RankingResult,
-    ReturnAnalysis,
-    ReturnsTrend,
-    SegmentSummary,
     SiteDetail,
     StaffPerformance,
     TimeSeriesPoint,
-    TopMovers,
     TrendResult,
 )
 
 
 def _kpi():
     return KPISummary(
-        today_net=Decimal("500"), mtd_net=Decimal("3000"), ytd_net=Decimal("30000"),
-        daily_transactions=20, daily_customers=10,
+        today_net=Decimal("500"),
+        mtd_net=Decimal("3000"),
+        ytd_net=Decimal("30000"),
+        daily_transactions=20,
+        daily_customers=10,
     )
 
 
 def _trend():
     return TrendResult(
         points=[TimeSeriesPoint(period="2025-01", value=Decimal("100"))],
-        total=Decimal("100"), average=Decimal("100"), minimum=Decimal("100"), maximum=Decimal("100"),
+        total=Decimal("100"),
+        average=Decimal("100"),
+        minimum=Decimal("100"),
+        maximum=Decimal("100"),
     )
 
 
 def _ranking():
     return RankingResult(
-        items=[RankingItem(rank=1, key=1, name="A", value=Decimal("500"), pct_of_total=Decimal("100"))],
+        items=[
+            RankingItem(rank=1, key=1, name="A", value=Decimal("500"), pct_of_total=Decimal("100"))
+        ],
         total=Decimal("500"),
     )
 
@@ -98,9 +93,16 @@ class TestDetailEndpoints:
     def test_product_detail_found(self, api_client):
         client, _, mock_detail_repo = api_client
         mock_detail_repo.get_product_detail.return_value = ProductPerformance(
-            product_key=1, drug_code="D001", drug_name="Aspirin", drug_brand="Bayer",
-            drug_category="Pain", total_quantity=Decimal("500"), total_sales=Decimal("10000"),
-            total_net_amount=Decimal("9000"), return_rate=Decimal("0.05"), unique_customers=42,
+            product_key=1,
+            drug_code="D001",
+            drug_name="Aspirin",
+            drug_brand="Bayer",
+            drug_category="Pain",
+            total_quantity=Decimal("500"),
+            total_sales=Decimal("10000"),
+            total_net_amount=Decimal("9000"),
+            return_rate=Decimal("0.05"),
+            unique_customers=42,
         )
         resp = client.get("/api/v1/analytics/products/1")
         assert resp.status_code == 200
@@ -114,9 +116,14 @@ class TestDetailEndpoints:
     def test_customer_detail_found(self, api_client):
         client, _, mock_detail_repo = api_client
         mock_detail_repo.get_customer_detail.return_value = CustomerAnalytics(
-            customer_key=1, customer_id="C001", customer_name="Customer A",
-            total_quantity=Decimal("300"), total_net_amount=Decimal("15000"),
-            transaction_count=120, unique_products=25, return_count=3,
+            customer_key=1,
+            customer_id="C001",
+            customer_name="Customer A",
+            total_quantity=Decimal("300"),
+            total_net_amount=Decimal("15000"),
+            transaction_count=120,
+            unique_products=25,
+            return_count=3,
         )
         resp = client.get("/api/v1/analytics/customers/1")
         assert resp.status_code == 200
@@ -130,9 +137,14 @@ class TestDetailEndpoints:
     def test_staff_detail_found(self, api_client):
         client, _, mock_detail_repo = api_client
         mock_detail_repo.get_staff_detail.return_value = StaffPerformance(
-            staff_key=1, staff_id="S001", staff_name="Staff A", staff_position="Pharmacist",
-            total_net_amount=Decimal("50000"), transaction_count=500,
-            avg_transaction_value=Decimal("100"), unique_customers=200,
+            staff_key=1,
+            staff_id="S001",
+            staff_name="Staff A",
+            staff_position="Pharmacist",
+            total_net_amount=Decimal("50000"),
+            transaction_count=500,
+            avg_transaction_value=Decimal("100"),
+            unique_customers=200,
         )
         resp = client.get("/api/v1/analytics/staff/1")
         assert resp.status_code == 200
@@ -146,10 +158,17 @@ class TestDetailEndpoints:
     def test_site_detail_found(self, api_client):
         client, _, mock_detail_repo = api_client
         mock_detail_repo.get_site_detail.return_value = SiteDetail(
-            site_key=1, site_code="SITE01", site_name="Main", area_manager="Mgr A",
-            total_net_amount=Decimal("100000"), transaction_count=1000,
-            unique_customers=500, unique_staff=50, walk_in_ratio=Decimal("0.6"),
-            insurance_ratio=Decimal("0.3"), return_rate=Decimal("0.02"),
+            site_key=1,
+            site_code="SITE01",
+            site_name="Main",
+            area_manager="Mgr A",
+            total_net_amount=Decimal("100000"),
+            transaction_count=1000,
+            unique_customers=500,
+            unique_staff=50,
+            walk_in_ratio=Decimal("0.6"),
+            insurance_ratio=Decimal("0.3"),
+            return_rate=Decimal("0.02"),
         )
         resp = client.get("/api/v1/analytics/sites/1")
         assert resp.status_code == 200

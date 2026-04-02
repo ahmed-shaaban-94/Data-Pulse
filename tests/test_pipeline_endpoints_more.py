@@ -3,13 +3,11 @@ _sse_event helper (line 190), and n8n webhook failure path (line 271)."""
 
 from __future__ import annotations
 
-import asyncio
 import json
 from datetime import UTC, datetime
 from unittest.mock import MagicMock, create_autospec, patch
 from uuid import uuid4
 
-import pytest
 from fastapi.testclient import TestClient
 
 from datapulse.pipeline.models import PipelineRunResponse

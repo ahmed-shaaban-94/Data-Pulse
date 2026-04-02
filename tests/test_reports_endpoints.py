@@ -7,12 +7,12 @@ from unittest.mock import MagicMock, patch
 from fastapi.testclient import TestClient
 
 from datapulse.reports.models import (
+    ParameterType,
     RenderedReport,
     RenderedSection,
     ReportParameter,
     ReportTemplate,
     SectionType,
-    ParameterType,
 )
 
 

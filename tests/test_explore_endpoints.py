@@ -46,7 +46,9 @@ _FAKE_MODEL = ExploreModel(
     label="Sales Fact",
     schema_name="public_marts",
     dimensions=[
-        Dimension(name="date_key", label="Date", dimension_type=DimensionType.date, model="fct_sales")
+        Dimension(
+            name="date_key", label="Date", dimension_type=DimensionType.date, model="fct_sales"
+        )
     ],
     metrics=[
         Metric(
@@ -93,7 +95,10 @@ class TestExecuteExploreQuery:
     @patch("datapulse.api.routes.explore.build_sql")
     def test_query_success(self, mock_build_sql, mock_cat):
         client, mock_session = _make_explore_client()
-        mock_build_sql.return_value = ("SELECT date_key, SUM(net_amount) FROM fct_sales GROUP BY 1", {})
+        mock_build_sql.return_value = (
+            "SELECT date_key, SUM(net_amount) FROM fct_sales GROUP BY 1",
+            {},
+        )
 
         mock_result = MagicMock()
         mock_result.keys.return_value = ["date_key", "total_sales"]

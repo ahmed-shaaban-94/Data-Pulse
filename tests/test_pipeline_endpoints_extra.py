@@ -1,4 +1,4 @@
-"""Extra tests for pipeline API endpoints — covers trigger, execute/*, quality, and update success cache invalidation."""
+"""Extra pipeline endpoint tests — trigger, execute, quality, cache."""
 
 from __future__ import annotations
 
@@ -10,7 +10,6 @@ from fastapi.testclient import TestClient
 
 from datapulse.pipeline.models import (
     ExecutionResult,
-    PipelineRunList,
     PipelineRunResponse,
 )
 from datapulse.pipeline.quality import QualityCheckList, QualityReport

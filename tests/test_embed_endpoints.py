@@ -2,14 +2,11 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import datetime
 from unittest.mock import MagicMock, patch
 
 import jwt as pyjwt
-import pytest
 from fastapi.testclient import TestClient
-
-from datapulse.explore.models import ExploreCatalog, ExploreModel, ExploreResult
 
 
 def _make_embed_client():
@@ -139,11 +136,13 @@ class TestEmbedQuery:
         mock_factory.return_value = lambda: mock_session
         # execute is called for SET LOCAL (succeeds), then for the query (fails)
         call_count = {"n": 0}
+
         def _side_effect(*a, **kw):
             call_count["n"] += 1
             if call_count["n"] > 1:
                 raise Exception("DB down")
             return MagicMock()
+
         mock_session.execute.side_effect = _side_effect
 
         resp = client.post(
@@ -187,7 +186,7 @@ class TestEmbedQuery:
 
 class TestSerialise:
     def test_serialise_types(self):
-        from datetime import date, datetime
+        from datetime import date
         from decimal import Decimal
 
         from datapulse.api.routes.embed import _serialise

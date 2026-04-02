@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import structlog
-
 from datapulse.logging import _mask_sensitive_fields, get_logger, setup_logging
 
 

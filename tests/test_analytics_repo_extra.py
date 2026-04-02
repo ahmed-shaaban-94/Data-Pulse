@@ -31,7 +31,9 @@ class TestGetMonthlyTrend:
         ]
         session.execute.return_value = mock_result
 
-        filters = AnalyticsFilter(date_range=DateRange(start_date=date(2025, 1, 1), end_date=date(2025, 3, 31)))
+        filters = AnalyticsFilter(
+            date_range=DateRange(start_date=date(2025, 1, 1), end_date=date(2025, 3, 31))
+        )
         result = r.get_monthly_trend(filters)
         assert len(result.points) == 2
         assert result.points[0].period == "2025-01"
@@ -42,7 +44,9 @@ class TestGetMonthlyTrend:
         mock_result.fetchall.return_value = []
         session.execute.return_value = mock_result
 
-        filters = AnalyticsFilter(date_range=DateRange(start_date=date(2025, 1, 1), end_date=date(2025, 3, 31)))
+        filters = AnalyticsFilter(
+            date_range=DateRange(start_date=date(2025, 1, 1), end_date=date(2025, 3, 31))
+        )
         result = r.get_monthly_trend(filters)
         assert result.points == []
 
@@ -57,7 +61,9 @@ class TestGetTopCustomers:
         ]
         session.execute.return_value = mock_result
 
-        filters = AnalyticsFilter(date_range=DateRange(start_date=date(2025, 1, 1), end_date=date(2025, 3, 31)))
+        filters = AnalyticsFilter(
+            date_range=DateRange(start_date=date(2025, 1, 1), end_date=date(2025, 3, 31))
+        )
         result = r.get_top_customers(filters)
         assert len(result.items) == 2
         assert result.items[0].name == "Customer A"
@@ -72,7 +78,9 @@ class TestGetTopStaff:
         ]
         session.execute.return_value = mock_result
 
-        filters = AnalyticsFilter(date_range=DateRange(start_date=date(2025, 1, 1), end_date=date(2025, 3, 31)))
+        filters = AnalyticsFilter(
+            date_range=DateRange(start_date=date(2025, 1, 1), end_date=date(2025, 3, 31))
+        )
         result = r.get_top_staff(filters)
         assert len(result.items) == 1
 
@@ -86,7 +94,9 @@ class TestGetSitePerformance:
         ]
         session.execute.return_value = mock_result
 
-        filters = AnalyticsFilter(date_range=DateRange(start_date=date(2025, 1, 1), end_date=date(2025, 3, 31)))
+        filters = AnalyticsFilter(
+            date_range=DateRange(start_date=date(2025, 1, 1), end_date=date(2025, 3, 31))
+        )
         result = r.get_site_performance(filters)
         assert len(result.items) == 1
         assert result.items[0].name == "Site Alpha"
@@ -99,7 +109,9 @@ class TestGetReturnAnalysisEmpty:
         mock_result.fetchall.return_value = []
         session.execute.return_value = mock_result
 
-        filters = AnalyticsFilter(date_range=DateRange(start_date=date(2025, 1, 1), end_date=date(2025, 3, 31)))
+        filters = AnalyticsFilter(
+            date_range=DateRange(start_date=date(2025, 1, 1), end_date=date(2025, 3, 31))
+        )
         result = r.get_return_analysis(filters)
         assert result == []
 
@@ -111,7 +123,9 @@ class TestGetReturnAnalysisEmpty:
         ]
         session.execute.return_value = mock_result
 
-        filters = AnalyticsFilter(date_range=DateRange(start_date=date(2025, 1, 1), end_date=date(2025, 3, 31)))
+        filters = AnalyticsFilter(
+            date_range=DateRange(start_date=date(2025, 1, 1), end_date=date(2025, 3, 31))
+        )
         result = r.get_return_analysis(filters)
         assert len(result) == 1
         assert result[0].drug_name == "Drug A"

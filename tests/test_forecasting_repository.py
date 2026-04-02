@@ -79,7 +79,20 @@ class TestGetCustomerSegments:
     def test_without_segment_filter(self, repo):
         r, session = repo
         session.execute.return_value.fetchall.return_value = [
-            (1, "C001", "Customer A", "Champions", 5, 5, 5, 10, 50, Decimal("100000"), Decimal("2000"), Decimal("0.05")),
+            (
+                1,
+                "C001",
+                "Customer A",
+                "Champions",
+                5,
+                5,
+                5,
+                10,
+                50,
+                Decimal("100000"),
+                Decimal("2000"),
+                Decimal("0.05"),
+            ),
         ]
         result = r.get_customer_segments(limit=10)
         assert len(result) == 1
@@ -113,10 +126,25 @@ class TestSaveForecasts:
                 horizon=2,
                 granularity="daily",
                 points=[
-                    ForecastPoint(period="2026-04-01", value=Decimal("1000"), lower_bound=Decimal("900"), upper_bound=Decimal("1100")),
-                    ForecastPoint(period="2026-04-02", value=Decimal("1100"), lower_bound=Decimal("1000"), upper_bound=Decimal("1200")),
+                    ForecastPoint(
+                        period="2026-04-01",
+                        value=Decimal("1000"),
+                        lower_bound=Decimal("900"),
+                        upper_bound=Decimal("1100"),
+                    ),
+                    ForecastPoint(
+                        period="2026-04-02",
+                        value=Decimal("1100"),
+                        lower_bound=Decimal("1000"),
+                        upper_bound=Decimal("1200"),
+                    ),
                 ],
-                accuracy_metrics=ForecastAccuracy(mape=Decimal("5.2"), mae=Decimal("50"), rmse=Decimal("60"), coverage=Decimal("0.95")),
+                accuracy_metrics=ForecastAccuracy(
+                    mape=Decimal("5.2"),
+                    mae=Decimal("50"),
+                    rmse=Decimal("60"),
+                    coverage=Decimal("0.95"),
+                ),
             ),
         ]
         count = r.save_forecasts(results, run_at=datetime(2026, 4, 1))
@@ -134,7 +162,12 @@ class TestSaveForecasts:
                 horizon=1,
                 granularity="monthly",
                 points=[
-                    ForecastPoint(period="2026-05", value=Decimal("500"), lower_bound=Decimal("400"), upper_bound=Decimal("600")),
+                    ForecastPoint(
+                        period="2026-05",
+                        value=Decimal("500"),
+                        lower_bound=Decimal("400"),
+                        upper_bound=Decimal("600"),
+                    ),
                 ],
                 accuracy_metrics=None,
             ),
@@ -153,8 +186,28 @@ class TestGetForecast:
     def test_returns_forecast_with_accuracy(self, repo):
         r, session = repo
         session.execute.return_value.fetchall.return_value = [
-            (date(2026, 4, 1), Decimal("1000"), Decimal("900"), Decimal("1100"), "holt_winters", Decimal("5.2"), Decimal("50"), Decimal("60"), datetime(2026, 4, 1)),
-            (date(2026, 4, 2), Decimal("1100"), Decimal("1000"), Decimal("1200"), "holt_winters", Decimal("5.2"), Decimal("50"), Decimal("60"), datetime(2026, 4, 1)),
+            (
+                date(2026, 4, 1),
+                Decimal("1000"),
+                Decimal("900"),
+                Decimal("1100"),
+                "holt_winters",
+                Decimal("5.2"),
+                Decimal("50"),
+                Decimal("60"),
+                datetime(2026, 4, 1),
+            ),
+            (
+                date(2026, 4, 2),
+                Decimal("1100"),
+                Decimal("1000"),
+                Decimal("1200"),
+                "holt_winters",
+                Decimal("5.2"),
+                Decimal("50"),
+                Decimal("60"),
+                datetime(2026, 4, 1),
+            ),
         ]
         result = r.get_forecast("revenue", "daily")
         assert result is not None
@@ -167,7 +220,17 @@ class TestGetForecast:
     def test_returns_forecast_without_accuracy(self, repo):
         r, session = repo
         session.execute.return_value.fetchall.return_value = [
-            (date(2026, 4, 1), Decimal("1000"), Decimal("900"), Decimal("1100"), "sma", None, None, None, datetime(2026, 4, 1)),
+            (
+                date(2026, 4, 1),
+                Decimal("1000"),
+                Decimal("900"),
+                Decimal("1100"),
+                "sma",
+                None,
+                None,
+                None,
+                datetime(2026, 4, 1),
+            ),
         ]
         result = r.get_forecast("revenue", "daily")
         assert result is not None
@@ -176,7 +239,17 @@ class TestGetForecast:
     def test_with_entity_key(self, repo):
         r, session = repo
         session.execute.return_value.fetchall.return_value = [
-            (date(2026, 5, 1), Decimal("500"), Decimal("400"), Decimal("600"), "sma", None, None, None, datetime(2026, 4, 1)),
+            (
+                date(2026, 5, 1),
+                Decimal("500"),
+                Decimal("400"),
+                Decimal("600"),
+                "sma",
+                None,
+                None,
+                None,
+                datetime(2026, 4, 1),
+            ),
         ]
         result = r.get_forecast("product", "monthly", entity_key=42)
         assert result is not None
@@ -189,17 +262,16 @@ class TestGetForecastSummaryData:
         # Mock 5 consecutive scalar/fetchall calls
         session.execute.return_value.scalar.side_effect = [
             datetime(2026, 4, 1),  # last_run
-            Decimal("30000"),      # next_30d
-            Decimal("90000"),      # next_3m
-            Decimal("5.5"),        # mape
+            Decimal("30000"),  # next_30d
+            Decimal("90000"),  # next_3m
+            Decimal("5.5"),  # mape
         ]
         session.execute.return_value.fetchall.side_effect = [
             [(1, "Drug A", Decimal("15.2"))],  # growing
-            [(2, "Drug B", Decimal("-8.3"))],   # declining
+            [(2, "Drug B", Decimal("-8.3"))],  # declining
         ]
 
         # Need to handle multiple execute calls with different return values
-        call_count = [0]
         scalar_values = [datetime(2026, 4, 1), Decimal("30000"), Decimal("90000"), Decimal("5.5")]
         fetchall_values = [
             [(1, "Drug A", Decimal("15.2"))],
@@ -207,11 +279,14 @@ class TestGetForecastSummaryData:
         ]
 
         scalar_idx = [0]
-        fetchall_idx = [0]
 
         def mock_execute(*args, **kwargs):
             mock_result = MagicMock()
-            mock_result.scalar.side_effect = lambda: scalar_values[scalar_idx[0]].__class__(scalar_values[scalar_idx[0]]) if scalar_idx[0] < len(scalar_values) else None
+            mock_result.scalar.side_effect = lambda: (
+                scalar_values[scalar_idx[0]].__class__(scalar_values[scalar_idx[0]])
+                if scalar_idx[0] < len(scalar_values)
+                else None
+            )
             return mock_result
 
         # Simpler approach: use side_effect with multiple mock results

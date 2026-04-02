@@ -4,10 +4,6 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, PropertyMock, patch
 
-import pytest
-
-from datapulse.ai_light.models import AnomalyReport, ChangeNarrative
-
 
 class TestAILightServiceAvailability:
     @patch("datapulse.ai_light.service.OpenRouterClient")

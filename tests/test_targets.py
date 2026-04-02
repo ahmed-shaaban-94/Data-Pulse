@@ -7,6 +7,7 @@ from decimal import Decimal
 from unittest.mock import MagicMock, create_autospec
 
 import pytest
+from pydantic import ValidationError
 
 from datapulse.targets.models import (
     AlertConfigCreate,
@@ -19,7 +20,6 @@ from datapulse.targets.models import (
 )
 from datapulse.targets.repository import TargetsRepository
 from datapulse.targets.service import TargetsService
-
 
 # ── Fixtures ──────────────────────────────────────────────────────────
 
@@ -111,7 +111,7 @@ class TestTargetModels:
 
     def test_target_response_frozen(self):
         t = TargetResponse(**_target_row())
-        with pytest.raises(Exception):
+        with pytest.raises((TypeError, AttributeError, ValidationError)):
             t.target_type = "transactions"  # type: ignore[misc]
 
     def test_target_vs_actual(self):
@@ -191,9 +191,7 @@ class TestTargetsRepository:
         mock_session.execute.return_value.rowcount = 0
         assert repo.delete_target(999) is False
 
-    def test_get_target_vs_actual_with_data(
-        self, repo: TargetsRepository, mock_session: MagicMock
-    ):
+    def test_get_target_vs_actual_with_data(self, repo: TargetsRepository, mock_session: MagicMock):
         mock_session.execute.return_value.fetchall.return_value = [
             ("2025-01", Decimal("100000"), Decimal("95000")),
             ("2025-02", Decimal("100000"), Decimal("110000")),
@@ -204,9 +202,7 @@ class TestTargetsRepository:
         assert result.ytd_target == Decimal("200000")
         assert result.ytd_actual == Decimal("205000")
 
-    def test_get_target_vs_actual_empty(
-        self, repo: TargetsRepository, mock_session: MagicMock
-    ):
+    def test_get_target_vs_actual_empty(self, repo: TargetsRepository, mock_session: MagicMock):
         mock_session.execute.return_value.fetchall.return_value = []
         result = repo.get_target_vs_actual(2025)
         assert result.monthly_targets == []
@@ -250,9 +246,7 @@ class TestTargetsRepository:
         assert result is not None
         assert result.enabled is False
 
-    def test_update_alert_config_not_found(
-        self, repo: TargetsRepository, mock_session: MagicMock
-    ):
+    def test_update_alert_config_not_found(self, repo: TargetsRepository, mock_session: MagicMock):
         mock_session.execute.return_value.mappings.return_value.fetchone.return_value = None
         result = repo.update_alert_config(999, enabled=True)
         assert result is None

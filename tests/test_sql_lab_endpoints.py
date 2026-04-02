@@ -38,9 +38,7 @@ class TestGetSchemas:
         mock_get_tables.return_value = [
             {
                 "table_name": "fct_sales",
-                "columns": [
-                    {"column_name": "id", "data_type": "integer", "is_nullable": False}
-                ],
+                "columns": [{"column_name": "id", "data_type": "integer", "is_nullable": False}],
             }
         ]
         client, _ = _make_sql_lab_client()

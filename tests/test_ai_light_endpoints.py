@@ -2,9 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import date
-from decimal import Decimal
-from unittest.mock import MagicMock, PropertyMock, create_autospec
+from unittest.mock import MagicMock, PropertyMock
 
 import pytest
 from fastapi.testclient import TestClient

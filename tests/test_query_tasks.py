@@ -52,10 +52,12 @@ class TestExecuteQuery:
         mock_result = MagicMock()
         mock_result.keys.return_value = ["id", "name", "amount"]
         mock_result.__iter__ = MagicMock(
-            return_value=iter([
-                (1, "Item A", Decimal("100.50")),
-                (2, "Item B", Decimal("200.75")),
-            ])
+            return_value=iter(
+                [
+                    (1, "Item A", Decimal("100.50")),
+                    (2, "Item B", Decimal("200.75")),
+                ]
+            )
         )
 
         # First call: SET LOCAL, second call: the actual query

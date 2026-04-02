@@ -25,8 +25,6 @@ from datapulse.analytics.models import (
     HeatmapData,
     ProductHierarchy,
     ProductPerformance,
-    ReturnsTrend,
-    SegmentSummary,
     SiteDetail,
     StaffPerformance,
     TopMovers,
@@ -132,7 +130,7 @@ class TestBreakdownMethods:
 
 class TestTopMovers:
     def test_delegates_with_date_range(self, analytics_service, mock_comparison_repo):
-        from datapulse.analytics.models import AnalyticsFilter, DateRange, MoverItem
+        from datapulse.analytics.models import AnalyticsFilter, DateRange
 
         expected = TopMovers(gainers=[], losers=[], entity_type="product")
         mock_comparison_repo.get_top_movers.return_value = expected
@@ -190,30 +188,78 @@ class TestAdvancedMethods:
         with pytest.raises(RuntimeError, match="AdvancedRepository not configured"):
             svc.get_segment_summary()
 
-    def test_abc_analysis_delegates(self, mock_repo, mock_detail_repo, mock_breakdown_repo, mock_comparison_repo, mock_hierarchy_repo):
+    def test_abc_analysis_delegates(
+        self,
+        mock_repo,
+        mock_detail_repo,
+        mock_breakdown_repo,
+        mock_comparison_repo,
+        mock_hierarchy_repo,
+    ):
         adv_repo = create_autospec(AdvancedRepository, instance=True)
         from datapulse.analytics.models import ABCAnalysis
+
         expected = ABCAnalysis(
-            items=[], total=Decimal("0"),
-            class_a_count=0, class_b_count=0, class_c_count=0,
-            class_a_pct=Decimal("0"), class_b_pct=Decimal("0"), class_c_pct=Decimal("0"),
+            items=[],
+            total=Decimal("0"),
+            class_a_count=0,
+            class_b_count=0,
+            class_c_count=0,
+            class_a_pct=Decimal("0"),
+            class_b_pct=Decimal("0"),
+            class_c_pct=Decimal("0"),
         )
         adv_repo.get_abc_analysis.return_value = expected
-        svc = AnalyticsService(mock_repo, mock_detail_repo, mock_breakdown_repo, mock_comparison_repo, mock_hierarchy_repo, adv_repo)
+        svc = AnalyticsService(
+            mock_repo,
+            mock_detail_repo,
+            mock_breakdown_repo,
+            mock_comparison_repo,
+            mock_hierarchy_repo,
+            adv_repo,
+        )
         result = svc.get_abc_analysis("product")
         assert result is expected
 
-    def test_heatmap_delegates(self, mock_repo, mock_detail_repo, mock_breakdown_repo, mock_comparison_repo, mock_hierarchy_repo):
+    def test_heatmap_delegates(
+        self,
+        mock_repo,
+        mock_detail_repo,
+        mock_breakdown_repo,
+        mock_comparison_repo,
+        mock_hierarchy_repo,
+    ):
         adv_repo = create_autospec(AdvancedRepository, instance=True)
         expected = HeatmapData(cells=[], year=2025, min_value=Decimal("0"), max_value=Decimal("0"))
         adv_repo.get_heatmap_data.return_value = expected
-        svc = AnalyticsService(mock_repo, mock_detail_repo, mock_breakdown_repo, mock_comparison_repo, mock_hierarchy_repo, adv_repo)
+        svc = AnalyticsService(
+            mock_repo,
+            mock_detail_repo,
+            mock_breakdown_repo,
+            mock_comparison_repo,
+            mock_hierarchy_repo,
+            adv_repo,
+        )
         result = svc.get_heatmap(2025)
         assert result is expected
 
-    def test_segment_summary_delegates(self, mock_repo, mock_detail_repo, mock_breakdown_repo, mock_comparison_repo, mock_hierarchy_repo):
+    def test_segment_summary_delegates(
+        self,
+        mock_repo,
+        mock_detail_repo,
+        mock_breakdown_repo,
+        mock_comparison_repo,
+        mock_hierarchy_repo,
+    ):
         adv_repo = create_autospec(AdvancedRepository, instance=True)
         adv_repo.get_segment_summary.return_value = []
-        svc = AnalyticsService(mock_repo, mock_detail_repo, mock_breakdown_repo, mock_comparison_repo, mock_hierarchy_repo, adv_repo)
+        svc = AnalyticsService(
+            mock_repo,
+            mock_detail_repo,
+            mock_breakdown_repo,
+            mock_comparison_repo,
+            mock_hierarchy_repo,
+            adv_repo,
+        )
         result = svc.get_segment_summary()
         assert result == []

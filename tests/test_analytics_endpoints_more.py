@@ -10,13 +10,11 @@ from fastapi.testclient import TestClient
 
 from datapulse.analytics.models import (
     ABCAnalysis,
-    AnalyticsFilter,
     BillingBreakdown,
     CustomerTypeBreakdown,
     HeatmapData,
     ProductHierarchy,
     ReturnsTrend,
-    SegmentSummary,
     TopMovers,
 )
 from datapulse.analytics.service import AnalyticsService
@@ -49,7 +47,9 @@ def client(mock_service: MagicMock) -> TestClient:
 
 class TestBillingBreakdown:
     def test_billing_breakdown(self, client: TestClient, mock_service: MagicMock):
-        mock_service.get_billing_breakdown.return_value = BillingBreakdown(items=[], total_transactions=0, total_net_amount=Decimal("0"))
+        mock_service.get_billing_breakdown.return_value = BillingBreakdown(
+            items=[], total_transactions=0, total_net_amount=Decimal("0")
+        )
         resp = client.get("/api/v1/analytics/billing-breakdown")
         assert resp.status_code == 200
 
@@ -63,7 +63,9 @@ class TestCustomerTypeBreakdown:
 
 class TestTopMovers:
     def test_top_movers(self, client: TestClient, mock_service: MagicMock):
-        mock_service.get_top_movers.return_value = TopMovers(gainers=[], losers=[], entity_type="product")
+        mock_service.get_top_movers.return_value = TopMovers(
+            gainers=[], losers=[], entity_type="product"
+        )
         resp = client.get("/api/v1/analytics/top-movers")
         assert resp.status_code == 200
 
@@ -78,9 +80,14 @@ class TestProductHierarchy:
 class TestABCAnalysis:
     def test_abc_analysis(self, client: TestClient, mock_service: MagicMock):
         mock_service.get_abc_analysis.return_value = ABCAnalysis(
-            items=[], total=Decimal("0"),
-            class_a_count=0, class_b_count=0, class_c_count=0,
-            class_a_pct=Decimal("0"), class_b_pct=Decimal("0"), class_c_pct=Decimal("0"),
+            items=[],
+            total=Decimal("0"),
+            class_a_count=0,
+            class_b_count=0,
+            class_c_count=0,
+            class_a_pct=Decimal("0"),
+            class_b_pct=Decimal("0"),
+            class_c_pct=Decimal("0"),
         )
         resp = client.get("/api/v1/analytics/abc-analysis")
         assert resp.status_code == 200
@@ -98,7 +105,10 @@ class TestHeatmap:
 class TestReturnsTrend:
     def test_returns_trend(self, client: TestClient, mock_service: MagicMock):
         mock_service.get_returns_trend.return_value = ReturnsTrend(
-            points=[], total_returns=0, total_return_amount=Decimal("0"), avg_return_rate=Decimal("0"),
+            points=[],
+            total_returns=0,
+            total_return_amount=Decimal("0"),
+            avg_return_rate=Decimal("0"),
         )
         resp = client.get("/api/v1/analytics/returns/trend")
         assert resp.status_code == 200
@@ -114,7 +124,9 @@ class TestSegmentSummary:
 class TestFilterBuildingEdgeCases:
     def test_with_filter_params(self, client: TestClient, mock_service: MagicMock):
         """Test _to_filter with actual filter parameters (covers lines 103, 113)."""
-        mock_service.get_billing_breakdown.return_value = BillingBreakdown(items=[], total_transactions=0, total_net_amount=Decimal("0"))
+        mock_service.get_billing_breakdown.return_value = BillingBreakdown(
+            items=[], total_transactions=0, total_net_amount=Decimal("0")
+        )
         resp = client.get(
             "/api/v1/analytics/billing-breakdown",
             params={"start_date": "2025-01-01", "end_date": "2025-06-30", "site_key": "1"},

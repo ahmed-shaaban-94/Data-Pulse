@@ -51,15 +51,17 @@ class TestGetSigningKey:
         mock_jwk_set = MagicMock()
         mock_jwk_set.keys = [mock_jwk]
 
-        with patch("datapulse.api.jwt.jwt.PyJWKSet.from_dict", return_value=mock_jwk_set):
-            with patch(
+        with (
+            patch("datapulse.api.jwt.jwt.PyJWKSet.from_dict", return_value=mock_jwk_set),
+            patch(
                 "datapulse.api.jwt.jwt.get_unverified_header",
                 side_effect=pyjwt.DecodeError("bad token"),
-            ):
-                with pytest.raises(HTTPException) as exc:
-                    _get_signing_key("garbage-token", mock_settings)
-                assert exc.value.status_code == 401
-                assert "Invalid token format" in exc.value.detail
+            ),
+        ):
+            with pytest.raises(HTTPException) as exc:
+                _get_signing_key("garbage-token", mock_settings)
+            assert exc.value.status_code == 401
+            assert "Invalid token format" in exc.value.detail
 
     @patch("datapulse.api.jwt._fetch_jwks")
     def test_token_missing_kid(self, mock_fetch, mock_settings):
@@ -71,15 +73,17 @@ class TestGetSigningKey:
         mock_jwk_set = MagicMock()
         mock_jwk_set.keys = [mock_jwk]
 
-        with patch("datapulse.api.jwt.jwt.PyJWKSet.from_dict", return_value=mock_jwk_set):
-            with patch(
+        with (
+            patch("datapulse.api.jwt.jwt.PyJWKSet.from_dict", return_value=mock_jwk_set),
+            patch(
                 "datapulse.api.jwt.jwt.get_unverified_header",
                 return_value={"alg": "RS256"},  # no kid
-            ):
-                with pytest.raises(HTTPException) as exc:
-                    _get_signing_key("no-kid-token", mock_settings)
-                assert exc.value.status_code == 401
-                assert "missing key ID" in exc.value.detail
+            ),
+        ):
+            with pytest.raises(HTTPException) as exc:
+                _get_signing_key("no-kid-token", mock_settings)
+            assert exc.value.status_code == 401
+            assert "missing key ID" in exc.value.detail
 
     @patch("datapulse.api.jwt._fetch_jwks")
     def test_key_found_on_first_try(self, mock_fetch, mock_settings):
@@ -91,13 +95,15 @@ class TestGetSigningKey:
         mock_jwk_set = MagicMock()
         mock_jwk_set.keys = [mock_jwk]
 
-        with patch("datapulse.api.jwt.jwt.PyJWKSet.from_dict", return_value=mock_jwk_set):
-            with patch(
+        with (
+            patch("datapulse.api.jwt.jwt.PyJWKSet.from_dict", return_value=mock_jwk_set),
+            patch(
                 "datapulse.api.jwt.jwt.get_unverified_header",
                 return_value={"kid": "match-kid", "alg": "RS256"},
-            ):
-                result = _get_signing_key("good-token", mock_settings)
-                assert result.key_id == "match-kid"
+            ),
+        ):
+            result = _get_signing_key("good-token", mock_settings)
+            assert result.key_id == "match-kid"
 
     @patch("datapulse.api.jwt._fetch_jwks")
     def test_key_found_after_cache_refresh(self, mock_fetch, mock_settings):
@@ -118,17 +124,19 @@ class TestGetSigningKey:
             {"keys": [{"kid": "new-kid"}]},
         ]
 
-        with patch(
-            "datapulse.api.jwt.jwt.PyJWKSet.from_dict",
-            side_effect=[mock_jwk_set_old, mock_jwk_set_new],
-        ):
-            with patch(
+        with (
+            patch(
+                "datapulse.api.jwt.jwt.PyJWKSet.from_dict",
+                side_effect=[mock_jwk_set_old, mock_jwk_set_new],
+            ),
+            patch(
                 "datapulse.api.jwt.jwt.get_unverified_header",
                 return_value={"kid": "new-kid", "alg": "RS256"},
-            ):
-                result = _get_signing_key("token-with-new-kid", mock_settings)
-                assert result.key_id == "new-kid"
-                assert mock_fetch.call_count == 2
+            ),
+        ):
+            result = _get_signing_key("token-with-new-kid", mock_settings)
+            assert result.key_id == "new-kid"
+            assert mock_fetch.call_count == 2
 
     @patch("datapulse.api.jwt._fetch_jwks")
     def test_key_not_found_after_retry(self, mock_fetch, mock_settings):
@@ -140,15 +148,17 @@ class TestGetSigningKey:
 
         mock_fetch.return_value = {"keys": [{"kid": "wrong-kid"}]}
 
-        with patch("datapulse.api.jwt.jwt.PyJWKSet.from_dict", return_value=mock_jwk_set):
-            with patch(
+        with (
+            patch("datapulse.api.jwt.jwt.PyJWKSet.from_dict", return_value=mock_jwk_set),
+            patch(
                 "datapulse.api.jwt.jwt.get_unverified_header",
                 return_value={"kid": "missing-kid", "alg": "RS256"},
-            ):
-                with pytest.raises(HTTPException) as exc:
-                    _get_signing_key("token", mock_settings)
-                assert exc.value.status_code == 401
-                assert "signing key not found" in exc.value.detail
+            ),
+        ):
+            with pytest.raises(HTTPException) as exc:
+                _get_signing_key("token", mock_settings)
+            assert exc.value.status_code == 401
+            assert "signing key not found" in exc.value.detail
 
     @patch("datapulse.api.jwt._fetch_jwks")
     def test_retry_jwks_parse_error(self, mock_fetch, mock_settings):
@@ -163,14 +173,16 @@ class TestGetSigningKey:
             {"keys": []},
         ]
 
-        with patch(
-            "datapulse.api.jwt.jwt.PyJWKSet.from_dict",
-            side_effect=[mock_jwk_set_old, pyjwt.PyJWKSetError("bad keys")],
-        ):
-            with patch(
+        with (
+            patch(
+                "datapulse.api.jwt.jwt.PyJWKSet.from_dict",
+                side_effect=[mock_jwk_set_old, pyjwt.PyJWKSetError("bad keys")],
+            ),
+            patch(
                 "datapulse.api.jwt.jwt.get_unverified_header",
                 return_value={"kid": "new-kid", "alg": "RS256"},
-            ):
-                with pytest.raises(HTTPException) as exc:
-                    _get_signing_key("token", mock_settings)
-                assert exc.value.status_code == 503
+            ),
+        ):
+            with pytest.raises(HTTPException) as exc:
+                _get_signing_key("token", mock_settings)
+            assert exc.value.status_code == 503
