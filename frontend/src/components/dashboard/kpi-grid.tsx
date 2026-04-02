@@ -39,7 +39,7 @@ export function KPIGrid() {
   if (isLoading) {
     return (
       <div className="space-y-4">
-        <div className="grid grid-cols-2 gap-4 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-7">
+        <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
           {Array.from({ length: 7 }).map((_, i) => (
             <LoadingCard key={i} lines={2} className={`stagger-${i + 1}`} />
           ))}
@@ -151,7 +151,7 @@ export function KPIGrid() {
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-4 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-7">
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
         {primaryCards.map((card, i) => (
           <KPICard
             key={card.label}

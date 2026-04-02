@@ -105,7 +105,7 @@ export function KPICard({ label, value, numericValue, isCurrency, isPercent, tre
         )}
       </div>
 
-      <p className="relative mt-3 text-xl sm:text-2xl xl:text-3xl font-bold tracking-tight text-text-primary truncate">
+      <p className="relative mt-3 text-xl sm:text-2xl xl:text-3xl font-bold tracking-tight text-text-primary truncate" data-kpi-value>
         <AnimatedValue
           value={value}
           numericValue={numericValue}

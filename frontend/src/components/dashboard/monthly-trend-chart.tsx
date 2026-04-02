@@ -19,6 +19,7 @@ import { useFilters } from "@/contexts/filter-context";
 import { LoadingCard } from "@/components/loading-card";
 import { EmptyState } from "@/components/empty-state";
 import { ErrorRetry } from "@/components/error-retry";
+import { ChartCard } from "@/components/shared/chart-card";
 import { formatCurrency, formatCompact } from "@/lib/formatters";
 import { useChartTheme } from "@/hooks/use-chart-theme";
 import { TrendingUp, TrendingDown, GitCompare } from "lucide-react";
@@ -64,47 +65,39 @@ export function MonthlyTrendChart() {
   const maxValue = Math.max(...chartData.map(d => d.value));
   const isPositiveGrowth = data.growth_pct !== null && data.growth_pct >= 0;
 
+  const growthBadge = data.growth_pct !== null ? (
+    <div className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-semibold ${
+      isPositiveGrowth
+        ? "bg-growth-green/10 text-growth-green"
+        : "bg-growth-red/10 text-growth-red"
+    }`}>
+      {isPositiveGrowth ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
+      {data.growth_pct > 0 ? "+" : ""}{data.growth_pct.toFixed(1)}%
+    </div>
+  ) : undefined;
+
+  const compareButton = (
+    <button
+      onClick={() => setCompare((v) => !v)}
+      className={cn(
+        "flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-all",
+        compare
+          ? "bg-chart-blue/20 text-chart-blue"
+          : "text-text-secondary hover:bg-chart-blue/10 hover:text-chart-blue"
+      )}
+    >
+      <GitCompare className="h-3.5 w-3.5" />
+      Compare
+    </button>
+  );
+
   return (
-    <div className="group rounded-xl border border-border bg-card p-5 transition-all duration-300 hover:border-chart-blue/30 hover:shadow-lg hover:shadow-chart-blue/5">
-      <div className="mb-5 flex items-center justify-between">
-        <div>
-          <h3 className="text-sm font-semibold uppercase tracking-wider text-text-secondary">
-            Monthly Net Sales
-          </h3>
-          <p className="mt-1 text-2xl font-bold text-text-primary">
-            {formatCurrency(data.total)}
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setCompare((v) => !v)}
-            className={cn(
-              "flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-all",
-              compare
-                ? "bg-chart-blue/20 text-chart-blue"
-                : "text-text-secondary hover:bg-chart-blue/10 hover:text-chart-blue"
-            )}
-          >
-            <GitCompare className="h-3.5 w-3.5" />
-            Compare
-          </button>
-          {data.growth_pct !== null && (
-            <div className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-semibold ${
-              isPositiveGrowth
-                ? "bg-growth-green/10 text-growth-green"
-                : "bg-growth-red/10 text-growth-red"
-            }`}>
-              {isPositiveGrowth ? (
-                <TrendingUp className="h-4 w-4" />
-              ) : (
-                <TrendingDown className="h-4 w-4" />
-              )}
-              {data.growth_pct > 0 ? "+" : ""}
-              {data.growth_pct.toFixed(1)}%
-            </div>
-          )}
-        </div>
-      </div>
+    <ChartCard
+      title="Monthly Net Sales"
+      subtitle={formatCurrency(data.total)}
+      badge={growthBadge}
+      actions={compareButton}
+    >
       <ResponsiveContainer width="100%" height={280}>
         <ComposedChart data={chartData}>
           <defs>
@@ -157,6 +150,6 @@ export function MonthlyTrendChart() {
           )}
         </ComposedChart>
       </ResponsiveContainer>
-    </div>
+    </ChartCard>
   );
 }

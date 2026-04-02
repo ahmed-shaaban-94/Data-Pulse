@@ -83,7 +83,19 @@
 body {
   background-color: var(--bg-page);
   color: var(--text-primary);
-  font-family: "Segoe UI", system-ui, sans-serif;
+  font-family: var(--font-inter), "Inter", "Segoe UI", system-ui, sans-serif;
+}
+
+/* Tabular numbers for consistent digit widths in KPIs, tables, and charts */
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Apply tabular nums to all numeric-heavy contexts */
+td, th,
+[data-kpi-value],
+.recharts-text {
+  font-variant-numeric: tabular-nums;
 }
 
 /* ═══════════════════════════════════════════════

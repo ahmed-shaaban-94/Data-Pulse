@@ -54,7 +54,7 @@ export default function DashboardPage() {
         <KPIGrid />
 
         {/* Trends Section */}
-        <div className="mt-8">
+        <div className="mt-10">
           <SectionHeader icon={TrendingUp} title="Trends" />
           <div className="mt-4 grid gap-6 lg:grid-cols-2">
             <DailyTrendChart />
@@ -63,7 +63,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Sales Distribution Section */}
-        <div className="mt-8">
+        <div className="mt-10">
           <SectionHeader icon={PieChart} title="Sales Distribution" />
           <div className="mt-4 grid gap-6 lg:grid-cols-2">
             <BillingBreakdownChart />
@@ -72,7 +72,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Rankings Section */}
-        <div className="mt-8">
+        <div className="mt-10">
           <SectionHeader icon={Trophy} title="Top Performers" />
           <div className="mt-4">
             <QuickRankings />
@@ -80,7 +80,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Top Movers Section */}
-        <div className="mt-8">
+        <div className="mt-10">
           <SectionHeader icon={Zap} title="Top Movers" />
           <div className="mt-4">
             <TopMoversCard />

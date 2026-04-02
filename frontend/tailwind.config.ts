@@ -23,7 +23,7 @@ const config: Config = {
         "growth-red": "var(--growth-red)",
       },
       fontFamily: {
-        sans: ["Segoe UI", "system-ui", "sans-serif"],
+        sans: ["var(--font-inter)", "Inter", "Segoe UI", "system-ui", "sans-serif"],
       },
       animation: {
         "fade-in": "fadeIn 0.4s ease-out forwards",
