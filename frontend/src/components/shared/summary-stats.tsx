@@ -29,16 +29,16 @@ export function SummaryStats({ stats, className }: SummaryStatsProps) {
             <div className="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-accent/50 via-accent to-accent/50 opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
 
             <div className="flex items-start justify-between">
-              <p className="text-xs font-semibold uppercase tracking-wider text-text-secondary">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-text-secondary">
                 {stat.label}
               </p>
               {Icon && (
-                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent/10 transition-colors group-hover:bg-accent/15">
-                  <Icon className="h-4 w-4 text-accent" />
+                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-accent/10 transition-colors group-hover:bg-accent/15">
+                  <Icon className="h-3.5 w-3.5 text-accent" />
                 </div>
               )}
             </div>
-            <p className="mt-2 text-lg font-bold tracking-tight text-text-primary truncate" title={stat.value}>
+            <p className="mt-1.5 text-base font-bold tracking-tight text-text-primary truncate" data-kpi-value title={stat.value}>
               {stat.value}
             </p>
           </div>

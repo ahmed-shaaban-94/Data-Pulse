@@ -15,11 +15,11 @@ import { FilterBar } from "@/components/filters/filter-bar";
 
 function SectionHeader({ icon: Icon, title }: { icon: React.ComponentType<{ className?: string }>; title: string }) {
   return (
-    <div className="flex items-center gap-2.5">
-      <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-accent/10">
-        <Icon className="h-4 w-4 text-accent" />
+    <div className="flex items-center gap-2">
+      <div className="flex h-6 w-6 items-center justify-center rounded-md bg-accent/10">
+        <Icon className="h-3.5 w-3.5 text-accent" />
       </div>
-      <h2 className="text-sm font-semibold uppercase tracking-wider text-text-secondary">
+      <h2 className="text-[11px] font-semibold uppercase tracking-widest text-text-secondary">
         {title}
       </h2>
       <div className="flex-1 section-divider" />
@@ -54,7 +54,7 @@ export default function DashboardPage() {
         <KPIGrid />
 
         {/* Trends Section */}
-        <div className="mt-8">
+        <div className="mt-10">
           <SectionHeader icon={TrendingUp} title="Trends" />
           <div className="mt-4 grid gap-6 lg:grid-cols-2">
             <DailyTrendChart />
@@ -63,7 +63,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Sales Distribution Section */}
-        <div className="mt-8">
+        <div className="mt-10">
           <SectionHeader icon={PieChart} title="Sales Distribution" />
           <div className="mt-4 grid gap-6 lg:grid-cols-2">
             <BillingBreakdownChart />
@@ -72,7 +72,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Rankings Section */}
-        <div className="mt-8">
+        <div className="mt-10">
           <SectionHeader icon={Trophy} title="Top Performers" />
           <div className="mt-4">
             <QuickRankings />
@@ -80,7 +80,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Top Movers Section */}
-        <div className="mt-8">
+        <div className="mt-10">
           <SectionHeader icon={Zap} title="Top Movers" />
           <div className="mt-4">
             <TopMoversCard />
