@@ -8,7 +8,12 @@ import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
 
 from datapulse.api.deps import CurrentUser, get_billing_service
-from datapulse.billing.models import BillingStatus, CheckoutRequest, CheckoutResponse, PortalResponse
+from datapulse.billing.models import (
+    BillingStatus,
+    CheckoutRequest,
+    CheckoutResponse,
+    PortalResponse,
+)
 from datapulse.billing.service import BillingService
 
 logger = structlog.get_logger()
@@ -73,8 +78,8 @@ async def stripe_webhook(
 ) -> dict:
     """Handle Stripe webhook events. Not behind JWT — uses Stripe signature verification."""
     from datapulse.billing.repository import BillingRepository
-    from datapulse.billing.stripe_client import StripeClient
     from datapulse.billing.service import BillingService
+    from datapulse.billing.stripe_client import StripeClient
     from datapulse.config import get_settings
     from datapulse.core.db import get_session_factory
 
