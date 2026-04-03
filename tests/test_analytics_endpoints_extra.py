@@ -51,6 +51,7 @@ class TestDashboardEndpoint:
     def test_get_dashboard(self, api_client):
         client, mock_repo, _ = api_client
         mock_repo.get_kpi_summary.return_value = _kpi()
+        mock_repo.get_kpi_summary_range.return_value = _kpi()
         mock_repo.get_daily_trend.return_value = _trend()
         mock_repo.get_monthly_trend.return_value = _trend()
         mock_repo.get_top_products.return_value = _ranking()
