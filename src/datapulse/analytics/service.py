@@ -157,18 +157,25 @@ class AnalyticsService:
             end = max_date or date.today()
             date_range = DateRange(start_date=end - timedelta(days=30), end_date=end)
 
-        key = _cache_key("dashboard", {
-            "target_date": str(target_date),
-            "start": str(date_range.start_date),
-            "end": str(date_range.end_date),
-        })
+        key = _cache_key(
+            "dashboard",
+            {
+                "target_date": str(target_date),
+                "start": str(date_range.start_date),
+                "end": str(date_range.end_date),
+            },
+        )
         cached_val = cache_get(key)
         if cached_val is not None:
             log.debug("cache_hit", key=key)
             return DashboardData(**cached_val)
 
-        log.info("dashboard_data", target_date=str(target_date),
-                 start=str(date_range.start_date), end=str(date_range.end_date))
+        log.info(
+            "dashboard_data",
+            target_date=str(target_date),
+            start=str(date_range.start_date),
+            end=str(date_range.end_date),
+        )
         kpi = self.get_dashboard_summary(target_date)
         filters = AnalyticsFilter(date_range=date_range)
         result = DashboardData(
