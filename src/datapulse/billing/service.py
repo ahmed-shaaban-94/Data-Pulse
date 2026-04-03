@@ -2,16 +2,30 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import structlog
 
-from datapulse.billing.models import BillingStatus, CheckoutResponse, PortalResponse, WebhookResult
-from datapulse.billing.plans import DEFAULT_PLAN, get_plan_limits, resolve_plan_from_price
+from datapulse.billing.models import (
+    BillingStatus,
+    CheckoutResponse,
+    PortalResponse,
+    WebhookResult,
+)
+from datapulse.billing.plans import (
+    DEFAULT_PLAN,
+    get_plan_limits,
+    resolve_plan_from_price,
+)
 from datapulse.billing.repository import BillingRepository
 from datapulse.billing.stripe_client import StripeClient
 
 logger = structlog.get_logger()
+
+_CHECKOUT_COMPLETED = "checkout.session.completed"
+_SUB_UPDATED = "customer.subscription.updated"
+_SUB_DELETED = "customer.subscription.deleted"
+_PAYMENT_FAILED = "invoice.payment_failed"
 
 
 class BillingService:
@@ -42,7 +56,9 @@ class BillingService:
             price_display=limits.price_display,
             subscription_status=sub["status"] if sub else None,
             current_period_end=sub["current_period_end"] if sub else None,
-            cancel_at_period_end=sub["cancel_at_period_end"] if sub else False,
+            cancel_at_period_end=(
+                sub["cancel_at_period_end"] if sub else False
+            ),
             data_sources_used=usage["data_sources_count"],
             data_sources_limit=limits.data_sources,
             total_rows_used=usage["total_rows"],
@@ -66,7 +82,6 @@ class BillingService:
             msg = "Stripe is not configured"
             raise RuntimeError(msg)
 
-        # Get or create Stripe customer
         customer_id = self._repo.get_stripe_customer_id(tenant_id)
         if not customer_id:
             customer = self._stripe.create_customer(
@@ -76,18 +91,28 @@ class BillingService:
             )
             customer_id = customer.id
             self._repo.set_stripe_customer_id(tenant_id, customer_id)
-            logger.info("stripe_customer_created", tenant_id=tenant_id, customer_id=customer_id)
+            logger.info(
+                "stripe_customer_created",
+                tenant_id=tenant_id,
+                customer_id=customer_id,
+            )
+
+        success = success_url or f"{self._base_url}/billing?success=true"
+        cancel = cancel_url or f"{self._base_url}/billing?canceled=true"
 
         session = self._stripe.create_checkout_session(
             customer_id=customer_id,
             price_id=price_id,
-            success_url=success_url or f"{self._base_url}/billing?success=true",
-            cancel_url=cancel_url or f"{self._base_url}/billing?canceled=true",
+            success_url=success,
+            cancel_url=cancel,
         )
 
-        return CheckoutResponse(checkout_url=session.url)
+        url: str = session.url or ""
+        return CheckoutResponse(checkout_url=url)
 
-    def create_portal_session(self, tenant_id: int) -> PortalResponse:
+    def create_portal_session(
+        self, tenant_id: int
+    ) -> PortalResponse:
         if not self._stripe.is_configured:
             msg = "Stripe is not configured"
             raise RuntimeError(msg)
@@ -107,36 +132,45 @@ class BillingService:
     def handle_webhook_event(
         self, payload: bytes, sig_header: str, webhook_secret: str
     ) -> WebhookResult:
-        event = self._stripe.construct_webhook_event(payload, sig_header, webhook_secret)
+        event = self._stripe.construct_webhook_event(
+            payload, sig_header, webhook_secret
+        )
         event_type = event["type"]
         data_object = event["data"]["object"]
 
         logger.info("stripe_webhook_received", event_type=event_type)
 
-        if event_type == "checkout.session.completed":
-            return self._handle_checkout_completed(data_object)
-        elif event_type == "customer.subscription.updated":
-            return self._handle_subscription_updated(data_object)
-        elif event_type == "customer.subscription.deleted":
-            return self._handle_subscription_deleted(data_object)
-        elif event_type == "invoice.payment_failed":
-            return self._handle_payment_failed(data_object)
-        else:
-            logger.debug("stripe_webhook_ignored", event_type=event_type)
-            return WebhookResult(event_type=event_type, status="ignored")
+        handlers = {
+            _CHECKOUT_COMPLETED: self._handle_checkout_completed,
+            _SUB_UPDATED: self._handle_subscription_updated,
+            _SUB_DELETED: self._handle_subscription_deleted,
+            _PAYMENT_FAILED: self._handle_payment_failed,
+        }
+        handler = handlers.get(event_type)
+        if handler:
+            return handler(data_object)
 
-    # ── Private webhook handlers ────────────────────────────────
+        logger.debug("stripe_webhook_ignored", event_type=event_type)
+        return WebhookResult(event_type=event_type, status="ignored")
+
+    # ── Private webhook handlers ──────────────────────────────
 
     def _handle_checkout_completed(self, session: dict) -> WebhookResult:
         customer_id = session["customer"]
         subscription_id = session.get("subscription")
         if not subscription_id:
-            return WebhookResult(event_type="checkout.session.completed", status="no_subscription")
+            return WebhookResult(
+                event_type=_CHECKOUT_COMPLETED, status="no_subscription"
+            )
 
         tenant_id = self._repo.get_tenant_by_stripe_customer(customer_id)
         if not tenant_id:
-            logger.warning("webhook_unknown_customer", customer_id=customer_id)
-            return WebhookResult(event_type="checkout.session.completed", status="unknown_customer")
+            logger.warning(
+                "webhook_unknown_customer", customer_id=customer_id
+            )
+            return WebhookResult(
+                event_type=_CHECKOUT_COMPLETED, status="unknown_customer"
+            )
 
         sub = self._stripe.retrieve_subscription(subscription_id)
         price_id = sub["items"]["data"][0]["price"]["id"]
@@ -155,14 +189,18 @@ class BillingService:
 
         logger.info("checkout_completed", tenant_id=tenant_id, plan=plan)
         return WebhookResult(
-            event_type="checkout.session.completed", tenant_id=tenant_id, plan=plan
+            event_type=_CHECKOUT_COMPLETED,
+            tenant_id=tenant_id,
+            plan=plan,
         )
 
     def _handle_subscription_updated(self, sub: dict) -> WebhookResult:
         customer_id = sub["customer"]
         tenant_id = self._repo.get_tenant_by_stripe_customer(customer_id)
         if not tenant_id:
-            return WebhookResult(event_type="customer.subscription.updated", status="unknown_customer")
+            return WebhookResult(
+                event_type=_SUB_UPDATED, status="unknown_customer"
+            )
 
         price_id = sub["items"]["data"][0]["price"]["id"]
         plan = resolve_plan_from_price(price_id, self._price_to_plan)
@@ -178,28 +216,36 @@ class BillingService:
         )
         self._repo.update_tenant_plan(tenant_id, plan)
 
-        logger.info("subscription_updated", tenant_id=tenant_id, plan=plan, status=sub["status"])
+        logger.info(
+            "subscription_updated",
+            tenant_id=tenant_id,
+            plan=plan,
+            status=sub["status"],
+        )
         return WebhookResult(
-            event_type="customer.subscription.updated", tenant_id=tenant_id, plan=plan
+            event_type=_SUB_UPDATED, tenant_id=tenant_id, plan=plan
         )
 
     def _handle_subscription_deleted(self, sub: dict) -> WebhookResult:
         customer_id = sub["customer"]
         tenant_id = self._repo.get_tenant_by_stripe_customer(customer_id)
         if not tenant_id:
-            return WebhookResult(event_type="customer.subscription.deleted", status="unknown_customer")
+            return WebhookResult(
+                event_type=_SUB_DELETED, status="unknown_customer"
+            )
 
+        price_id = sub["items"]["data"][0]["price"]["id"]
         self._repo.upsert_subscription(
             tenant_id=tenant_id,
             stripe_subscription_id=sub["id"],
-            stripe_price_id=sub["items"]["data"][0]["price"]["id"],
+            stripe_price_id=price_id,
             status="canceled",
         )
         self._repo.update_tenant_plan(tenant_id, DEFAULT_PLAN)
 
         logger.info("subscription_canceled", tenant_id=tenant_id)
         return WebhookResult(
-            event_type="customer.subscription.deleted",
+            event_type=_SUB_DELETED,
             tenant_id=tenant_id,
             plan=DEFAULT_PLAN,
         )
@@ -210,16 +256,24 @@ class BillingService:
         sub_id = invoice.get("subscription")
 
         if tenant_id and sub_id:
+            lines = invoice.get("lines", {})
+            line_data = lines.get("data", [{}])
+            price_obj = line_data[0].get("price", {})
+            price_id = price_obj.get("id", "")
             self._repo.upsert_subscription(
                 tenant_id=tenant_id,
                 stripe_subscription_id=sub_id,
-                stripe_price_id=invoice.get("lines", {}).get("data", [{}])[0].get("price", {}).get("id", ""),
+                stripe_price_id=price_id,
                 status="past_due",
             )
-            logger.warning("payment_failed", tenant_id=tenant_id, subscription_id=sub_id)
+            logger.warning(
+                "payment_failed",
+                tenant_id=tenant_id,
+                subscription_id=sub_id,
+            )
 
         return WebhookResult(
-            event_type="invoice.payment_failed",
+            event_type=_PAYMENT_FAILED,
             tenant_id=tenant_id,
             status="past_due",
         )
@@ -229,4 +283,4 @@ def _ts_to_dt(ts: int | None) -> datetime | None:
     """Convert a Unix timestamp to a timezone-aware datetime."""
     if ts is None:
         return None
-    return datetime.fromtimestamp(ts, tz=timezone.utc)
+    return datetime.fromtimestamp(ts, tz=UTC)

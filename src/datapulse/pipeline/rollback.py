@@ -28,7 +28,7 @@ def rollback_bronze(session: Session, run_id: UUID) -> int:
             text("DELETE FROM bronze.sales WHERE _pipeline_run_id = :run_id"),
             {"run_id": str(run_id)},
         )
-        deleted = result.rowcount
+        deleted = result.rowcount  # type: ignore[attr-defined]
         session.commit()
         log.info("rollback_bronze_done", run_id=str(run_id), rows_deleted=deleted)
         return deleted
@@ -49,7 +49,7 @@ def rollback_forecasting(session: Session, run_id: UUID) -> int:
             text("DELETE FROM public_marts.forecasts WHERE pipeline_run_id = :run_id"),
             {"run_id": str(run_id)},
         )
-        deleted = result.rowcount
+        deleted = result.rowcount  # type: ignore[attr-defined]
         session.commit()
         log.info("rollback_forecasting_done", run_id=str(run_id), rows_deleted=deleted)
         return deleted

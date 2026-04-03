@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import structlog
 from sqlalchemy import text
@@ -70,7 +70,7 @@ class BillingRepository:
         current_period_end: datetime | None = None,
         cancel_at_period_end: bool = False,
     ) -> None:
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         existing = self._session.execute(
             text(
                 "SELECT id FROM public.subscriptions "
@@ -158,7 +158,7 @@ class BillingRepository:
     def upsert_usage(
         self, tenant_id: int, *, data_sources_count: int | None = None, total_rows: int | None = None
     ) -> None:
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         existing = self._session.execute(
             text("SELECT id FROM public.usage_metrics WHERE tenant_id = :tid"),
             {"tid": tenant_id},

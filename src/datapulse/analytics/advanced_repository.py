@@ -175,9 +175,9 @@ class AdvancedRepository:
         ]
 
         total_returns = sum(p.return_count for p in points)
-        total_amount = sum(p.return_amount for p in points)
+        total_amount = Decimal(sum(p.return_amount for p in points))
         avg_rate = (
-            (sum(p.return_rate for p in points) / len(points)).quantize(Decimal("0.01"))
+            Decimal(sum(p.return_rate for p in points) / len(points)).quantize(Decimal("0.01"))
             if points
             else _ZERO
         )

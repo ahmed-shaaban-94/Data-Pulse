@@ -100,8 +100,8 @@ def profile_table(session: Session, stage: str) -> TableProfile:
             FROM {schema}.{table}
         """)
         stats = session.execute(stats_stmt).fetchone()
-        null_count = stats._mapping["null_count"]
-        unique_count = stats._mapping["unique_count"]
+        null_count = stats._mapping["null_count"]  # type: ignore[union-attr]
+        unique_count = stats._mapping["unique_count"]  # type: ignore[union-attr]
 
         null_rate = round(null_count / row_count * 100, 2) if row_count > 0 else 0.0
         cardinality = round(unique_count / row_count, 4) if row_count > 0 else 0.0

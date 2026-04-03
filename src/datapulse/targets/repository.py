@@ -115,7 +115,7 @@ class TargetsRepository:
         log.info("delete_target", target_id=target_id)
         stmt = text("DELETE FROM public.sales_targets WHERE id = :target_id")
         result = self._session.execute(stmt, {"target_id": target_id})
-        return result.rowcount > 0  # type: ignore[union-attr]
+        return result.rowcount > 0  # type: ignore[attr-defined]
 
     def get_target_vs_actual(self, year: int) -> TargetSummary:
         """Compare monthly revenue targets against actuals for a given year.
@@ -291,4 +291,4 @@ class TargetsRepository:
             WHERE id = :alert_id AND acknowledged = FALSE
         """)
         result = self._session.execute(stmt, {"alert_id": alert_id})
-        return result.rowcount > 0  # type: ignore[union-attr]
+        return result.rowcount > 0  # type: ignore[attr-defined]

@@ -121,7 +121,7 @@ def export_products(
     from datapulse.analytics.models import AnalyticsFilter
 
     f = AnalyticsFilter(
-        date_range=(start_date, end_date) if start_date else None,
+        date_range=(start_date, end_date) if start_date else None,  # type: ignore[arg-type]
         category=category,
         limit=limit,
     )
@@ -141,7 +141,7 @@ def export_customers(
     """Export top customers data as CSV or Excel."""
     from datapulse.analytics.models import AnalyticsFilter
 
-    f = AnalyticsFilter(date_range=(start_date, end_date) if start_date else None, limit=limit)
+    f = AnalyticsFilter(date_range=(start_date, end_date) if start_date else None, limit=limit)  # type: ignore[arg-type]
     result = service.get_customer_insights(f)
     data = [item.model_dump() for item in result.items] if hasattr(result, "items") else []
     return _export_response(data, "customers", format)
@@ -158,7 +158,7 @@ def export_staff(
     """Export staff performance data as CSV or Excel."""
     from datapulse.analytics.models import AnalyticsFilter
 
-    f = AnalyticsFilter(date_range=(start_date, end_date) if start_date else None, limit=limit)
+    f = AnalyticsFilter(date_range=(start_date, end_date) if start_date else None, limit=limit)  # type: ignore[arg-type]
     result = service.get_staff_leaderboard(f)
     data = [item.model_dump() for item in result.items] if hasattr(result, "items") else []
     return _export_response(data, "staff", format)
