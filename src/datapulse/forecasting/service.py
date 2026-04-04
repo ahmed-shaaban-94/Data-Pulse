@@ -26,6 +26,10 @@ log = get_logger(__name__)
 
 _FORECAST_PREFIX = "datapulse:forecast"
 
+# Minimum number of data points required to produce a meaningful forecast.
+# Fewer than this yields unreliable results and wide confidence intervals.
+_MIN_SERIES_LENGTH = 7
+
 
 class ForecastingService:
     """Orchestrates forecasting jobs and serves cached results."""
@@ -117,7 +121,14 @@ class ForecastingService:
 
         # --- 1. Daily revenue ---
         daily_series = self._repo.get_daily_revenue_series(lookback_days=730)
-        if daily_series:
+        if len(daily_series) < _MIN_SERIES_LENGTH:
+            log.warning(
+                "forecast_skip_daily",
+                reason="insufficient_data",
+                points=len(daily_series),
+                minimum=_MIN_SERIES_LENGTH,
+            )
+        elif daily_series:
             daily_values = [v for _, v in daily_series]
             last_date = daily_series[-1][0]
             start = last_date + timedelta(days=1)
@@ -158,7 +169,14 @@ class ForecastingService:
 
         # --- 2. Monthly revenue ---
         monthly_series = self._repo.get_monthly_revenue_series()
-        if monthly_series:
+        if len(monthly_series) < _MIN_SERIES_LENGTH:
+            log.warning(
+                "forecast_skip_monthly",
+                reason="insufficient_data",
+                points=len(monthly_series),
+                minimum=_MIN_SERIES_LENGTH,
+            )
+        elif monthly_series:
             monthly_values = [v for _, v in monthly_series]
             last_period = monthly_series[-1][0]
             # Parse "YYYY-MM" to get start of next month

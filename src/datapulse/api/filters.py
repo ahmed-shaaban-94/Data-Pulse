@@ -144,8 +144,17 @@ def apply_filters(
             conditions.append(col.in_(values))
         elif f.op == FilterOp.BETWEEN:
             parts = str(f.value).split(",", 1)
-            if len(parts) == 2:
-                conditions.append(col.between(parts[0].strip(), parts[1].strip()))
+            if len(parts) != 2:
+                log.warning("filter_between_invalid", field=f.field, value=f.value)
+                continue
+            low, high = parts[0].strip(), parts[1].strip()
+            if not low or not high:
+                log.warning("filter_between_empty_bound", field=f.field, value=f.value)
+                continue
+            if low > high:
+                log.warning("filter_between_reversed", field=f.field, low=low, high=high)
+                low, high = high, low
+            conditions.append(col.between(low, high))
         elif f.op == FilterOp.LIKE:
             conditions.append(col.ilike(f"%{f.value}%"))
         elif f.op == FilterOp.IS_NULL:
