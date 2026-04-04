@@ -6,15 +6,14 @@ import { usePathname } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
 import {
   Activity,
+  BarChartBig,
   Bell,
-  Compass,
   CreditCard,
   FileBarChart,
   LayoutDashboard,
   Menu,
   Package,
   Target,
-  Terminal,
   Users,
   UserCog,
   Building2,
@@ -38,8 +37,7 @@ interface SidebarProps {
 const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   LayoutDashboard,
   Target,
-  Compass,
-  Terminal,
+  BarChartBig,
   Package,
   Users,
   UserCog,
