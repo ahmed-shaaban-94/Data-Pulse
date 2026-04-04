@@ -20,7 +20,7 @@ def pytest_configure(config):
     """Set minimal env vars so modules with eager Settings() calls can import.
 
     This runs before test collection, fixing collection errors in modules
-    like celery_app.py that call get_settings() at module level.
+    that call get_settings() at module level.
     """
     os.environ.setdefault("DATABASE_URL", "postgresql://test:test@localhost/test")
 
