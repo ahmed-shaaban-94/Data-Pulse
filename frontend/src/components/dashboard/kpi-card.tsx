@@ -1,6 +1,6 @@
 "use client";
 
-import { useId } from "react";
+import { memo, useId } from "react";
 import { AreaChart, Area, ResponsiveContainer } from "recharts";
 import { cn } from "@/lib/utils";
 import { TrendingUp, TrendingDown, Minus } from "lucide-react";
@@ -46,7 +46,7 @@ function AnimatedValue({ value, numericValue, isCurrency, isPercent }: {
   return <>{animated}</>;
 }
 
-export function KPICard({ label, value, numericValue, isCurrency, isPercent, trend, trendLabel, subtitle, icon: Icon, className, accentGradient, sparkline, tooltip }: KPICardProps) {
+export const KPICard = memo(function KPICard({ label, value, numericValue, isCurrency, isPercent, trend, trendLabel, subtitle, icon: Icon, className, accentGradient, sparkline, tooltip }: KPICardProps) {
   const sparkId = useId();
   const isPositive = trend !== null && trend !== undefined && trend > 0;
   const isNegative = trend !== null && trend !== undefined && trend < 0;
@@ -161,4 +161,4 @@ export function KPICard({ label, value, numericValue, isCurrency, isPercent, tre
       )}
     </div>
   );
-}
+});

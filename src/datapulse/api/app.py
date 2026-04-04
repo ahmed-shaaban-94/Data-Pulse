@@ -11,6 +11,7 @@ import structlog
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from starlette.exceptions import HTTPException as StarletteHTTPException
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
@@ -105,6 +106,8 @@ def create_app() -> FastAPI:
     # Global exception handler
     @app.exception_handler(Exception)
     async def global_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+        if isinstance(exc, StarletteHTTPException):
+            raise exc
         logger.error(
             "unhandled_exception",
             method=request.method,

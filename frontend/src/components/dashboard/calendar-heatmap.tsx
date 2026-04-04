@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { memo, useMemo, useState } from "react";
 import { useHeatmap } from "@/hooks/use-heatmap";
 import { formatCurrency } from "@/lib/formatters";
 import { LoadingCard } from "@/components/loading-card";
@@ -17,7 +17,7 @@ function getColor(value: number, min: number, max: number, isDark: boolean): str
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const DAYS = ["Mon", "", "Wed", "", "Fri", "", ""];
 
-export function CalendarHeatmap() {
+export const CalendarHeatmap = memo(function CalendarHeatmap() {
   const currentYear = new Date().getFullYear();
   const [year, setYear] = useState(currentYear);
   const { data, isLoading } = useHeatmap(year);
@@ -195,4 +195,4 @@ export function CalendarHeatmap() {
       </div>
     </div>
   );
-}
+});
