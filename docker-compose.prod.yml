@@ -22,6 +22,12 @@ services:
     volumes:
       - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
       - ./traefik/certs:/etc/nginx/certs:ro
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost/health/live || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
     depends_on:
       api:
         condition: service_healthy
@@ -31,6 +37,7 @@ services:
       resources:
         limits:
           memory: 64M
+          cpus: "0.25"
     networks:
       - frontend-net
       - backend
@@ -77,11 +84,9 @@ services:
   prestart:
     image: ghcr.io/ahmed-shaaban-94/saas/api:${IMAGE_TAG:-latest}
 
-  celery-worker:
-    image: ghcr.io/ahmed-shaaban-94/saas/api:${IMAGE_TAG:-latest}
+  # celery-worker removed — async queries now run in-process
 
-  n8n:
-    ports: !reset []
+  # n8n removed — orchestration now in-process via datapulse.scheduler
 
   app:
     ports: !reset []

@@ -5,6 +5,7 @@ import { useTopMovers } from "@/hooks/use-top-movers";
 import { useFilters } from "@/contexts/filter-context";
 import { LoadingCard } from "@/components/loading-card";
 import { EmptyState } from "@/components/empty-state";
+import { ErrorRetry } from "@/components/error-retry";
 import { formatCurrency } from "@/lib/formatters";
 import { TrendingUp, TrendingDown } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -51,9 +52,10 @@ function MoverRow({ item }: { item: MoverItem }) {
 export function TopMoversCard() {
   const [entityType, setEntityType] = useState<"product" | "customer" | "staff">("product");
   const { filters } = useFilters();
-  const { data, isLoading } = useTopMovers(entityType, filters);
+  const { data, isLoading, error } = useTopMovers(entityType, filters);
 
   if (isLoading) return <LoadingCard lines={8} className="h-96" />;
+  if (error) return <ErrorRetry description="Failed to load top movers" />;
 
   return (
     <div className="rounded-xl border border-border bg-card p-5">
@@ -81,7 +83,7 @@ export function TopMoversCard() {
         </div>
       </div>
 
-      {!data || (data.gainers.length === 0 && data.losers.length === 0) ? (
+      {!data || (!data.gainers?.length && !data.losers?.length) ? (
         <EmptyState title="No movers data for this period" />
       ) : (
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2">

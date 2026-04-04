@@ -46,7 +46,7 @@ export function TargetProgress() {
 
   if (isLoading) return <LoadingCard className="h-64" />;
 
-  if (!data || data.monthly_targets.length === 0) {
+  if (!data?.monthly_targets?.length) {
     return (
       <div className="rounded-xl border border-border bg-card p-6">
         <div className="mb-4 flex items-center gap-2">

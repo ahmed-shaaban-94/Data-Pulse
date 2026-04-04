@@ -52,7 +52,7 @@ export function DailyTrendChart() {
 
   if (isLoading) return <LoadingCard lines={8} className="h-80" />;
   if (error) return <ErrorRetry title="Failed to load daily trend data" description="Failed to load data. Please try again." />;
-  if (!data || data.points.length === 0)
+  if (!data?.points?.length)
     return <EmptyState title="No daily trend data" />;
 
   const chartData = data.points.map((p, i) => ({
