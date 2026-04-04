@@ -1,6 +1,7 @@
 "use client";
 
 import { Component, type ReactNode } from "react";
+import { captureError } from "@/lib/sentry";
 
 interface Props {
   children: ReactNode;
@@ -24,14 +25,7 @@ export class ErrorBoundary extends Component<Props, State> {
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo): void {
     console.error("ErrorBoundary caught:", error, errorInfo);
-    // Report to Sentry if SDK is available
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const Sentry = require("@sentry/nextjs");
-      Sentry.captureException(error, { extra: { componentStack: errorInfo.componentStack } });
-    } catch {
-      // @sentry/nextjs not installed — skip silently
-    }
+    captureError(error, { componentStack: errorInfo.componentStack });
   }
 
   render() {
