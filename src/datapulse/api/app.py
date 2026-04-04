@@ -28,7 +28,6 @@ from datapulse.api.routes import (
     pipeline,
     queries,
     reports,
-    sql_lab,
     targets,
 )
 from datapulse.config import get_settings
@@ -148,7 +147,7 @@ def create_app() -> FastAPI:
     app.include_router(explore.router, prefix="/api/v1")
     app.include_router(embed.auth_router, prefix="/api/v1")
     app.include_router(embed.public_router, prefix="/api/v1")
-    app.include_router(sql_lab.router, prefix="/api/v1")
+
     app.include_router(reports.router, prefix="/api/v1")
     app.include_router(targets.router, prefix="/api/v1")
     app.include_router(export.router, prefix="/api/v1")
