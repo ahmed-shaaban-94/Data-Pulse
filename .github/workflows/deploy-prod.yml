@@ -31,7 +31,7 @@ jobs:
 
           # Check staging workflow status
           RESULT=$(gh api \
-            repos/${{ github.repository }}/actions/workflows/deploy.yml/runs \
+            repos/${{ github.repository }}/actions/workflows/deploy-staging.yml/runs \
             --jq '.workflow_runs[0] | {status: .status, conclusion: .conclusion}' \
             2>/dev/null || echo '{"status":"unknown","conclusion":"unknown"}')
 
