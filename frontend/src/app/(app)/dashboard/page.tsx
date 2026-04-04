@@ -8,6 +8,7 @@ import { LoadingCard } from "@/components/loading-card";
 import dynamic from "next/dynamic";
 
 // Above-fold: regular imports (seen immediately)
+import { DayHeroConnected } from "@/components/dashboard/day-hero-connected";
 import { KPIGrid } from "@/components/dashboard/kpi-grid";
 import { DailyTrendChart } from "@/components/dashboard/daily-trend-chart";
 import { MonthlyTrendChart } from "@/components/dashboard/monthly-trend-chart";
@@ -90,6 +91,9 @@ export default function DashboardPage() {
 
         {/* Client boundary: single API call provides data to KPI + trends + rankings */}
         <DashboardContent>
+          {/* Day Hero — today's snapshot sentence */}
+          <DayHeroConnected />
+
           {/* KPI Section */}
           <KPIGrid />
 

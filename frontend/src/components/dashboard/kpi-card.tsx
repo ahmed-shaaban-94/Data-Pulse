@@ -51,10 +51,14 @@ export const KPICard = memo(function KPICard({ label, value, numericValue, isCur
   const isPositive = trend !== null && trend !== undefined && trend > 0;
   const isNegative = trend !== null && trend !== undefined && trend < 0;
 
+  const trendOpacity = trend !== null && trend !== undefined
+    ? Math.min(Math.abs(trend) * 3, 100) / 100
+    : 0.1;
+
   const pillBg = isPositive
-    ? "bg-growth-green/10 text-growth-green"
+    ? "text-growth-green"
     : isNegative
-      ? "bg-growth-red/10 text-growth-red"
+      ? "text-growth-red"
       : "bg-text-secondary/10 text-text-secondary";
 
   const defaultGradient = isPositive
@@ -127,6 +131,11 @@ export const KPICard = memo(function KPICard({ label, value, numericValue, isCur
               "transition-all duration-300 group-hover:scale-105",
               pillBg,
             )}
+            style={isPositive || isNegative ? {
+              backgroundColor: isPositive
+                ? `rgba(var(--growth-green-rgb, 5, 150, 105), ${trendOpacity})`
+                : `rgba(var(--growth-red-rgb, 220, 38, 38), ${trendOpacity})`,
+            } : undefined}
           >
             <TrendIcon className="h-3 w-3" />
             {trend !== null ? `${isPositive ? "+" : ""}${trend.toFixed(1)}%` : "N/A"}
