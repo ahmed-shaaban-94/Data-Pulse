@@ -9,6 +9,7 @@ from __future__ import annotations
 import asyncio
 import json
 from datetime import datetime
+from functools import partial
 from typing import Annotated
 from uuid import UUID
 
@@ -360,14 +361,16 @@ def resume_run(
     response_model=ExecutionResult,
     dependencies=[Depends(require_pipeline_token)],
 )
-def execute_bronze(
+async def execute_bronze(
     executor: ExecutorDep,
     body: ExecuteRequest,
 ) -> ExecutionResult:
-    """Run the bronze loader stage for a pipeline run."""
-    return executor.run_bronze(
-        run_id=body.run_id,
-        source_dir=body.source_dir,
+    """Run the bronze loader stage for a pipeline run.
+
+    Runs in a background thread to avoid blocking the API threadpool.
+    """
+    return await asyncio.to_thread(
+        partial(executor.run_bronze, run_id=body.run_id, source_dir=body.source_dir),
     )
 
 
@@ -376,12 +379,14 @@ def execute_bronze(
     response_model=ExecutionResult,
     dependencies=[Depends(require_pipeline_token)],
 )
-def execute_dbt_staging(
+async def execute_dbt_staging(
     executor: ExecutorDep,
     body: ExecuteRequest,
 ) -> ExecutionResult:
-    """Run dbt staging models."""
-    return executor.run_dbt(run_id=body.run_id, selector="staging")
+    """Run dbt staging models in a background thread."""
+    return await asyncio.to_thread(
+        partial(executor.run_dbt, run_id=body.run_id, selector="staging"),
+    )
 
 
 @router.post(
@@ -389,12 +394,14 @@ def execute_dbt_staging(
     response_model=ExecutionResult,
     dependencies=[Depends(require_pipeline_token)],
 )
-def execute_dbt_marts(
+async def execute_dbt_marts(
     executor: ExecutorDep,
     body: ExecuteRequest,
 ) -> ExecutionResult:
-    """Run dbt marts models."""
-    return executor.run_dbt(run_id=body.run_id, selector="marts")
+    """Run dbt marts models in a background thread."""
+    return await asyncio.to_thread(
+        partial(executor.run_dbt, run_id=body.run_id, selector="marts"),
+    )
 
 
 @router.post(
@@ -402,12 +409,14 @@ def execute_dbt_marts(
     response_model=ExecutionResult,
     dependencies=[Depends(require_pipeline_token)],
 )
-def execute_forecasting(
+async def execute_forecasting(
     executor: ExecutorDep,
     body: ExecuteRequest,
 ) -> ExecutionResult:
-    """Run the forecasting stage (after gold layer completes)."""
-    return executor.run_forecasting(run_id=body.run_id)
+    """Run the forecasting stage in a background thread."""
+    return await asyncio.to_thread(
+        partial(executor.run_forecasting, run_id=body.run_id),
+    )
 
 
 @router.get("/runs/{run_id}/quality", response_model=QualityCheckList)
