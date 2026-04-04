@@ -38,10 +38,8 @@ function toChartData(result: ExploreResult): Record<string, unknown>[] {
 const CURRENCY_COLS = new Set([
   "total_net_sales",
   "total_gross_sales",
-  "total_tax",
-  "total_paid",
+  "total_discount",
   "avg_order_value",
-  "avg_unit_price",
 ]);
 
 function formatCell(value: unknown, colName?: string): string {

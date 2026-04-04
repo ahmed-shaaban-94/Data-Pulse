@@ -44,16 +44,14 @@ export const DIMENSION_LABELS: Record<string, string> = {
 
 /** Map metric API names to user-friendly labels */
 export const METRIC_LABELS: Record<string, string> = {
-  total_net_sales: "Total Revenue",
+  total_net_sales: "Net Revenue",
   total_gross_sales: "Gross Sales",
-  total_tax: "Tax Amount",
-  total_paid: "Paid Amount",
+  total_discount: "Total Discount",
   total_quantity: "Total Units",
   transaction_count: "Transactions",
   unique_customers: "Unique Customers",
   unique_products: "Unique Products",
   avg_order_value: "Avg. Order Value",
-  avg_unit_price: "Avg. Price per Unit",
 };
 
 // ---- Dimension & Metric Groups ----
@@ -73,9 +71,9 @@ export const DIMENSION_GROUPS: FieldGroup[] = [
 ];
 
 export const METRIC_GROUPS: FieldGroup[] = [
-  { label: "Revenue", fields: ["total_net_sales", "total_gross_sales", "total_tax", "total_paid"] },
+  { label: "Revenue", fields: ["total_net_sales", "total_gross_sales", "total_discount"] },
   { label: "Volume", fields: ["total_quantity", "transaction_count", "unique_customers", "unique_products"] },
-  { label: "Averages", fields: ["avg_order_value", "avg_unit_price"] },
+  { label: "Averages", fields: ["avg_order_value"] },
 ];
 
 // ---- Chart types ----
@@ -113,7 +111,7 @@ export const REPORT_TEMPLATES: ReportTemplate[] = [
     icon: Package,
     model: "fct_sales",
     dimensions: ["drug_name"],
-    metrics: ["total_net_sales", "total_quantity", "unique_customers", "avg_unit_price"],
+    metrics: ["total_net_sales", "total_quantity", "unique_customers", "avg_order_value"],
     chartType: "bar",
   },
   {
