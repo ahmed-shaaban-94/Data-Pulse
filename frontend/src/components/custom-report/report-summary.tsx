@@ -11,18 +11,15 @@ interface ReportSummaryProps {
 const CURRENCY_METRICS = new Set([
   "total_net_sales",
   "total_gross_sales",
-  "total_tax",
-  "total_paid",
+  "total_discount",
   "avg_order_value",
-  "avg_unit_price",
 ]);
 
 /** Metrics where SUM makes sense; the rest get AVG */
 const SUM_METRICS = new Set([
   "total_net_sales",
   "total_gross_sales",
-  "total_tax",
-  "total_paid",
+  "total_discount",
   "total_quantity",
   "transaction_count",
   "unique_customers",
