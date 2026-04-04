@@ -68,6 +68,9 @@ def get_redis_client():
     return _redis_client
 
 
+_CACHE_MISS = object()
+
+
 def cache_get(key: str) -> Any | None:
     """Get a value from cache. Returns None on miss or error."""
     client = get_redis_client()
@@ -76,10 +79,12 @@ def cache_get(key: str) -> Any | None:
     try:
         raw = client.get(key)
         if raw is None:
+            logger.debug("cache_miss", key=key)
             return None
+        logger.debug("cache_hit", key=key)
         return json.loads(raw)
     except Exception as exc:
-        logger.warning("cache_get_error", key=key, error=str(exc))
+        logger.error("cache_get_error", key=key, error=str(exc))
         return None
 
 
@@ -93,7 +98,7 @@ def cache_set(key: str, value: Any, ttl: int | None = None) -> None:
     try:
         client.setex(key, ttl, json.dumps(value, default=str))
     except Exception as exc:
-        logger.warning("cache_set_error", key=key, error=str(exc))
+        logger.error("cache_set_error", key=key, error=str(exc))
 
 
 def cache_invalidate_pattern(pattern: str) -> int:
@@ -112,5 +117,5 @@ def cache_invalidate_pattern(pattern: str) -> int:
             return deleted
         return 0
     except Exception as exc:
-        logger.warning("cache_invalidate_error", pattern=pattern, error=str(exc))
+        logger.error("cache_invalidate_error", pattern=pattern, error=str(exc))
         return 0

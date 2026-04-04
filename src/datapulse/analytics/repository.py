@@ -322,7 +322,8 @@ class AnalyticsRepository:
 
         try:
             rows = self._session.execute(stmt, {"td": target_date}).fetchall()
-        except Exception:
+        except Exception as exc:
+            log.error("growth_significance_query_failed", target_date=str(target_date), kind=kind, error=str(exc))
             return None
         if len(rows) < 3:
             return None
@@ -332,7 +333,8 @@ class AnalyticsRepository:
             if r[0] is not None:
                 try:
                     values.append(Decimal(str(r[0])))
-                except Exception:
+                except Exception as exc:
+                    log.warning("growth_significance_decimal_error", value=str(r[0]), error=str(exc))
                     continue
         if len(values) < 3:
             return None

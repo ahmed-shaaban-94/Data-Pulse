@@ -1,6 +1,6 @@
 """Health check endpoints.
 
-- ``/health``       — full component check (DB + Redis + Celery)
+- ``/health``       — full component check (DB + Redis)
 - ``/health/live``  — liveness probe (app is running)
 - ``/health/ready`` — readiness probe (DB is reachable)
 """
@@ -32,6 +32,7 @@ def _check_db() -> dict:
         latency = round((time.monotonic() - t0) * 1000)
         return {"status": "ok", "latency_ms": latency}
     except Exception as exc:
+        logger.error("health_db_error", error=str(exc))
         return {"status": "error", "error": str(exc)[:100]}
 
 
@@ -48,20 +49,24 @@ def _check_redis() -> dict:
         latency = round((time.monotonic() - t0) * 1000)
         return {"status": "ok", "latency_ms": latency}
     except Exception as exc:
+        logger.error("health_redis_error", error=str(exc))
         return {"status": "error", "error": str(exc)[:100]}
 
 
-def _check_celery() -> dict:
-    """Check whether at least one Celery worker is available."""
+def _check_query_executor() -> dict:
+    """Check whether the async query executor (Redis db 2) is reachable."""
     try:
-        from datapulse.tasks.celery_app import celery_app
+        from datapulse.tasks.async_executor import _get_job_client
 
-        inspector = celery_app.control.inspect(timeout=2)
-        active = inspector.active()
-        if active is None:
-            return {"status": "no-workers"}
-        return {"status": "ok", "workers": len(active)}
+        client = _get_job_client()
+        if client is None:
+            return {"status": "disabled"}
+        t0 = time.monotonic()
+        client.ping()
+        latency = round((time.monotonic() - t0) * 1000)
+        return {"status": "ok", "latency_ms": latency}
     except Exception as exc:
+        logger.error("health_query_executor_error", error=str(exc))
         return {"status": "error", "error": str(exc)[:100]}
 
 
@@ -80,7 +85,7 @@ def health_check() -> JSONResponse:
     checks = {
         "database": _check_db(),
         "redis": _check_redis(),
-        "celery": _check_celery(),
+        "query_executor": _check_query_executor(),
     }
 
     # Determine overall status

@@ -77,8 +77,7 @@ services:
   prestart:
     image: ghcr.io/ahmed-shaaban-94/saas/api:${IMAGE_TAG:-latest}
 
-  celery-worker:
-    image: ghcr.io/ahmed-shaaban-94/saas/api:${IMAGE_TAG:-latest}
+  # celery-worker removed — async queries now run in-process
 
   n8n:
     ports: !reset []

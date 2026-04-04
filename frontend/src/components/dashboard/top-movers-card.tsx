@@ -81,7 +81,7 @@ export function TopMoversCard() {
         </div>
       </div>
 
-      {!data || (data.gainers.length === 0 && data.losers.length === 0) ? (
+      {!data || (!data.gainers?.length && !data.losers?.length) ? (
         <EmptyState title="No movers data for this period" />
       ) : (
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2">

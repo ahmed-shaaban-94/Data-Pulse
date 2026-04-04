@@ -60,8 +60,8 @@ def test_health_endpoint(api_client):
         patch("datapulse.api.routes.health.get_engine") as mock_engine,
         patch("datapulse.api.routes.health._check_redis", return_value={"status": "disabled"}),
         patch(
-            "datapulse.api.routes.health._check_celery",
-            return_value={"status": "ok", "workers": 1},
+            "datapulse.api.routes.health._check_query_executor",
+            return_value={"status": "ok", "latency_ms": 1},
         ),
     ):
         mock_conn = MagicMock()
@@ -82,8 +82,8 @@ def test_health_endpoint_degraded(api_client):
         patch("datapulse.api.routes.health.get_engine") as mock_engine,
         patch("datapulse.api.routes.health._check_redis", return_value={"status": "disabled"}),
         patch(
-            "datapulse.api.routes.health._check_celery",
-            return_value={"status": "ok", "workers": 1},
+            "datapulse.api.routes.health._check_query_executor",
+            return_value={"status": "ok", "latency_ms": 1},
         ),
     ):
         mock_engine.return_value.connect.side_effect = Exception("connection refused")

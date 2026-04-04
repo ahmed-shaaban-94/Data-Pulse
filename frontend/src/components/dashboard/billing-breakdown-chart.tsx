@@ -40,7 +40,7 @@ export function BillingBreakdownChart() {
   const CHART_THEME = useChartTheme();
 
   if (isLoading) return <LoadingCard lines={6} className="h-80" />;
-  if (!data || data.items.length === 0)
+  if (!data?.items?.length)
     return <EmptyState title="No billing data" />;
 
   const chartData = data.items.map((item) => ({
