@@ -200,10 +200,13 @@ class TestAIResponseValidation:
 class TestForecastingMinSeries:
     """Verify min series length guard in forecasting service."""
 
-    def test_min_series_constant_defined(self):
-        from datapulse.forecasting.service import _MIN_SERIES_LENGTH
+    def test_min_daily_points_defined(self):
+        """Daily forecast requires min_daily_points threshold."""
+        import inspect
+        from datapulse.forecasting.service import ForecastingService
 
-        assert _MIN_SERIES_LENGTH >= 3
+        source = inspect.getsource(ForecastingService.run_all_forecasts)
+        assert "min_daily_points" in source
 
     def test_short_daily_series_skipped(self):
         """Daily forecast should be skipped when series is too short."""
@@ -211,7 +214,7 @@ class TestForecastingMinSeries:
         from datapulse.forecasting.service import ForecastingService
 
         source = inspect.getsource(ForecastingService.run_all_forecasts)
-        assert "_MIN_SERIES_LENGTH" in source
+        assert "min_daily_points" in source
         assert "insufficient_data" in source
 
     def test_short_monthly_series_skipped(self):
@@ -220,7 +223,8 @@ class TestForecastingMinSeries:
         from datapulse.forecasting.service import ForecastingService
 
         source = inspect.getsource(ForecastingService.run_all_forecasts)
-        assert "forecast_skip_monthly" in source
+        assert "min_monthly_points" in source
+        assert "forecast_monthly_skipped" in source
 
 
 # ---------------------------------------------------------------------------
@@ -251,29 +255,31 @@ class TestBetweenFilterValidation:
         """BETWEEN with only one value should be skipped (not crash)."""
         from unittest.mock import MagicMock
 
+        from sqlalchemy import column
+
         from datapulse.api.filters import FilterCondition, FilterOp, apply_filters
 
-        col = MagicMock()
+        col = column("test_date")
         query = MagicMock()
-        query.where = MagicMock(return_value=query)
 
         filters = [FilterCondition(field="date", op=FilterOp.BETWEEN, value="2024-01-01")]
         result = apply_filters(query, filters, {"date": col})
-        col.between.assert_not_called()
+        query.where.assert_not_called()
 
     def test_between_empty_bound_skipped(self):
         """BETWEEN with an empty bound should be skipped."""
         from unittest.mock import MagicMock
 
+        from sqlalchemy import column
+
         from datapulse.api.filters import FilterCondition, FilterOp, apply_filters
 
-        col = MagicMock()
+        col = column("test_date")
         query = MagicMock()
-        query.where = MagicMock(return_value=query)
 
         filters = [FilterCondition(field="date", op=FilterOp.BETWEEN, value=",2024-12-31")]
         result = apply_filters(query, filters, {"date": col})
-        col.between.assert_not_called()
+        query.where.assert_not_called()
 
     def test_between_reversed_range_auto_swaps(self):
         """BETWEEN with reversed range should auto-swap and still apply filter."""
