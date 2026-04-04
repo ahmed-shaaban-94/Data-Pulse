@@ -16,6 +16,11 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-datapulse}
       PGPASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
       DB_HOST: postgres
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: "0.25"
     networks:
       - backend
 
@@ -187,7 +192,7 @@ services:
       - AUTH0_AUDIENCE=${AUTH0_AUDIENCE:-}
       - NEXTAUTH_URL=${NEXTAUTH_URL:-http://localhost:3000}
       - NEXTAUTH_SECRET=${NEXTAUTH_SECRET:?NEXTAUTH_SECRET must be set}
-      - NEXTAUTH_DEBUG=true
+      - NEXTAUTH_DEBUG=${NEXTAUTH_DEBUG:-false}
       - NEXT_PUBLIC_SENTRY_DSN=${SENTRY_DSN:-}
       - NEXT_PUBLIC_SENTRY_ENVIRONMENT=${SENTRY_ENVIRONMENT:-development}
     depends_on:

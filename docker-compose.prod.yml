@@ -37,6 +37,7 @@ services:
       resources:
         limits:
           memory: 64M
+          cpus: "0.25"
     networks:
       - frontend-net
       - backend
