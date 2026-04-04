@@ -71,7 +71,7 @@ jobs:
           username: ${{ secrets.STAGING_USER }}
           key: ${{ secrets.STAGING_SSH_KEY }}
           fingerprint: ${{ secrets.STAGING_HOST_FINGERPRINT }}
-          source: "docker-compose.yml,docker-compose.prod.yml,traefik/,nginx/"
+          source: "docker-compose.yml,docker-compose.prod.yml,nginx/,migrations/,postgres/"
           target: ${{ secrets.STAGING_DEPLOY_PATH }}
 
       - name: Deploy via SSH
@@ -95,18 +95,34 @@ jobs:
               -f docker-compose.prod.yml \
               up -d --remove-orphans
 
-            # Wait for services to be healthy
-            sleep 15
-            docker compose \
-              -f docker-compose.yml \
-              -f docker-compose.prod.yml \
-              ps --format json | head -20
+            # Health check with retries
+            echo "=== Waiting for services ==="
+            for i in $(seq 1 6); do
+              HTTP_CODE=$(curl -s -o /dev/null -w '%{http_code}' --connect-timeout 5 http://localhost:3000 || echo "000")
+              if [ "$HTTP_CODE" = "200" ]; then
+                echo "Health check PASSED on attempt $i (HTTP $HTTP_CODE)"
+                break
+              fi
+              echo "Attempt $i: HTTP $HTTP_CODE — retrying in 10s..."
+              sleep 10
+            done
 
-            # Rebuild dbt models (stg -> fct -> agg -> metrics)
+            echo "=== Container Status ==="
             docker compose \
               -f docker-compose.yml \
               -f docker-compose.prod.yml \
-              exec -T api sh -c "\
+              ps
+
+            if [ "$HTTP_CODE" != "200" ]; then
+              echo "::error::Staging health check failed after 6 attempts (HTTP $HTTP_CODE)"
+              exit 1
+            fi
+
+            # Rebuild dbt models (stg -> fct -> agg -> metrics) with 5min timeout
+            docker compose \
+              -f docker-compose.yml \
+              -f docker-compose.prod.yml \
+              exec -T api timeout 300 sh -c "\
                 cd /app/dbt && \
                 dbt deps --profiles-dir . && \
                 dbt run --profiles-dir . \

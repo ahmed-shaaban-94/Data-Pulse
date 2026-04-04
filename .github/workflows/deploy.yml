@@ -130,5 +130,6 @@ jobs:
               ps
 
             if [ "$HTTP_CODE" != "200" ]; then
-              echo "::warning::Health check failed after 6 attempts (HTTP $HTTP_CODE)"
+              echo "::error::Health check failed after 6 attempts (HTTP $HTTP_CODE)"
+              exit 1
             fi
