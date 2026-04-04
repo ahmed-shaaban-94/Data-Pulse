@@ -33,9 +33,9 @@ from datapulse.analytics.models import (
 def test_kpi_summary_backward_compat():
     """Old responses without new fields should parse with defaults."""
     kpi = KPISummary(
-        today_net=100,
-        mtd_net=1000,
-        ytd_net=10000,
+        today_gross=100,
+        mtd_gross=1000,
+        ytd_gross=10000,
         daily_transactions=5,
         daily_customers=3,
     )
@@ -49,9 +49,9 @@ def test_kpi_summary_backward_compat():
 def test_kpi_summary_with_new_fields():
     """KPISummary correctly stores new Enhancement 3 fields."""
     kpi = KPISummary(
-        today_net=100,
-        mtd_net=1000,
-        ytd_net=10000,
+        today_gross=100,
+        mtd_gross=1000,
+        ytd_gross=10000,
         daily_transactions=5,
         daily_customers=3,
         avg_basket_size=Decimal("50.25"),

@@ -45,9 +45,9 @@ def _make_ranking_result() -> RankingResult:
 def _make_kpi_summary() -> KPISummary:
     """Helper to build a KPISummary for mocking."""
     return KPISummary(
-        today_net=Decimal("1000"),
-        mtd_net=Decimal("5000"),
-        ytd_net=Decimal("50000"),
+        today_gross=Decimal("1000"),
+        mtd_gross=Decimal("5000"),
+        ytd_gross=Decimal("50000"),
         daily_transactions=42,
         daily_customers=15,
     )
@@ -133,9 +133,9 @@ def test_summary_endpoint(api_client):
 
     assert resp.status_code == 200
     data = resp.json()
-    assert "today_net" in data
-    assert "mtd_net" in data
-    assert "ytd_net" in data
+    assert "today_gross" in data
+    assert "mtd_gross" in data
+    assert "ytd_gross" in data
 
 
 def test_daily_trend_endpoint(api_client):
@@ -249,7 +249,7 @@ def test_product_detail_found(api_client):
         drug_category="Analgesic",
         total_quantity=Decimal("500"),
         total_sales=Decimal("10000"),
-        total_net_amount=Decimal("9000"),
+        total_sales=Decimal("9000"),
         return_rate=Decimal("0.02"),
         unique_customers=50,
     )
@@ -276,7 +276,7 @@ def test_customer_detail_found(api_client):
         customer_id="C001",
         customer_name="Pharmacy X",
         total_quantity=Decimal("1000"),
-        total_net_amount=Decimal("50000"),
+        total_sales=Decimal("50000"),
         transaction_count=200,
         unique_products=30,
         return_count=5,
