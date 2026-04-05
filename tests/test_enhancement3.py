@@ -221,30 +221,35 @@ def detail_repo():
 
 def test_get_site_detail_not_found(detail_repo):
     repo, session = detail_repo
-    session.execute.return_value.fetchone.return_value = None
+    mock_exec = MagicMock()
+    mock_maps = MagicMock()
+    mock_exec.mappings.return_value = mock_maps
+    mock_maps.fetchone.return_value = None
+    session.execute.return_value = mock_exec
     result = repo.get_site_detail(999)
     assert result is None
 
 
 def test_get_site_detail_with_data(detail_repo):
     repo, session = detail_repo
-    site_row = (
-        1,
-        "S01",
-        "Main Pharmacy",
-        "John Manager",
-        Decimal("500000"),
-        2000,
-        800,
-        10,
-        Decimal("0.65"),
-        Decimal("0.30"),
-        Decimal("0.02"),
-    )
-    trend_rows = [("2024-01", 40000), ("2024-02", 45000)]
-
-    session.execute.return_value.fetchone.return_value = site_row
-    session.execute.return_value.fetchall.return_value = trend_rows
+    mock_exec = MagicMock()
+    mock_maps = MagicMock()
+    mock_exec.mappings.return_value = mock_maps
+    mock_maps.fetchone.return_value = {
+        "site_key": 1,
+        "site_code": "S01",
+        "site_name": "Main Pharmacy",
+        "area_manager": "John Manager",
+        "total_sales": Decimal("500000"),
+        "transaction_count": 2000,
+        "unique_customers": 800,
+        "unique_staff": 10,
+        "walk_in_ratio": Decimal("0.65"),
+        "insurance_ratio": Decimal("0.30"),
+        "return_rate": Decimal("0.02"),
+        "trend_points": None,
+    }
+    session.execute.return_value = mock_exec
 
     result = repo.get_site_detail(1)
     assert isinstance(result, SiteDetail)

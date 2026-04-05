@@ -3,16 +3,18 @@ import { http, HttpResponse } from "msw";
 const API = process.env.NEXT_PUBLIC_API_URL || "";
 
 export const mockKPISummary = {
-  today_net: 125000,
-  mtd_net: 3500000,
-  ytd_net: 42000000,
-  growth_pct: 12.5,
+  today_gross: 125000,
+  mtd_gross: 3500000,
+  ytd_gross: 42000000,
+  today_discount: 5000,
+  mom_growth_pct: 12.5,
+  yoy_growth_pct: 8.3,
   daily_transactions: 1250,
-  daily_quantity: 8500,
-  avg_basket_value: 100,
-  prev_day_net: 110000,
-  prev_mtd_net: 3200000,
-  prev_ytd_net: 38000000,
+  daily_customers: 850,
+  avg_basket_size: 100,
+  daily_returns: 15,
+  mtd_transactions: 35000,
+  ytd_transactions: 420000,
   sparkline: [
     { period: "2024-01-01", value: 100000 },
     { period: "2024-01-02", value: 110000 },
