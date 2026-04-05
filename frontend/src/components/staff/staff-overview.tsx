@@ -54,7 +54,7 @@ export function StaffOverview() {
 
   const stats = [
     { label: "Total Revenue", value: formatCurrency(data.total) },
-    { label: "Staff Count", value: formatNumber(data.items.length) },
+    { label: "Active Staff", value: formatNumber(data.active_count ?? data.items.length) },
     { label: "Top Performer", value: topPerformer.name },
     { label: "Top Revenue", value: formatCurrency(topPerformer.value) },
   ];

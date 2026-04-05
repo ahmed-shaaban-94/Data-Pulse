@@ -615,13 +615,51 @@ class AnalyticsRepository:
         )
 
     def get_top_staff(self, filters: AnalyticsFilter) -> RankingResult:
-        """Return top-N staff members by net sales."""
+        """Return top-N staff members by net sales with active_count.
+
+        Active staff count uses 4 layers:
+        1. Exclude Unknown (staff_key = -1)
+        2. Exclude Services/Other origin transactions
+        3. Only non-return transactions
+        4. Exclude below 33% of average transaction count (data entry noise)
+        """
         log.info("get_top_staff", filters=filters.model_dump())
-        return self._get_ranking(
+        ranking = self._get_ranking(
             "public_marts.agg_sales_by_staff",
             "staff_key",
             "staff_name",
             filters,
+        )
+
+        # Compute active staff count with 4-layer filter
+        where, params = build_where(filters, use_year_month=True)
+        stmt = text(f"""
+            WITH staff_txns AS (
+                SELECT f.staff_key,
+                       COUNT(*) FILTER (WHERE NOT f.is_return) AS sale_count
+                FROM public_marts.fct_sales f
+                INNER JOIN public_marts.dim_date d ON f.date_key = d.date_key
+                INNER JOIN public_marts.dim_product p ON f.product_key = p.product_key
+                    AND f.tenant_id = p.tenant_id
+                WHERE {where}
+                  AND f.staff_key != -1
+                  AND COALESCE(p.origin, 'Other') IN ('Pharma', 'Non-pharma', 'HVI')
+                  AND NOT f.is_return
+                GROUP BY f.staff_key
+            ),
+            threshold AS (
+                SELECT AVG(sale_count) * 0.33 AS min_txns FROM staff_txns
+            )
+            SELECT COUNT(*) FROM staff_txns, threshold
+            WHERE sale_count >= min_txns
+        """)
+        row = self._session.execute(stmt, params).fetchone()
+        active = int(row[0]) if row else 0
+
+        return RankingResult(
+            items=ranking.items,
+            total=ranking.total,
+            active_count=active,
         )
 
     def get_site_performance(self, filters: AnalyticsFilter) -> RankingResult:
