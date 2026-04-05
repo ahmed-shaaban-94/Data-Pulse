@@ -11,7 +11,6 @@ const pathLabels: Record<string, string> = {
   staff: "Staff",
   sites: "Sites",
   returns: "Returns",
-  pipeline: "Pipeline",
   insights: "Insights",
   goals: "Goals",
   alerts: "Alerts",
