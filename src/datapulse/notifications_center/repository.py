@@ -1,4 +1,5 @@
 """Repository for notifications CRUD."""
+
 from __future__ import annotations
 
 from sqlalchemy import text
@@ -64,16 +65,20 @@ class NotificationRepository:
             VALUES (:tid, :uid, :type, :title, :msg, :link)
             RETURNING id, type, title, message, link, read, created_at
         """)
-        row = self._session.execute(
-            sql,
-            {
-                "tid": tenant_id,
-                "uid": user_id,
-                "type": type_,
-                "title": title,
-                "msg": message,
-                "link": link,
-            },
-        ).mappings().first()
+        row = (
+            self._session.execute(
+                sql,
+                {
+                    "tid": tenant_id,
+                    "uid": user_id,
+                    "type": type_,
+                    "title": title,
+                    "msg": message,
+                    "link": link,
+                },
+            )
+            .mappings()
+            .first()
+        )
         self._session.flush()
         return dict(row) if row else {}

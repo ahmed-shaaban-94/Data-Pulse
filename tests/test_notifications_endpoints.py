@@ -23,8 +23,13 @@ def mock_service():
     now = datetime.now(UTC)
     svc.list_notifications.return_value = [
         NotificationResponse(
-            id=1, type="info", title="Hi", message="Hello",
-            link=None, read=False, created_at=now,
+            id=1,
+            type="info",
+            title="Hi",
+            message="Hello",
+            link=None,
+            read=False,
+            created_at=now,
         ),
     ]
     svc.unread_count.return_value = NotificationCount(unread=3)

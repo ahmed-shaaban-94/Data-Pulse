@@ -35,26 +35,26 @@ class AnnotationRepository:
             VALUES (:tid, :uid, :cid, :dp, :note, :color)
             RETURNING id, chart_id, data_point, note, color, user_id, created_at
         """)
-        row = self._session.execute(
-            sql,
-            {
-                "tid": tenant_id,
-                "uid": user_id,
-                "cid": chart_id,
-                "dp": data_point,
-                "note": note,
-                "color": color,
-            },
-        ).mappings().first()
+        row = (
+            self._session.execute(
+                sql,
+                {
+                    "tid": tenant_id,
+                    "uid": user_id,
+                    "cid": chart_id,
+                    "dp": data_point,
+                    "note": note,
+                    "color": color,
+                },
+            )
+            .mappings()
+            .first()
+        )
         self._session.flush()
         return dict(row) if row else {}
 
     def delete(self, annotation_id: int, user_id: str) -> bool:
-        sql = text(
-            "DELETE FROM public.annotations WHERE id = :aid AND user_id = :uid"
-        )
-        result = self._session.execute(
-            sql, {"aid": annotation_id, "uid": user_id}
-        )
+        sql = text("DELETE FROM public.annotations WHERE id = :aid AND user_id = :uid")
+        result = self._session.execute(sql, {"aid": annotation_id, "uid": user_id})
         self._session.flush()
         return (result.rowcount or 0) > 0

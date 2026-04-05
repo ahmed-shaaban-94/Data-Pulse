@@ -13,8 +13,12 @@ from datapulse.api.routes.annotations import get_annotation_repo
 
 def _make_row(**overrides):
     base = {
-        "id": 1, "chart_id": "daily_trend", "data_point": "2024-01-15",
-        "note": "Test", "color": "#D97706", "user_id": "test-user",
+        "id": 1,
+        "chart_id": "daily_trend",
+        "data_point": "2024-01-15",
+        "note": "Test",
+        "color": "#D97706",
+        "user_id": "test-user",
         "created_at": datetime.now(UTC),
     }
     base.update(overrides)
@@ -56,10 +60,15 @@ def test_list_requires_chart_id(client):
 
 
 def test_create_annotation(client, mock_repo):
-    res = client.post("/api/v1/annotations", json={
-        "chart_id": "daily_trend", "data_point": "2024-01-15",
-        "note": "New", "color": "#4F46E5",
-    })
+    res = client.post(
+        "/api/v1/annotations",
+        json={
+            "chart_id": "daily_trend",
+            "data_point": "2024-01-15",
+            "note": "New",
+            "color": "#4F46E5",
+        },
+    )
     assert res.status_code == 201
     mock_repo.create.assert_called_once()
 

@@ -30,9 +30,7 @@ class ViewsRepository:
             FROM public.saved_views
             WHERE id = :vid AND user_id = :uid
         """)
-        row = self._session.execute(
-            sql, {"vid": view_id, "uid": user_id}
-        ).mappings().first()
+        row = self._session.execute(sql, {"vid": view_id, "uid": user_id}).mappings().first()
         return dict(row) if row else None
 
     def count_views(self, user_id: str) -> int:
@@ -54,17 +52,21 @@ class ViewsRepository:
             VALUES (:tid, :uid, :name, :path, :filters, :default)
             RETURNING id, name, page_path, filters, is_default, created_at
         """)
-        row = self._session.execute(
-            sql,
-            {
-                "tid": tenant_id,
-                "uid": user_id,
-                "name": name,
-                "path": page_path,
-                "filters": json.dumps(filters),
-                "default": is_default,
-            },
-        ).mappings().first()
+        row = (
+            self._session.execute(
+                sql,
+                {
+                    "tid": tenant_id,
+                    "uid": user_id,
+                    "name": name,
+                    "path": page_path,
+                    "filters": json.dumps(filters),
+                    "default": is_default,
+                },
+            )
+            .mappings()
+            .first()
+        )
         self._session.flush()
         return dict(row) if row else {}
 
@@ -83,7 +85,7 @@ class ViewsRepository:
         if not sets:
             return self.get_view(view_id, user_id)
         sql = text(f"""
-            UPDATE public.saved_views SET {', '.join(sets)}
+            UPDATE public.saved_views SET {", ".join(sets)}
             WHERE id = :vid AND user_id = :uid
             RETURNING id, name, page_path, filters, is_default, created_at
         """)

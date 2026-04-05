@@ -8,9 +8,13 @@ from datapulse.annotations.repository import AnnotationRepository
 
 def _make_row(**overrides):
     base = {
-        "id": 1, "chart_id": "daily_trend", "data_point": "2024-01-15",
-        "note": "Ramadan sale started", "color": "#D97706",
-        "user_id": "user1", "created_at": datetime.now(UTC),
+        "id": 1,
+        "chart_id": "daily_trend",
+        "data_point": "2024-01-15",
+        "note": "Ramadan sale started",
+        "color": "#D97706",
+        "user_id": "user1",
+        "created_at": datetime.now(UTC),
     }
     base.update(overrides)
     return base
@@ -19,7 +23,8 @@ def _make_row(**overrides):
 def test_list_by_chart():
     session = MagicMock()
     session.execute.return_value.mappings.return_value.all.return_value = [
-        _make_row(), _make_row(id=2, data_point="2024-02-01"),
+        _make_row(),
+        _make_row(id=2, data_point="2024-02-01"),
     ]
     repo = AnnotationRepository(session)
     result = repo.list_by_chart("daily_trend")

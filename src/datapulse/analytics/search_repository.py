@@ -35,9 +35,11 @@ class SearchRepository:
             ORDER BY similarity(product_name, :q) DESC
             LIMIT :lim
         """)
-        rows = self._session.execute(
-            sql, {"q": query, "pattern": f"%{query}%", "lim": limit}
-        ).mappings().all()
+        rows = (
+            self._session.execute(sql, {"q": query, "pattern": f"%{query}%", "lim": limit})
+            .mappings()
+            .all()
+        )
         return [
             {
                 "key": r["key"],
@@ -58,12 +60,13 @@ class SearchRepository:
             ORDER BY similarity(customer_name, :q) DESC
             LIMIT :lim
         """)
-        rows = self._session.execute(
-            sql, {"q": query, "pattern": f"%{query}%", "lim": limit}
-        ).mappings().all()
+        rows = (
+            self._session.execute(sql, {"q": query, "pattern": f"%{query}%", "lim": limit})
+            .mappings()
+            .all()
+        )
         return [
-            {"key": r["key"], "name": r["name"], "subtitle": "", "type": "customer"}
-            for r in rows
+            {"key": r["key"], "name": r["name"], "subtitle": "", "type": "customer"} for r in rows
         ]
 
     def _search_staff(self, query: str, limit: int) -> list[dict]:
@@ -76,10 +79,9 @@ class SearchRepository:
             ORDER BY similarity(staff_name, :q) DESC
             LIMIT :lim
         """)
-        rows = self._session.execute(
-            sql, {"q": query, "pattern": f"%{query}%", "lim": limit}
-        ).mappings().all()
-        return [
-            {"key": r["key"], "name": r["name"], "subtitle": "", "type": "staff"}
-            for r in rows
-        ]
+        rows = (
+            self._session.execute(sql, {"q": query, "pattern": f"%{query}%", "lim": limit})
+            .mappings()
+            .all()
+        )
+        return [{"key": r["key"], "name": r["name"], "subtitle": "", "type": "staff"} for r in rows]

@@ -1,4 +1,5 @@
 """Service layer for notification center."""
+
 from __future__ import annotations
 
 from datapulse.notifications_center.models import NotificationCount, NotificationResponse

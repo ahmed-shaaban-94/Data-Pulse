@@ -1,4 +1,5 @@
 """Notification center API endpoints."""
+
 from __future__ import annotations
 
 import asyncio
@@ -88,9 +89,7 @@ async def notification_stream(
             try:
                 session = get_session_factory()()
                 try:
-                    session.execute(
-                        sa_text("SET LOCAL app.tenant_id = :tid"), {"tid": tenant_id}
-                    )
+                    session.execute(sa_text("SET LOCAL app.tenant_id = :tid"), {"tid": tenant_id})
                     repo = NotificationRepository(session)
                     count = repo.unread_count(user_id)
                     if count != last_count:

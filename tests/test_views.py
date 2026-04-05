@@ -65,7 +65,9 @@ class TestCreateView:
         mock_repo.create_view.return_value = SAMPLE_VIEW
 
         data = SavedViewCreate(
-            name="My View", page_path="/dashboard", filters={"date_range": "30d"},
+            name="My View",
+            page_path="/dashboard",
+            filters={"date_range": "30d"},
         )
         result = service.create_view(1, "user-1", data)
 
