@@ -32,7 +32,7 @@ export function ConnectDataStep({ onComplete }: ConnectDataStepProps) {
           onClick={onComplete}
           className="inline-flex items-center justify-center gap-2 rounded-lg border border-border bg-transparent px-6 py-2.5 text-sm font-medium text-text-secondary transition-colors hover:bg-divider"
         >
-          I'll upload later
+          I&apos;ll upload later
         </button>
       </div>
     </div>

@@ -7,11 +7,11 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request
 from sqlalchemy.orm import Session
 
+from datapulse.annotations.models import AnnotationCreate, AnnotationResponse
+from datapulse.annotations.repository import AnnotationRepository
 from datapulse.api.auth import get_current_user
 from datapulse.api.deps import CurrentUser, get_tenant_session
 from datapulse.api.limiter import limiter
-from datapulse.annotations.models import AnnotationCreate, AnnotationResponse
-from datapulse.annotations.repository import AnnotationRepository
 
 router = APIRouter(
     prefix="/annotations",

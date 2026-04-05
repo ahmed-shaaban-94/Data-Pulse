@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
-// eslint-disable-next-line @typescript-eslint/no-var-requires
+// eslint-disable-next-line
 const ReactGridLayout = require("react-grid-layout");
 import { Settings, Plus, Save, X } from "lucide-react";
 import {

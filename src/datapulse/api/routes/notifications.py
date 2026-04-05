@@ -101,7 +101,7 @@ async def notification_stream(
                 finally:
                     session.close()
             except Exception:
-                yield f"event: error\ndata: {{}}\n\n"
+                yield "event: error\ndata: {}\n\n"
             await asyncio.sleep(5)
 
     return StreamingResponse(

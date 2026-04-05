@@ -7,10 +7,10 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.orm import Session
 
+from datapulse.analytics.search_repository import SearchRepository
 from datapulse.api.auth import get_current_user
 from datapulse.api.deps import get_tenant_session
 from datapulse.api.limiter import limiter
-from datapulse.analytics.search_repository import SearchRepository
 
 router = APIRouter(
     prefix="/search",

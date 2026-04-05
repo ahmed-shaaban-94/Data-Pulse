@@ -9,6 +9,7 @@ from __future__ import annotations
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Request
+from sqlalchemy.orm import Session
 
 from datapulse.api.auth import get_current_user
 from datapulse.api.deps import get_tenant_session
@@ -16,8 +17,6 @@ from datapulse.api.limiter import limiter
 from datapulse.onboarding.models import CompleteStepRequest, OnboardingStatus
 from datapulse.onboarding.repository import OnboardingRepository
 from datapulse.onboarding.service import OnboardingService
-
-from sqlalchemy.orm import Session
 
 router = APIRouter(
     prefix="/onboarding",
