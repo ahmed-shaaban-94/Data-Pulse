@@ -65,7 +65,7 @@ def client(app):
 class TestListViews:
     def test_list_views(self, client, mock_service):
         """GET /views returns 200 with list of views."""
-        resp = client.get("/views")
+        resp = client.get("/api/v1/views")
         assert resp.status_code == 200
         data = resp.json()
         assert len(data) == 1
@@ -77,7 +77,7 @@ class TestCreateView:
     def test_create_view(self, client, mock_service):
         """POST /views returns 201 with created view."""
         resp = client.post(
-            "/views",
+            "/api/v1/views",
             json={"name": "My View", "page_path": "/dashboard", "filters": {}},
         )
         assert resp.status_code == 201
@@ -87,14 +87,14 @@ class TestCreateView:
 
     def test_create_view_empty_name(self, client):
         """POST /views with empty name returns 422."""
-        resp = client.post("/views", json={"name": ""})
+        resp = client.post("/api/v1/views", json={"name": ""})
         assert resp.status_code == 422
 
 
 class TestUpdateView:
     def test_update_view(self, client, mock_service):
         """PATCH /views/1 returns 200 with updated view."""
-        resp = client.patch("/views/1", json={"name": "Updated"})
+        resp = client.patch("/api/v1/views/1", json={"name": "Updated"})
         assert resp.status_code == 200
         mock_service.update_view.assert_called_once()
 
@@ -102,6 +102,6 @@ class TestUpdateView:
 class TestDeleteView:
     def test_delete_view(self, client, mock_service):
         """DELETE /views/1 returns 204."""
-        resp = client.delete("/views/1")
+        resp = client.delete("/api/v1/views/1")
         assert resp.status_code == 204
         mock_service.delete_view.assert_called_once()
