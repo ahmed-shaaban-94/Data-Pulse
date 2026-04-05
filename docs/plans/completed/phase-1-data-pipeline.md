@@ -1,18 +1,12 @@
 # Phase 1: Data Pipeline (COMPLETED)
 
-> All sub-phases (1.1–1.6) are complete. This is the consolidated reference document.
-
----
-
-# Phase 1 -- Data Pipeline
-
-> **Status**: DONE
+> **Status**: COMPLETED
 > **Timeline**: Foundation through Dashboard + Polish
 > **Result**: End-to-end sales analytics platform -- from raw Excel ingestion to interactive web dashboard
 
 ## Overview
 
-Phase 1 delivers the complete data pipeline for DataPulse, a sales analytics SaaS platform. Raw Excel/CSV files flow through a medallion architecture (Bronze -> Silver -> Gold), are served via a FastAPI REST API, and visualized on a Next.js dashboard.
+Phase 1 delivers the complete data pipeline for DataPulse. Raw Excel/CSV files (272 MB) flow through a medallion architecture (Bronze -> Silver -> Gold), are served via a FastAPI REST API, and visualized on a Next.js 14 dashboard. All six sub-phases are done.
 
 ```
 Excel/CSV (272 MB)
@@ -36,18 +30,16 @@ Excel/CSV (272 MB)
 [1.6 Polish]         Security audit, error handling, 95%+ coverage
 ```
 
-## Sub-Phases
+### Key Metrics
 
-| Phase | Name | Status | Document |
-|-------|------|--------|----------|
-| 1.1 | Foundation | DONE | [1.1-foundation.md](./1.1-foundation.md) |
-| 1.2 | Bronze Layer | DONE | [1.2-bronze-layer.md](./1.2-bronze-layer.md) |
-| 1.3 | Silver Layer | DONE | [1.3-silver-layer.md](./1.3-silver-layer.md) |
-| 1.4 | Gold Layer & API | DONE | [1.4-gold-layer.md](./1.4-gold-layer.md) |
-| 1.5 | Dashboard | DONE | [1.5-dashboard.md](./1.5-dashboard.md) |
-| 1.6 | Polish & Testing | DONE | [1.6-polish-and-testing.md](./1.6-polish-and-testing.md) |
+- **Raw data**: 272 MB Excel -> 57 MB Parquet -> 1.1M rows in PostgreSQL
+- **Star schema**: 6 dimension tables, 1 fact table, 8 aggregation models
+- **API**: 10 analytics endpoints + health check
+- **Dashboard**: 6 pages, 7 KPI cards, 5 chart types
+- **Test coverage**: 95%+ backend, 18 E2E specs frontend
+- **dbt tests**: ~40 schema and data tests passing
 
-## Tech Stack Summary
+### Tech Stack
 
 | Layer | Technology |
 |-------|-----------|
@@ -61,36 +53,17 @@ Excel/CSV (272 MB)
 | Testing | pytest (95%+), Playwright (18 E2E specs) |
 | Containers | Docker Compose |
 
-## Key Metrics
-
-- **Raw data**: 272 MB Excel -> 57 MB Parquet -> 1.1M rows in PostgreSQL
-- **Star schema**: 6 dimension tables, 1 fact table, 8 aggregation models
-- **API**: 10 analytics endpoints + health check
-- **Dashboard**: 6 pages, 7 KPI cards, 5 chart types
-- **Test coverage**: 95%+ backend, 18 E2E specs frontend
-- **dbt tests**: ~40 schema and data tests passing
-
 ---
 
 ## 1.1 Foundation
 
 > **Status**: DONE
 
-## Objective
+### Objective
 
 Establish the project infrastructure: Docker services, Python project scaffold, configuration management, generic file reader, and dbt project initialization.
 
-## Scope
-
-- Docker Compose environment with PostgreSQL, Python app, pgAdmin, JupyterLab
-- Pydantic Settings for configuration management
-- structlog for structured JSON logging
-- Generic file reader supporting CSV and Excel (via Polars + fastexcel)
-- Automatic column type detection
-- File validation (size, format)
-- dbt project initialization with profiles
-
-## Deliverables
+### Deliverables
 
 - [x] Docker Compose with 4 services (app, postgres, pgadmin, jupyter)
 - [x] PostgreSQL 16 database with `datapulse` schema
@@ -102,9 +75,9 @@ Establish the project infrastructure: Docker services, Python project scaffold, 
 - [x] dbt project with `dbt_project.yml` and `profiles.yml`
 - [x] Full test suite for reader, type detector, config, and validator
 
-## Technical Details
+### Technical Details
 
-### Docker Services
+**Docker Services**
 
 | Service | Image | Port | Purpose |
 |---------|-------|------|---------|
@@ -112,9 +85,7 @@ Establish the project infrastructure: Docker services, Python project scaffold, 
 | `postgres` | PostgreSQL 16 | 5432 | Primary database |
 | `pgadmin` | pgAdmin 4 | 5050 | DB admin UI |
 
-### Configuration (Pydantic Settings)
-
-All settings loaded from environment variables or `.env` file:
+**Configuration (Pydantic Settings)** -- all settings loaded from `.env`:
 
 - `DATABASE_URL` -- PostgreSQL connection string
 - `MAX_FILE_SIZE_MB` -- 500 MB default
@@ -122,14 +93,14 @@ All settings loaded from environment variables or `.env` file:
 - `MAX_COLUMNS` -- 200 default
 - `BRONZE_BATCH_SIZE` -- 50,000 rows per insert batch
 
-### File Reader
+**File Reader**
 
-- **Engine**: Polars for DataFrames, fastexcel (calamine) for Excel parsing
-- **Formats**: `.csv`, `.xlsx`, `.xls`
-- **Output**: Polars DataFrame with detected column types
-- **Models**: `ImportConfig`, `ImportResult`, `ColumnInfo` (Pydantic)
+- Engine: Polars for DataFrames, fastexcel (calamine) for Excel parsing
+- Formats: `.csv`, `.xlsx`, `.xls`
+- Output: Polars DataFrame with detected column types
+- Models: `ImportConfig`, `ImportResult`, `ColumnInfo` (Pydantic)
 
-## Key Decisions
+### Key Decisions
 
 1. **Polars over Pandas** -- better performance for large datasets, native Arrow integration
 2. **fastexcel over openpyxl** -- calamine Rust engine, significantly faster Excel parsing
@@ -137,7 +108,7 @@ All settings loaded from environment variables or `.env` file:
 4. **structlog** -- structured JSON logging for production observability
 5. **Docker-first** -- all services containerized from day one
 
-## Files Created
+### Files Created
 
 ```
 src/datapulse/
@@ -170,19 +141,11 @@ tests/
 
 > **Status**: DONE
 
-## Objective
+### Objective
 
 Build the raw data ingestion pipeline: read Excel sales files, convert to Parquet, and load into PostgreSQL's bronze schema with full column mapping and batch inserts.
 
-## Scope
-
-- SQL migration for bronze schema and tables
-- Column mapping from Excel headers (Arabic/mixed) to database columns
-- Excel -> Polars -> Parquet conversion
-- Parquet -> PostgreSQL batch loading
-- CLI entry point for pipeline execution
-
-## Deliverables
+### Deliverables
 
 - [x] Migration `001_create_bronze_schema.sql` -- bronze schema + `bronze.sales` table (46 columns)
 - [x] Column mapping for 46 Excel columns to database columns
@@ -193,9 +156,9 @@ Build the raw data ingestion pipeline: read Excel sales files, convert to Parque
 - [x] 1,134,799 rows loaded successfully
 - [x] Tests for loader module
 
-## Technical Details
+### Technical Details
 
-### Pipeline Flow
+**Pipeline Flow**
 
 ```
 Excel file (272 MB, .xlsx)
@@ -210,16 +173,17 @@ Parquet file (57 MB, compressed)
 PostgreSQL bronze.sales (1,134,799 rows)
 ```
 
-### Column Mapping (46 columns)
+**Column Mapping (46 columns)**
 
-Key column groups:
-- **Transaction**: `reference_no`, `date`, `billing_document`, `billing_type`
-- **Product**: `material`, `material_desc`, `brand`, `category`, `subcategory`, `division`, `segment`
-- **Customer/Site**: `customer`, `customer_name`, `site`, `site_name`, `buyer`
-- **Personnel**: `personel_number`, `person_name`, `position`, `area_mg`
-- **Financials**: `quantity`, `net_sales`, `gross_sales`, `sales_not_tax`, `tax`, `paid`, `kzwi1`
+| Group | Columns |
+|-------|---------|
+| Transaction | `reference_no`, `date`, `billing_document`, `billing_type` |
+| Product | `material`, `material_desc`, `brand`, `category`, `subcategory`, `division`, `segment` |
+| Customer/Site | `customer`, `customer_name`, `site`, `site_name`, `buyer` |
+| Personnel | `personel_number`, `person_name`, `position`, `area_mg` |
+| Financials | `quantity`, `net_sales`, `gross_sales`, `sales_not_tax`, `tax`, `paid`, `kzwi1` |
 
-### Database Schema
+**Database Schema**
 
 ```sql
 CREATE SCHEMA IF NOT EXISTS bronze;
@@ -233,7 +197,7 @@ CREATE TABLE bronze.sales (
 );
 ```
 
-### CLI Usage
+**CLI Usage**
 
 ```bash
 # Full pipeline (Excel -> Parquet -> PostgreSQL)
@@ -243,7 +207,7 @@ python -m datapulse.bronze.loader --source /app/data/raw/sales
 python -m datapulse.bronze.loader --source /app/data/raw/sales --skip-db
 ```
 
-## Key Decisions
+### Key Decisions
 
 1. **Parquet as intermediate format** -- columnar storage, 79% compression, enables re-loading without re-reading Excel
 2. **Batch insert at 50K rows** -- balances memory usage with insert performance
@@ -251,7 +215,7 @@ python -m datapulse.bronze.loader --source /app/data/raw/sales --skip-db
 4. **Financial columns as NUMERIC(18,4)** -- avoids floating-point precision errors
 5. **`loaded_at` timestamp** -- tracks when each row was ingested for auditability
 
-## Files Created/Modified
+### Files Created
 
 ```
 src/datapulse/bronze/
@@ -273,21 +237,11 @@ tests/
 
 > **Status**: DONE
 
-## Objective
+### Objective
 
 Build the data cleaning and transformation layer using dbt. The silver layer deduplicates, renames, derives new columns, and standardizes the raw bronze data into a clean staging model.
 
-## Scope
-
-- dbt staging model for cleaned sales data
-- Column reduction (46 -> 30 columns)
-- Deduplication on `reference_no`
-- NULL handling and type casting
-- Billing type translation (Arabic -> English)
-- Derived columns (financial, temporal, categorical)
-- dbt schema tests
-
-## Deliverables
+### Deliverables
 
 - [x] Source definition `_bronze__sources.yml`
 - [x] Base model `bronze_sales.sql`
@@ -300,24 +254,24 @@ Build the data cleaning and transformation layer using dbt. The silver layer ded
 - [x] 7 dbt tests passing
 - [x] Staging source definition `_staging__sources.yml`
 
-## Technical Details
+### Technical Details
 
-### Transformations in `stg_sales.sql`
+**Transformations in `stg_sales.sql`**
 
 | Transformation | Detail |
 |---------------|--------|
-| **Dedup** | `ROW_NUMBER() OVER (PARTITION BY reference_no ORDER BY date)` -- keep first occurrence |
-| **Drop columns** | 19 columns removed (redundant, empty, internal) |
-| **Rename** | 22 columns renamed to snake_case English conventions |
-| **Billing EN** | CASE expression mapping 10 Arabic billing types to English |
-| **NULL handling** | COALESCE for key fields, NULL-safe comparisons |
-| **net_amount** | Derived: `gross_sales - tax` |
-| **Temporal** | `EXTRACT(YEAR/MONTH/QUARTER FROM date)` |
-| **is_return** | Boolean flag based on negative quantity |
-| **has_insurance** | Boolean flag based on insurance billing types |
-| **drug_status** | Normalized to consistent values via CASE |
+| Dedup | `ROW_NUMBER() OVER (PARTITION BY reference_no ORDER BY date)` -- keep first occurrence |
+| Drop columns | 19 columns removed (redundant, empty, internal) |
+| Rename | 22 columns renamed to snake_case English conventions |
+| Billing EN | CASE expression mapping 10 Arabic billing types to English |
+| NULL handling | COALESCE for key fields, NULL-safe comparisons |
+| net_amount | Derived: `gross_sales - tax` |
+| Temporal | `EXTRACT(YEAR/MONTH/QUARTER FROM date)` |
+| is_return | Boolean flag based on negative quantity |
+| has_insurance | Boolean flag based on insurance billing types |
+| drug_status | Normalized to consistent values via CASE |
 
-### Billing Type Mapping
+**Billing Type Mapping (10 types)**
 
 | Arabic | English |
 |--------|---------|
@@ -326,16 +280,16 @@ Build the data cleaning and transformation layer using dbt. The silver layer ded
 | تأمين | Insurance |
 | مرتجع نقدي | Cash Return |
 | مرتجع آجل | Credit Return |
-| ... | (10 types total, 5 groups) |
+| ... | (5 groups total) |
 
-### dbt Tests (7 passing)
+**dbt Tests (7 passing)**
 
 - `unique` on `reference_no`
 - `not_null` on key columns (`reference_no`, `date`, `material`)
 - `accepted_values` on `billing_type_en`
 - `relationships` to bronze source
 
-## Key Decisions
+### Key Decisions
 
 1. **dbt over raw SQL** -- version-controlled transformations, built-in testing, dependency graph
 2. **View materialization for staging** -- avoids data duplication, always reflects latest bronze data
@@ -343,7 +297,7 @@ Build the data cleaning and transformation layer using dbt. The silver layer ded
 4. **Aggressive column pruning** -- 19 columns dropped early to reduce downstream complexity
 5. **Security invoker on views** -- `security_invoker=on` ensures RLS applies through views
 
-## Files Created/Modified
+### Files Created
 
 ```
 dbt/models/
@@ -357,23 +311,15 @@ dbt/models/
 
 ---
 
-## 1.4 Gold Layer
+## 1.4 Gold Layer & Analytics API
 
 > **Status**: DONE
 
-## Objective
+### Objective
 
 Build the business-ready gold layer as a star schema in dbt, then expose it through a Python analytics module and FastAPI REST API.
 
-## Scope
-
-- Star schema: 6 dimension tables, 1 fact table
-- 8 aggregation models for pre-computed analytics
-- ~40 dbt tests
-- Python analytics module (models, repository, service)
-- FastAPI REST API with 10 analytics endpoints + health
-
-## Deliverables
+### Deliverables
 
 - [x] 6 dimension tables: `dim_date`, `dim_billing`, `dim_customer`, `dim_product`, `dim_site`, `dim_staff`
 - [x] 1 fact table: `fct_sales` (1,134,073 rows, 6 foreign keys)
@@ -384,9 +330,9 @@ Build the business-ready gold layer as a star schema in dbt, then expose it thro
 - [x] Health endpoint: `GET /health`
 - [x] CORS configuration for frontend access
 
-## Technical Details
+### Technical Details
 
-### Star Schema
+**Star Schema**
 
 ```
                     dim_date
@@ -396,7 +342,7 @@ dim_billing ----> fct_sales <---- dim_customer
             dim_product  dim_site  dim_staff
 ```
 
-### Dimension Tables
+**Dimension Tables**
 
 | Table | Rows | Key Columns | Notes |
 |-------|------|-------------|-------|
@@ -407,14 +353,14 @@ dim_billing ----> fct_sales <---- dim_customer
 | `dim_site` | 2 | site_name, area_manager | Unknown member at key=-1 |
 | `dim_staff` | 1,226 | staff_name, position | Unknown member at key=-1 |
 
-### Fact Table: `fct_sales`
+**Fact Table: `fct_sales`**
 
-- **Rows**: 1,134,073
-- **Foreign Keys**: 6 (date, billing, customer, product, site, staff)
-- **Measures**: quantity, net_sales, gross_sales, tax
-- **COALESCE to -1**: All FK joins use COALESCE to map NULLs to Unknown dimension members
+- Rows: 1,134,073
+- Foreign Keys: 6 (date, billing, customer, product, site, staff)
+- Measures: quantity, net_sales, gross_sales, tax
+- COALESCE to -1: All FK joins map NULLs to Unknown dimension members
 
-### Aggregation Models
+**Aggregation Models**
 
 | Model | Rows | Grain | Key Metrics |
 |-------|------|-------|-------------|
@@ -427,7 +373,7 @@ dim_billing ----> fct_sales <---- dim_customer
 | `agg_returns` | 91,536 | product x customer | return_quantity, return_value |
 | `metrics_summary` | 1,094 | day | MTD/YTD running totals, daily KPIs |
 
-### API Endpoints
+**API Endpoints**
 
 | Method | Path | Description |
 |--------|------|-------------|
@@ -442,13 +388,13 @@ dim_billing ----> fct_sales <---- dim_customer
 | GET | `/api/v1/analytics/returns` | Returns analysis |
 | GET | `/api/v1/analytics/filters` | Available filter values |
 
-### Python Analytics Module
+**Python Analytics Module**
 
-- **models.py** -- Pydantic models: `KPISummary`, `TrendResult`, `RankingResult`, etc.
-- **repository.py** -- SQLAlchemy read-only queries against `public_marts` schema
-- **service.py** -- Business logic layer with default date filters
+- `models.py` -- Pydantic models: `KPISummary`, `TrendResult`, `RankingResult`, etc.
+- `repository.py` -- SQLAlchemy read-only queries against `public_marts` schema
+- `service.py` -- Business logic layer with default date filters
 
-## Key Decisions
+### Key Decisions
 
 1. **Star schema with Unknown members** -- dimension key=-1 for unmatched records, avoids NULL FKs
 2. **Pre-computed aggregations** -- 8 agg tables avoid expensive runtime JOINs
@@ -457,31 +403,23 @@ dim_billing ----> fct_sales <---- dim_customer
 5. **Read-only repository** -- analytics queries never write, clean separation from pipeline mutations
 6. **JsonDecimal type** -- Decimal precision internally, float serialization in JSON responses
 
-## Files Created/Modified
+### Files Created
 
 ```
 dbt/models/marts/
   dims/
     _dims__models.yml              # Schema + tests for all dimensions
-    dim_date.sql
-    dim_billing.sql
-    dim_customer.sql
-    dim_product.sql
-    dim_site.sql
-    dim_staff.sql
+    dim_date.sql, dim_billing.sql, dim_customer.sql
+    dim_product.sql, dim_site.sql, dim_staff.sql
   facts/
     _facts__models.yml             # Schema + tests for fact table
     fct_sales.sql
   aggs/
     _aggs__models.yml              # Schema + tests for aggregations
-    agg_sales_daily.sql
-    agg_sales_monthly.sql
-    agg_sales_by_product.sql
-    agg_sales_by_customer.sql
-    agg_sales_by_site.sql
-    agg_sales_by_staff.sql
-    agg_returns.sql
-    metrics_summary.sql
+    agg_sales_daily.sql, agg_sales_monthly.sql
+    agg_sales_by_product.sql, agg_sales_by_customer.sql
+    agg_sales_by_site.sql, agg_sales_by_staff.sql
+    agg_returns.sql, metrics_summary.sql
 
 src/datapulse/
   analytics/
@@ -505,21 +443,11 @@ src/datapulse/
 
 > **Status**: DONE
 
-## Objective
+### Objective
 
 Build an interactive web dashboard to visualize the gold layer analytics. Six pages covering executive overview, product/customer/staff/site analytics, and returns analysis.
 
-## Scope
-
-- Next.js 14 application with TypeScript and Tailwind CSS
-- 6 analytics pages with Recharts visualizations
-- SWR data fetching with 9 custom hooks
-- Date preset filters with URL sync
-- Responsive dark-themed UI (midnight-pharma)
-- Docker multi-stage build
-- Playwright E2E test suite
-
-## Deliverables
+### Deliverables
 
 - [x] Next.js 14 scaffold with App Router
 - [x] API client with `fetchAPI<T>` and Decimal parsing
@@ -539,9 +467,9 @@ Build an interactive web dashboard to visualize the gold layer analytics. Six pa
 - [x] Docker multi-stage build (dev + builder + production)
 - [x] 18 Playwright E2E specs across 6 test files
 
-## Technical Details
+### Technical Details
 
-### Pages
+**Pages**
 
 | Route | Page | Key Components |
 |-------|------|---------------|
@@ -553,7 +481,7 @@ Build an interactive web dashboard to visualize the gold layer analytics. Six pa
 | `/sites` | Site Comparison | Side-by-side comparison cards (2 sites) |
 | `/returns` | Returns Analysis | Custom 5-column table, top returns chart |
 
-### Component Architecture
+**Component Architecture**
 
 ```
 layout.tsx
@@ -566,7 +494,7 @@ layout.tsx
           SWR hooks -> API client -> FastAPI
 ```
 
-### SWR Hooks (9 total)
+**SWR Hooks (9 total)**
 
 | Hook | Endpoint | Used By |
 |------|----------|---------|
@@ -580,26 +508,18 @@ layout.tsx
 | `useReturns` | `/analytics/returns` | Returns page |
 | `useHealth` | `/health` | Health indicator |
 
-### Design System (midnight-pharma)
+**E2E Tests (18 specs)**
 
-- Dark theme with custom color tokens in `tailwind.config.ts`
-- Consistent card styling with subtle borders and shadows
-- Recharts color palette for chart consistency
-- Responsive breakpoints: mobile-first, `lg:` sidebar breakpoint
-- Loading skeletons match final layout dimensions
+| File | Coverage |
+|------|----------|
+| `dashboard.spec.ts` | KPI cards, trend charts, filter bar |
+| `navigation.spec.ts` | Sidebar nav, active highlight, redirect |
+| `filters.spec.ts` | Date preset clicks |
+| `pages.spec.ts` | All 5 analytics pages load |
+| `health.spec.ts` | API health indicator |
+| `pipeline.spec.ts` | Pipeline dashboard elements |
 
-### E2E Tests (18 specs)
-
-| File | Specs | Coverage |
-|------|-------|----------|
-| `dashboard.spec.ts` | KPI cards, trend charts, filter bar | Executive overview |
-| `navigation.spec.ts` | Sidebar nav, active highlight, redirect | Navigation |
-| `filters.spec.ts` | Date preset clicks | Filter interaction |
-| `pages.spec.ts` | All 5 analytics pages load | Page rendering |
-| `health.spec.ts` | API health indicator | Health check |
-| `pipeline.spec.ts` | Pipeline dashboard elements | Pipeline UI |
-
-## Key Decisions
+### Key Decisions
 
 1. **Next.js 14 App Router** -- server components by default, file-based routing
 2. **SWR over React Query** -- lighter weight, sufficient for read-heavy analytics
@@ -608,40 +528,24 @@ layout.tsx
 5. **No SSR for data** -- all analytics data fetched client-side via SWR (API behind auth)
 6. **Multi-stage Docker** -- dev stage for hot reload, builder for compilation, production for minimal image
 
-## Files Created
+### Files Created
 
 ```
 frontend/
-  Dockerfile
-  package.json
-  tailwind.config.ts
-  playwright.config.ts
+  Dockerfile, package.json, tailwind.config.ts, playwright.config.ts
   e2e/
-    dashboard.spec.ts
-    navigation.spec.ts
-    filters.spec.ts
-    pages.spec.ts
-    health.spec.ts
-    pipeline.spec.ts
+    dashboard.spec.ts, navigation.spec.ts, filters.spec.ts
+    pages.spec.ts, health.spec.ts, pipeline.spec.ts
   src/
     app/
       layout.tsx, page.tsx, not-found.tsx, error.tsx
-      dashboard/  page.tsx, loading.tsx
-      products/   page.tsx, loading.tsx
-      customers/  page.tsx, loading.tsx
-      staff/      page.tsx, loading.tsx
-      sites/      page.tsx, loading.tsx
-      returns/    page.tsx, loading.tsx
+      dashboard/, products/, customers/, staff/, sites/, returns/
     components/
       layout/     sidebar.tsx, header.tsx, health-indicator.tsx
       dashboard/  kpi-card.tsx, kpi-grid.tsx, daily-trend-chart.tsx, monthly-trend-chart.tsx
       filters/    filter-bar.tsx
       shared/     ranking-table.tsx, ranking-chart.tsx, summary-stats.tsx, progress-bar.tsx
-      products/   product-overview.tsx
-      customers/  customer-overview.tsx
-      staff/      staff-overview.tsx
-      sites/      site-overview.tsx, site-comparison-cards.tsx
-      returns/    returns-overview.tsx, returns-table.tsx, returns-chart.tsx
+      products/, customers/, staff/, sites/, returns/  (per-page overview components)
       providers.tsx, error-boundary.tsx, empty-state.tsx, loading-card.tsx
     hooks/        9 SWR hooks (use-summary.ts, use-daily-trend.ts, ...)
     contexts/     filter-context.tsx
@@ -655,23 +559,11 @@ frontend/
 
 > **Status**: DONE
 
-## Objective
+### Objective
 
 Harden the platform for production readiness: security audit, error handling, test coverage, CORS configuration, and quality fixes across the full stack.
 
-## Scope
-
-- Global exception handling and error responses
-- Health endpoint correctness (503 when DB unreachable)
-- CORS hardening with specific headers
-- JsonDecimal for financial precision in API
-- React ErrorBoundary for frontend resilience
-- RLS enforcement across all layers
-- Backend test coverage to 95%+
-- E2E test hardening
-- Chart theming fixes
-
-## Deliverables
+### Deliverables
 
 - [x] Global exception handler -- catches unhandled errors, logs traceback, returns generic 500
 - [x] Health endpoint returns 503 (not 200) when database is unreachable
@@ -686,9 +578,9 @@ Harden the platform for production readiness: security audit, error handling, te
 - [x] E2E test hardening: 18 specs across 6 files
 - [x] Chart dark/light theme compatibility in Recharts SVG
 
-## Technical Details
+### Technical Details
 
-### Security Hardening
+**Security Hardening**
 
 | Area | Before | After |
 |------|--------|-------|
@@ -698,7 +590,7 @@ Harden the platform for production readiness: security audit, error handling, te
 | RLS | Tables had RLS but owner could bypass | `FORCE ROW LEVEL SECURITY` on all tables |
 | Financial precision | Float serialization | `JsonDecimal` -- Decimal in Python, float in JSON |
 
-### Error Handling Stack
+**Error Handling Stack**
 
 ```
 Frontend:
@@ -714,20 +606,19 @@ Backend:
         -> 503 health when DB down
 ```
 
-### Test Coverage
+**Test Coverage**
 
-| Module | Coverage | Key Tests |
-|--------|----------|-----------|
-| `config.py` | 95%+ | Settings loading, defaults, validation |
-| `import_pipeline/` | 95%+ | Reader, type detector, validator |
-| `bronze/` | 95%+ | Loader, column mapping |
-| `analytics/` | 95%+ | Models, repository, service |
-| `pipeline/` | 95%+ | Models, repository, service, executor |
-| `api/` | 95%+ | Routes, deps, error handling |
+| Module | Coverage |
+|--------|----------|
+| `config.py` | 95%+ |
+| `import_pipeline/` | 95%+ |
+| `bronze/` | 95%+ |
+| `analytics/` | 95%+ |
+| `pipeline/` | 95%+ |
+| `api/` | 95%+ |
 
-### Files Modified (21 files across the audit)
+**Key Files Modified (21 files across the audit)**
 
-Key changes:
 - `src/datapulse/api/app.py` -- global exception handler, security headers, rate limiting
 - `src/datapulse/api/routes/health.py` -- 503 on DB failure
 - `src/datapulse/analytics/models.py` -- JsonDecimal type alias
@@ -735,7 +626,7 @@ Key changes:
 - `frontend/src/components/dashboard/*.tsx` -- chart theme fixes
 - `migrations/002_add_rls_and_roles.sql` -- FORCE ROW LEVEL SECURITY
 
-## Key Decisions
+### Key Decisions
 
 1. **Generic 500 responses** -- never expose internal error details to clients
 2. **503 over 200 for health** -- load balancers and monitoring tools expect proper status codes
