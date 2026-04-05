@@ -4,7 +4,7 @@ set -euo pipefail
 # prestart.sh — Run SQL migrations in order before the API starts.
 # Expects DATABASE_URL or individual PG* env vars to be set.
 # For migration 002: set DB_READER_PASSWORD env var for the reader role password.
-# If DB_READER_PASSWORD is not set, a random one is generated automatically.
+# If DB_READER_PASSWORD is not set, a fallback value is used.
 
 DB_HOST="${DB_HOST:-postgres}"
 DB_PORT="${DB_PORT:-5432}"
@@ -13,11 +13,19 @@ DB_USER="${POSTGRES_USER:-datapulse}"
 
 MIGRATIONS_DIR="${MIGRATIONS_DIR:-/app/migrations}"
 
-# Auto-generate DB_READER_PASSWORD if not provided
+# Use fallback DB_READER_PASSWORD if not provided
 if [ -z "${DB_READER_PASSWORD:-}" ]; then
-    DB_READER_PASSWORD="$(python -c 'import secrets; print(secrets.token_hex(16))')"
-    echo "[prestart] WARNING: DB_READER_PASSWORD not set. Auto-generated a random password for datapulse_reader role."
-    echo "[prestart] Set DB_READER_PASSWORD in .env to use a fixed password."
+    DB_READER_PASSWORD="datapulse_reader_$(date +%s)"
+    echo "[prestart] WARNING: DB_READER_PASSWORD not set. Using fallback password."
+    echo "[prestart] Set DB_READER_PASSWORD in .env for a fixed password."
+fi
+
+echo "[prestart] Connecting to ${DB_HOST}:${DB_PORT}/${DB_NAME} as ${DB_USER}..."
+
+# Test connection first
+if ! psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -c "SELECT 1" > /dev/null 2>&1; then
+    echo "[prestart] ERROR: Cannot connect to database. Check POSTGRES_PASSWORD and DB_HOST."
+    exit 1
 fi
 
 echo "[prestart] Running SQL migrations from ${MIGRATIONS_DIR}..."
