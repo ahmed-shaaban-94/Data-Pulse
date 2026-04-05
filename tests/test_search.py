@@ -20,10 +20,10 @@ def repo(mock_session):
 
 
 def _make_mapping_rows(rows: list[dict]):
-    """Helper to build mock mapping results."""
+    """Helper to build mock mapping results that support dict access."""
     mock_result = MagicMock()
     mock_mappings = MagicMock()
-    mock_mappings.all.return_value = [MagicMock(**r) for r in rows]
+    mock_mappings.all.return_value = rows  # Return plain dicts — RowMapping supports []
     mock_result.mappings.return_value = mock_mappings
     return mock_result
 
