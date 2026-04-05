@@ -95,11 +95,11 @@ export default function PrintReportPage() {
         </section>
       )}
 
-      {/* Top Customers */}
+      {/* Top Revenue Sources */}
       {customers && customers.items.length > 0 && (
         <section>
           <h2 className="mb-4 text-lg font-semibold text-text-primary print:text-black">
-            Top Customers
+            Top Revenue Sources
           </h2>
           <ReportTable
             headers={["Rank", "Customer", "Revenue", "% of Total"]}

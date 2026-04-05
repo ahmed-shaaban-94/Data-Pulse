@@ -132,7 +132,7 @@ export const QuickRankings = memo(function QuickRankings() {
         accentColor="bg-accent/10 text-accent"
       />
       <RankingCard
-        title="Top 5 Customers"
+        title="Top 5 Revenue Sources"
         href="/customers"
         items={dashboardData?.top_customers?.items}
         isLoading={isLoading}
