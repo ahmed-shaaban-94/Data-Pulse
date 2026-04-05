@@ -1,6 +1,6 @@
 """Tests for annotation API endpoints."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from unittest.mock import MagicMock
 
 import pytest
@@ -15,7 +15,7 @@ def _make_row(**overrides):
     base = {
         "id": 1, "chart_id": "daily_trend", "data_point": "2024-01-15",
         "note": "Test", "color": "#D97706", "user_id": "test-user",
-        "created_at": datetime.now(timezone.utc),
+        "created_at": datetime.now(UTC),
     }
     base.update(overrides)
     return base

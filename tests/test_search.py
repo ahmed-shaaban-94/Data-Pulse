@@ -23,7 +23,7 @@ def _make_mapping_rows(rows: list[dict]):
     """Helper to build mock mapping results."""
     mock_result = MagicMock()
     mock_mappings = MagicMock()
-    mock_mappings.all.return_value = [MagicMock(**r, __getitem__=lambda s, k: r[k]) for r in rows]
+    mock_mappings.all.return_value = [MagicMock(**r) for r in rows]
     mock_result.mappings.return_value = mock_mappings
     return mock_result
 

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from unittest.mock import MagicMock, create_autospec
+from unittest.mock import create_autospec
 
 import pytest
 from fastapi import HTTPException
@@ -64,7 +64,9 @@ class TestCreateView:
         mock_repo.count_views.return_value = 0
         mock_repo.create_view.return_value = SAMPLE_VIEW
 
-        data = SavedViewCreate(name="My View", page_path="/dashboard", filters={"date_range": "30d"})
+        data = SavedViewCreate(
+            name="My View", page_path="/dashboard", filters={"date_range": "30d"},
+        )
         result = service.create_view(1, "user-1", data)
 
         assert isinstance(result, SavedViewResponse)

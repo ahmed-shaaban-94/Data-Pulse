@@ -1,6 +1,6 @@
 """Tests for NotificationService."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from unittest.mock import MagicMock
 
 from datapulse.notifications_center.models import NotificationCount, NotificationResponse
@@ -15,7 +15,7 @@ def _make_row(**overrides):
         "message": "Test message",
         "link": None,
         "read": False,
-        "created_at": datetime.now(timezone.utc),
+        "created_at": datetime.now(UTC),
     }
     base.update(overrides)
     return base

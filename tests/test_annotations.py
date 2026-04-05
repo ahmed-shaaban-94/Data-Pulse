@@ -1,6 +1,6 @@
 """Tests for AnnotationRepository."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from unittest.mock import MagicMock
 
 from datapulse.annotations.repository import AnnotationRepository
@@ -10,7 +10,7 @@ def _make_row(**overrides):
     base = {
         "id": 1, "chart_id": "daily_trend", "data_point": "2024-01-15",
         "note": "Ramadan sale started", "color": "#D97706",
-        "user_id": "user1", "created_at": datetime.now(timezone.utc),
+        "user_id": "user1", "created_at": datetime.now(UTC),
     }
     base.update(overrides)
     return base

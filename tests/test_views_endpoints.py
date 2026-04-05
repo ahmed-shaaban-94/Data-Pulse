@@ -6,14 +6,12 @@ from datetime import UTC, datetime
 from unittest.mock import MagicMock
 
 import pytest
-from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
 from datapulse.api.app import create_app
 from datapulse.api.auth import get_current_user
 from datapulse.api.routes.views import get_views_service
 from datapulse.views.models import SavedViewResponse
-
 
 NOW = datetime(2025, 6, 1, 12, 0, 0, tzinfo=UTC)
 

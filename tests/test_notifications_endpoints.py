@@ -1,6 +1,6 @@
 """Tests for notification center API endpoints."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from unittest.mock import MagicMock
 
 import pytest
@@ -20,9 +20,12 @@ def mock_user():
 @pytest.fixture()
 def mock_service():
     svc = MagicMock()
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     svc.list_notifications.return_value = [
-        NotificationResponse(id=1, type="info", title="Hi", message="Hello", link=None, read=False, created_at=now),
+        NotificationResponse(
+            id=1, type="info", title="Hi", message="Hello",
+            link=None, read=False, created_at=now,
+        ),
     ]
     svc.unread_count.return_value = NotificationCount(unread=3)
     return svc

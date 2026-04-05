@@ -3,11 +3,11 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from unittest.mock import MagicMock, create_autospec, patch
+from unittest.mock import create_autospec
 
 import pytest
 
-from datapulse.onboarding.models import ONBOARDING_STEPS, OnboardingStatus
+from datapulse.onboarding.models import OnboardingStatus
 from datapulse.onboarding.repository import OnboardingRepository
 from datapulse.onboarding.service import OnboardingService
 
@@ -147,7 +147,7 @@ class TestCompleteStep:
             "created_at": datetime.now(UTC),
         }
 
-        result = service.complete_step(tenant_id=1, user_id="user-1", step="connect_data")
+        service.complete_step(tenant_id=1, user_id="user-1", step="connect_data")
 
         call_kwargs = mock_repo.upsert_status.call_args.kwargs
         # Step should not appear twice
