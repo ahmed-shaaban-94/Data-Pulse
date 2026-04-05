@@ -27,7 +27,10 @@ import {
 import { cn } from "@/lib/utils";
 import { NAV_ITEMS } from "@/lib/constants";
 import { HealthIndicator } from "./health-indicator";
+import { SavedViewsMenu } from "./saved-views-menu";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { LanguageToggle } from "./language-toggle";
+import { LanguageToggle } from "./language-toggle";
 
 interface SidebarProps {
   anomalyCount?: number;
@@ -212,10 +215,14 @@ export function Sidebar({ anomalyCount = 0, alertCount = 0 }: SidebarProps) {
               <NavLinks pathname={pathname} onNavigate={() => setMobileOpen(false)} anomalyCount={anomalyCount} alertCount={alertCount} />
             </nav>
 
+            {/* Saved Views */}
+            <SavedViewsMenu onNavigate={() => setMobileOpen(false)} />
+
             {/* Footer */}
             <div className="border-t border-border px-4 py-4 space-y-3">
               <UserInfo />
               <ThemeToggle />
+              <LanguageToggle />
               <HealthIndicator />
               <p className="text-xs text-text-secondary">DataPulse v0.1.0</p>
             </div>
@@ -236,10 +243,14 @@ export function Sidebar({ anomalyCount = 0, alertCount = 0 }: SidebarProps) {
           <NavLinks pathname={pathname} anomalyCount={anomalyCount} alertCount={alertCount} />
         </nav>
 
+        {/* Saved Views */}
+        <SavedViewsMenu />
+
         {/* Footer */}
         <div className="border-t border-border px-4 py-4 space-y-3">
           <UserInfo />
           <ThemeToggle />
+          <LanguageToggle />
           <HealthIndicator />
           <p className="text-xs text-text-secondary">DataPulse v0.1.0</p>
         </div>
