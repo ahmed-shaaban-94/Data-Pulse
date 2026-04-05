@@ -53,7 +53,7 @@ class AdvancedRepository:
                            MAX(drug_cluster) AS cluster
                     FROM {table}
                     WHERE {where}
-                      AND COALESCE(origin, 'Other') NOT IN ('Services', 'Other')
+                      AND COALESCE(origin, 'Other') IN ('Pharma', 'Non-pharma')
                     GROUP BY {key_col}, {name_col}
                     HAVING SUM(total_sales) > 0
                     ORDER BY value DESC
