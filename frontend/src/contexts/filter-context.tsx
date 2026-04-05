@@ -10,6 +10,7 @@ import {
   type ReactNode,
 } from "react";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
+import { subDays, format } from "date-fns";
 import type { FilterParams } from "@/types/filters";
 
 interface FilterContextValue {
@@ -63,20 +64,29 @@ export function FilterProvider({ children }: { children: ReactNode }) {
 
     try {
       const stored = sessionStorage.getItem(STORAGE_KEY);
-      if (!stored) return;
-      const saved: FilterParams = JSON.parse(stored);
-      if (Object.keys(saved).length === 0) return;
-
-      const params = new URLSearchParams();
-      for (const [key, value] of Object.entries(saved)) {
-        if (value !== undefined && value !== null) {
-          params.set(key, String(value));
+      if (stored) {
+        const saved: FilterParams = JSON.parse(stored);
+        if (Object.keys(saved).length > 0) {
+          const params = new URLSearchParams();
+          for (const [key, value] of Object.entries(saved)) {
+            if (value !== undefined && value !== null) {
+              params.set(key, String(value));
+            }
+          }
+          router.push(`${pathname}?${params.toString()}`);
+          return;
         }
       }
-      router.push(`${pathname}?${params.toString()}`);
     } catch {
       // Ignore corrupted sessionStorage
     }
+
+    // Default to Last 30 days when no saved filters exist
+    const today = new Date();
+    const params = new URLSearchParams();
+    params.set("start_date", format(subDays(today, 30), "yyyy-MM-dd"));
+    params.set("end_date", format(today, "yyyy-MM-dd"));
+    router.push(`${pathname}?${params.toString()}`);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Persist filters to sessionStorage on every change

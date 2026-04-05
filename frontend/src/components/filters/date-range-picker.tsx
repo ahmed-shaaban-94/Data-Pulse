@@ -31,17 +31,35 @@ export function DateRangePicker({
         }
       : undefined;
 
+  // Track whether user already picked the "from" date (waiting for "to")
+  const [pendingFrom, setPendingFrom] = useState<Date | null>(null);
+
   const handleSelect = (range: DateRange | undefined) => {
-    if (range?.from && range?.to) {
+    if (!range?.from) {
+      onRangeChange(undefined, undefined);
+      setPendingFrom(null);
+      return;
+    }
+
+    if (range.to) {
+      // Full range selected
       onRangeChange(
         format(range.from, "yyyy-MM-dd"),
         format(range.to, "yyyy-MM-dd"),
       );
+      setPendingFrom(null);
       setOpen(false);
-    } else if (range?.from) {
-      // Partial selection — wait for "to" date
+    } else if (pendingFrom && range.from.getTime() === pendingFrom.getTime()) {
+      // Same day clicked twice — select single day
+      onRangeChange(
+        format(range.from, "yyyy-MM-dd"),
+        format(range.from, "yyyy-MM-dd"),
+      );
+      setPendingFrom(null);
+      setOpen(false);
     } else {
-      onRangeChange(undefined, undefined);
+      // First click — wait for second click
+      setPendingFrom(range.from);
     }
   };
 
