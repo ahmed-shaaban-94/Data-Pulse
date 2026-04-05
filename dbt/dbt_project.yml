@@ -19,6 +19,14 @@ seeds:
       +column_types:
         division: varchar(50)
         origin: varchar(20)
+    seed_budget_2025:
+      +schema: marts
+      +column_types:
+        year: integer
+        month: integer
+        site_name: varchar(100)
+        origin: varchar(20)
+        budget: numeric(18,2)
 
 models:
   datapulse:
