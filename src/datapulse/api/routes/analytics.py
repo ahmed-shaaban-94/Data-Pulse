@@ -298,6 +298,19 @@ def get_customer_type_breakdown(
     return service.get_customer_type_breakdown(_to_filter(params))
 
 
+@router.get("/origin-breakdown")
+@limiter.limit("60/minute")
+def get_origin_breakdown(
+    request: Request,
+    response: Response,
+    service: ServiceDep,
+    params: Annotated[AnalyticsQueryParams, Depends()],
+) -> list[dict]:
+    """Revenue breakdown by product origin (Pharma, Non-pharma, HVI, etc.)."""
+    _set_cache(response, 300)
+    return service.get_origin_breakdown(_to_filter(params))
+
+
 @router.get("/top-movers", response_model=TopMovers)
 @limiter.limit("60/minute")
 def get_top_movers(

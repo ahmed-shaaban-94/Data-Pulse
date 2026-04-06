@@ -595,14 +595,49 @@ class AnalyticsRepository:
         return build_trend(list(rows))
 
     def get_top_products(self, filters: AnalyticsFilter) -> RankingResult:
-        """Return top-N products by net sales."""
+        """Return top-N products by net sales (excludes Services/Other origin)."""
         log.info("get_top_products", filters=filters.model_dump())
-        return self._get_ranking(
-            "public_marts.agg_sales_by_product",
-            "product_key",
-            "drug_name",
-            filters,
-        )
+        where, params = build_where(filters, use_year_month=True)
+        params["limit"] = filters.limit
+
+        stmt = text(f"""
+            SELECT product_key, drug_brand, SUM(total_sales) AS value
+            FROM public_marts.agg_sales_by_product
+            WHERE {where}
+              AND product_key != -1
+              AND COALESCE(origin, 'Other') IN ('Pharma', 'Non-pharma', 'HVI')
+            GROUP BY product_key, drug_brand
+            ORDER BY value DESC
+            LIMIT :limit
+        """)
+        rows = self._session.execute(stmt, params).fetchall()
+        return build_ranking(list(rows))
+
+    def get_origin_breakdown(self, filters: AnalyticsFilter) -> list[dict]:
+        """Revenue breakdown by product origin (Pharma, Non-pharma, HVI)."""
+        log.info("get_origin_breakdown", filters=filters.model_dump())
+        where, params = build_where(filters, use_year_month=True)
+
+        stmt = text(f"""
+            SELECT COALESCE(origin, 'Other') AS origin,
+                   ROUND(SUM(total_sales), 2) AS value,
+                   COUNT(DISTINCT product_key) AS product_count
+            FROM public_marts.agg_sales_by_product
+            WHERE {where} AND product_key != -1
+            GROUP BY COALESCE(origin, 'Other')
+            ORDER BY value DESC
+        """)
+        rows = self._session.execute(stmt, params).fetchall()
+        total = sum(float(r[1]) for r in rows)
+        return [
+            {
+                "origin": str(r[0]),
+                "value": float(r[1]),
+                "product_count": int(r[2]),
+                "pct": round(float(r[1]) / total * 100, 1) if total else 0,
+            }
+            for r in rows
+        ]
 
     def get_top_customers(self, filters: AnalyticsFilter) -> RankingResult:
         """Return top-N customers by net sales."""
