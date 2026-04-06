@@ -7,8 +7,19 @@ const withNextIntl = createNextIntlPlugin("./src/i18n/request.ts");
 const nextConfig = {
   output: "standalone",
   experimental: {
-    optimizePackageImports: ["lucide-react", "recharts", "date-fns"],
+    optimizePackageImports: [
+      "lucide-react",
+      "recharts",
+      "date-fns",
+      "framer-motion",
+      "react-day-picker",
+      "@radix-ui/react-popover",
+      "@radix-ui/react-dialog",
+      "@radix-ui/react-dropdown-menu",
+      "@radix-ui/react-tooltip",
+    ],
   },
+  compress: true,
   // Proxy /api/v1/* and /health to the FastAPI backend.
   // This lets NEXT_PUBLIC_API_URL stay empty (same-origin requests from the
   // browser) while the Next.js server forwards the calls to the API container.
@@ -43,6 +54,26 @@ const nextConfig = {
           {
             key: "Cache-Control",
             value: "public, max-age=86400, stale-while-revalidate=43200",
+          },
+        ],
+      },
+      {
+        // Cache static assets (fonts, images, etc.)
+        source: "/(.*)\\.(woff2|woff|ttf|ico|png|jpg|jpeg|svg|webp)",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "public, max-age=31536000, immutable",
+          },
+        ],
+      },
+      {
+        // Short cache for API proxy responses with stale-while-revalidate
+        source: "/api/v1/:path*",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "private, max-age=30, stale-while-revalidate=60",
           },
         ],
       },

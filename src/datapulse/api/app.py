@@ -10,6 +10,7 @@ import sentry_sdk
 import structlog
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
@@ -75,6 +76,9 @@ def create_app() -> FastAPI:
     )
     app.state.limiter = limiter
     app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)  # type: ignore[arg-type]
+
+    # GZip compression for API responses (minimum 500 bytes)
+    app.add_middleware(GZipMiddleware, minimum_size=500)
 
     # CORS for Next.js dev server
     app.add_middleware(

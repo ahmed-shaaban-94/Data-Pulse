@@ -86,7 +86,7 @@ export function useDashboard(filters?: FilterParams) {
   const { data, error, isLoading, mutate } = useSWR(
     key,
     () => fetchAPI<DashboardData>(key),
-    { refreshInterval: 60000, revalidateOnFocus: true },
+    { refreshInterval: 300000 },
   );
 
   return { data, error, isLoading, mutate };
