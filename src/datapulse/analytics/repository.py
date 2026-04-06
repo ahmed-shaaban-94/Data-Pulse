@@ -714,7 +714,7 @@ class AnalyticsRepository:
         params["limit"] = filters.limit
 
         stmt = text(f"""
-            SELECT a.drug_brand, a.customer_name,
+            SELECT a.drug_name, a.drug_brand, a.customer_name,
                    a.return_quantity, a.return_amount,
                    a.return_count,
                    COALESCE(p.origin, 'Other') AS origin
@@ -735,12 +735,12 @@ class AnalyticsRepository:
         return [
             ReturnAnalysis(
                 drug_name=str(r[0]),
-                drug_brand=str(r[0]),
-                customer_name=str(r[1]),
-                return_quantity=Decimal(str(r[2])),
-                return_amount=Decimal(str(r[3])),
-                return_count=int(r[4]),
-                origin=str(r[5]),
+                drug_brand=str(r[1]),
+                customer_name=str(r[2]),
+                return_quantity=Decimal(str(r[3])),
+                return_amount=Decimal(str(r[4])),
+                return_count=int(r[5]),
+                origin=str(r[6]),
             )
             for r in rows
         ]

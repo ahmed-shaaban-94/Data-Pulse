@@ -185,22 +185,14 @@ class AdvancedRepository:
         where, params = build_where(filters, use_year_month=True)
 
         stmt = text(f"""
-            WITH monthly AS (
-                SELECT year || '-' || LPAD(month::TEXT, 2, '0') AS period,
-                       SUM(return_count) AS return_count,
-                       SUM(return_amount) AS return_amount,
-                       SUM(total_sales) AS total_amount
-                FROM public_marts.agg_sales_monthly
-                WHERE {where}
-                GROUP BY year, month
-                ORDER BY year, month
-            )
-            SELECT period, return_count,
-                   ABS(return_amount) AS return_amount,
-                   CASE WHEN total_amount > 0
-                        THEN ROUND(ABS(return_amount) / total_amount * 100, 2)
-                        ELSE 0 END AS return_rate
-            FROM monthly
+            SELECT year || '-' || LPAD(month::TEXT, 2, '0') AS period,
+                   SUM(return_count)::INT AS return_count,
+                   ROUND(ABS(SUM(total_discount)), 2) AS return_amount,
+                   ROUND(AVG(return_rate) * 100, 2) AS return_rate
+            FROM public_marts.agg_sales_monthly
+            WHERE {where}
+            GROUP BY year, month
+            ORDER BY year, month
         """)
         rows = self._session.execute(stmt, params).fetchall()
         if not rows:

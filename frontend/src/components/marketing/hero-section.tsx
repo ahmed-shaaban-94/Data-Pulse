@@ -5,18 +5,18 @@ import { TypingSubtitle } from "./typing-subtitle";
 
 const BAR_HEIGHTS = [38, 52, 45, 68, 55, 78, 62, 88, 72, 92, 82, 96];
 const BAR_COLORS = [
-  "from-accent/50 to-accent/90",
-  "from-chart-blue/50 to-chart-blue/90",
-  "from-accent/50 to-accent/90",
-  "from-chart-amber/50 to-chart-amber/90",
-  "from-accent/50 to-accent/90",
-  "from-chart-blue/50 to-chart-blue/90",
-  "from-accent/50 to-accent/90",
-  "from-chart-amber/50 to-chart-amber/90",
-  "from-accent/50 to-accent/90",
-  "from-chart-blue/50 to-chart-blue/90",
-  "from-accent/50 to-accent/90",
-  "from-chart-amber/50 to-chart-amber/90",
+  "from-[#E5A00D]/60 to-[#E5A00D]",
+  "from-[#3B82F6]/60 to-[#3B82F6]",
+  "from-[#E5A00D]/60 to-[#E5A00D]",
+  "from-[#FF9800]/60 to-[#FF9800]",
+  "from-[#E5A00D]/60 to-[#E5A00D]",
+  "from-[#3B82F6]/60 to-[#3B82F6]",
+  "from-[#E5A00D]/60 to-[#E5A00D]",
+  "from-[#FF9800]/60 to-[#FF9800]",
+  "from-[#E5A00D]/60 to-[#E5A00D]",
+  "from-[#3B82F6]/60 to-[#3B82F6]",
+  "from-[#E5A00D]/60 to-[#E5A00D]",
+  "from-[#FF9800]/60 to-[#FF9800]",
 ];
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
@@ -73,7 +73,7 @@ export function HeroSection() {
 
         {/* Animated chart visualization */}
         <div className="mx-auto mt-16 max-w-4xl float-card">
-          <div className="rounded-xl border border-border bg-card/80 backdrop-blur-sm p-4 shadow-2xl relative overflow-hidden">
+          <div className="rounded-xl border border-border bg-card/80 backdrop-blur-sm p-4 shadow-2xl relative overflow-hidden hero-dashboard-glow">
             {/* Top accent bar */}
             <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-accent via-chart-amber to-chart-blue" />
 
