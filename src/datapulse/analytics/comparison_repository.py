@@ -17,6 +17,7 @@ from datapulse.analytics.models import (
     TopMovers,
 )
 from datapulse.analytics.queries import (
+    SITE_DATE_ONLY,
     build_where,
     safe_growth,
 )
@@ -45,6 +46,14 @@ _ENTITY_MAP: dict[str, tuple[str, str, str]] = {
     ),
 }
 
+# Map agg table -> (dim_table, dim_key) for fct_sales-based day-level queries
+_DIM_JOIN: dict[str, tuple[str, str, str]] = {
+    "public_marts.agg_sales_by_product": ("public_marts.dim_product", "product_key", "drug_brand"),
+    "public_marts.agg_sales_by_customer": ("public_marts.dim_customer", "customer_key", "customer_name"),
+    "public_marts.agg_sales_by_staff": ("public_marts.dim_staff", "staff_key", "staff_name"),
+    "public_marts.agg_sales_by_site": ("public_marts.dim_site", "site_key", "site_name"),
+}
+
 
 class ComparisonRepository:
     """Period-over-period comparison queries."""
@@ -68,7 +77,7 @@ class ComparisonRepository:
         transaction counts below 33% of the average — same threshold used
         by get_top_staff in the main repository.
         """
-        where, params = build_where(filters, use_year_month=True)
+        where, params = build_where(filters, date_column="date_key", supported_fields=SITE_DATE_ONLY)
         params["limit"] = limit
 
         if active_only:
@@ -104,11 +113,15 @@ class ComparisonRepository:
                 LIMIT :limit
             """)
         else:
+            # Use fct_sales with dimension JOIN for day-level date precision
+            dim_table, dim_key, dim_join = _DIM_JOIN.get(table, (table, key_col, "1=1"))
             stmt = text(f"""
-                SELECT {key_col}, {name_col}, SUM(total_sales) AS value
-                FROM {table}
-                WHERE {where} AND {key_col} != -1
-                GROUP BY {key_col}, {name_col}
+                SELECT f.{key_col}, dim.{name_col}, ROUND(SUM(f.sales), 2) AS value
+                FROM public_marts.fct_sales f
+                INNER JOIN {dim_table} dim
+                    ON f.{key_col} = dim.{dim_key} AND f.tenant_id = dim.tenant_id
+                WHERE {where} AND f.{key_col} != -1
+                GROUP BY f.{key_col}, dim.{name_col}
                 ORDER BY value DESC
                 LIMIT :limit
             """)
