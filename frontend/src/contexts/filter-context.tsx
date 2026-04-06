@@ -10,6 +10,8 @@ import {
   type ReactNode,
 } from "react";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
+import { subDays, format } from "date-fns";
+import { useDateRange } from "@/hooks/use-date-range";
 import type { FilterParams } from "@/types/filters";
 
 interface FilterContextValue {
@@ -28,6 +30,7 @@ export function FilterProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const { data: dateRange } = useDateRange();
 
   const STORAGE_KEY = "datapulse:filters";
   const hydratedRef = useRef(false);
@@ -63,21 +66,31 @@ export function FilterProvider({ children }: { children: ReactNode }) {
 
     try {
       const stored = sessionStorage.getItem(STORAGE_KEY);
-      if (!stored) return;
-      const saved: FilterParams = JSON.parse(stored);
-      if (Object.keys(saved).length === 0) return;
-
-      const params = new URLSearchParams();
-      for (const [key, value] of Object.entries(saved)) {
-        if (value !== undefined && value !== null) {
-          params.set(key, String(value));
+      if (stored) {
+        const saved: FilterParams = JSON.parse(stored);
+        if (Object.keys(saved).length > 0) {
+          const params = new URLSearchParams();
+          for (const [key, value] of Object.entries(saved)) {
+            if (value !== undefined && value !== null) {
+              params.set(key, String(value));
+            }
+          }
+          router.push(`${pathname}?${params.toString()}`);
+          return;
         }
       }
-      router.push(`${pathname}?${params.toString()}`);
     } catch {
       // Ignore corrupted sessionStorage
     }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+    // Default to Last 30 days from the latest date in the database
+    if (!dateRange?.max_date) return; // Wait for API to load
+    const anchor = new Date(dateRange.max_date + "T00:00:00");
+    const params = new URLSearchParams();
+    params.set("start_date", format(subDays(anchor, 30), "yyyy-MM-dd"));
+    params.set("end_date", format(anchor, "yyyy-MM-dd"));
+    router.push(`${pathname}?${params.toString()}`);
+  }, [dateRange?.max_date]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Persist filters to sessionStorage on every change
   useEffect(() => {

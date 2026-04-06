@@ -263,6 +263,12 @@ class AnalyticsService:
         return self._repo.get_top_staff(f)
 
     @cached(ttl=300, prefix=_CACHE_PREFIX)
+    def get_origin_breakdown(self, filters: AnalyticsFilter | None = None) -> list[dict]:
+        """Revenue breakdown by product origin (cached 300s)."""
+        f = self._default_filter(filters)
+        return self._repo.get_origin_breakdown(f)
+
+    @cached(ttl=300, prefix=_CACHE_PREFIX)
     def get_return_report(self, filters: AnalyticsFilter | None = None) -> list[ReturnAnalysis]:
         """Top returns by amount (cached 300s)."""
         f = self._default_filter(filters)

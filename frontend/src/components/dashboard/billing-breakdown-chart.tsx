@@ -2,233 +2,105 @@
 
 import { memo, useState } from "react";
 import {
-  PieChart,
-  Pie,
-  Cell,
-  Legend,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
   Tooltip,
   ResponsiveContainer,
-  Sector,
+  Cell,
 } from "recharts";
 import { useBillingBreakdown } from "@/hooks/use-billing-breakdown";
 import { useFilters } from "@/contexts/filter-context";
 import { LoadingCard } from "@/components/loading-card";
 import { EmptyState } from "@/components/empty-state";
-import { formatCurrency, formatNumber } from "@/lib/formatters";
+import { formatCurrency, formatCompact } from "@/lib/formatters";
 import { CHART_COLORS } from "@/lib/constants";
 import { useChartTheme } from "@/hooks/use-chart-theme";
 import { ChartSpotlight, SpotlightTrigger } from "@/components/shared/chart-spotlight";
 
 function CustomTooltip(props: Record<string, unknown>) {
   const { active, payload } = props;
-  const items = payload as Array<{
-    name: string;
-    value: number;
-    payload: { pct: number; count: number };
-  }> | undefined;
+  const items = payload as
+    | Array<{
+        name: string;
+        value: number;
+        payload: { name: string; value: number; pct: number; count: number };
+      }>
+    | undefined;
   if (!active || !items?.length) return null;
-  const item = items[0];
+  const d = items[0].payload;
   return (
     <div className="rounded-xl border border-border bg-card/95 px-4 py-3 shadow-xl backdrop-blur-sm">
-      <p className="text-xs font-medium text-text-secondary">{item.name}</p>
+      <p className="text-xs font-medium text-text-secondary">{d.name}</p>
       <p className="mt-1 text-lg font-bold text-accent">
-        {formatCurrency(item.value)}
+        {formatCurrency(d.value)}
       </p>
       <p className="text-xs text-text-secondary">
-        {formatNumber(item.payload.count)} transactions ({item.payload.pct.toFixed(1)}%)
+        {d.count.toLocaleString()} transactions ({d.pct.toFixed(1)}%)
       </p>
     </div>
   );
 }
 
-/** Active shape renderer — enlarges the hovered slice with a glow */
-function renderActiveShape(props: any) {
-  const {
-    cx,
-    cy,
-    innerRadius,
-    outerRadius,
-    startAngle,
-    endAngle,
-    fill,
-  } = props;
-
-  return (
-    <g>
-      <Sector
-        cx={cx}
-        cy={cy}
-        innerRadius={innerRadius - 2}
-        outerRadius={outerRadius + 8}
-        startAngle={startAngle}
-        endAngle={endAngle}
-        fill={fill}
-        style={{ filter: "drop-shadow(0 0 8px rgba(255,255,255,0.15))" }}
-      />
-      <Sector
-        cx={cx}
-        cy={cy}
-        innerRadius={innerRadius - 2}
-        outerRadius={innerRadius}
-        startAngle={startAngle}
-        endAngle={endAngle}
-        fill={fill}
-        opacity={0.4}
-      />
-    </g>
-  );
-}
-
-/** Dynamic center label — shows hovered segment or total */
-function CenterLabel({
-  cx,
-  cy,
-  activeEntry,
-  total,
-  theme,
-}: {
-  cx: number;
-  cy: number;
-  activeEntry: { name: string; value: number; pct: number } | null;
-  total: number;
-  theme: ReturnType<typeof useChartTheme>;
-}) {
-  return (
-    <g>
-      <text
-        x={cx}
-        y={cy - 8}
-        textAnchor="middle"
-        fill={theme.tooltipColor}
-        fontSize={activeEntry ? 13 : 11}
-        fontWeight={600}
-        className="transition-all"
-      >
-        {activeEntry ? activeEntry.name : "Total"}
-      </text>
-      <text
-        x={cx}
-        y={cy + 14}
-        textAnchor="middle"
-        fill={theme.accentColor}
-        fontSize={16}
-        fontWeight={700}
-      >
-        {formatCurrency(activeEntry ? activeEntry.value : total)}
-      </text>
-      {activeEntry && (
-        <text
-          x={cx}
-          y={cy + 32}
-          textAnchor="middle"
-          fill={theme.tickFill}
-          fontSize={10}
-        >
-          {activeEntry.pct.toFixed(1)}%
-        </text>
-      )}
-    </g>
-  );
-}
-
-function DonutInner({
+function HorizontalBarInner({
   chartData,
-  total,
   height,
   CHART_THEME,
 }: {
   chartData: Array<{ name: string; value: number; pct: number; count: number }>;
-  total: number;
   height: number;
   CHART_THEME: ReturnType<typeof useChartTheme>;
 }) {
-  const [activeIdx, setActiveIdx] = useState<number | undefined>(undefined);
-
-  const activeEntry = activeIdx !== undefined ? chartData[activeIdx] : null;
-
   return (
     <ResponsiveContainer width="100%" height={height}>
-      <PieChart>
-        <Pie
-          data={chartData}
-          cx="50%"
-          cy="50%"
-          innerRadius={60}
-          outerRadius={100}
-          dataKey="value"
-          nameKey="name"
-          paddingAngle={2}
-          animationDuration={800}
-          activeIndex={activeIdx}
-          activeShape={renderActiveShape}
-          onMouseEnter={(_, index) => setActiveIdx(index)}
-          onMouseLeave={() => setActiveIdx(undefined)}
-        >
+      <BarChart data={chartData} layout="vertical" margin={{ left: 10, right: 80 }}>
+        <XAxis
+          type="number"
+          tick={{ fill: CHART_THEME.tickFill, fontSize: 11 }}
+          tickLine={false}
+          axisLine={false}
+          tickFormatter={(v) => formatCompact(v)}
+        />
+        <YAxis
+          type="category"
+          dataKey="name"
+          tick={{ fill: CHART_THEME.tickFill, fontSize: 12 }}
+          tickLine={false}
+          axisLine={false}
+          width={80}
+        />
+        <Tooltip content={<CustomTooltip />} cursor={{ fill: "rgba(255,255,255,0.04)" }} />
+        <Bar dataKey="value" radius={[0, 6, 6, 0]} barSize={28} label={<BarLabel theme={CHART_THEME} />}>
           {chartData.map((_, index) => (
             <Cell
               key={`cell-${index}`}
               fill={CHART_COLORS[index % CHART_COLORS.length]}
-              stroke="transparent"
-              className="transition-opacity duration-200"
-              opacity={activeIdx !== undefined && activeIdx !== index ? 0.4 : 1}
             />
           ))}
-        </Pie>
-        {/* Center label */}
-        <CenterLabel
-          cx={typeof window !== "undefined" ? 0 : 0}
-          cy={0}
-          activeEntry={activeEntry}
-          total={total}
-          theme={CHART_THEME}
-        />
-        <Tooltip content={<CustomTooltip />} />
-        <Legend
-          verticalAlign="bottom"
-          iconType="circle"
-          iconSize={8}
-          formatter={(value: string) => (
-            <span style={{ color: CHART_THEME.tickFill, fontSize: 12 }}>
-              {value}
-            </span>
-          )}
-        />
-        {/* Custom center text rendered via Pie label prop */}
-        <text
-          x="50%"
-          y="46%"
-          textAnchor="middle"
-          fill={CHART_THEME.tooltipColor}
-          fontSize={activeEntry ? 13 : 11}
-          fontWeight={600}
-        >
-          {activeEntry ? activeEntry.name : "Total"}
-        </text>
-        <text
-          x="50%"
-          y="54%"
-          textAnchor="middle"
-          fill={CHART_THEME.accentColor}
-          fontSize={16}
-          fontWeight={700}
-          dominantBaseline="hanging"
-        >
-          {formatCurrency(activeEntry ? activeEntry.value : total)}
-        </text>
-        {activeEntry && (
-          <text
-            x="50%"
-            y="62%"
-            textAnchor="middle"
-            fill={CHART_THEME.tickFill}
-            fontSize={10}
-            dominantBaseline="hanging"
-          >
-            {activeEntry.pct.toFixed(1)}%
-          </text>
-        )}
-      </PieChart>
+        </Bar>
+      </BarChart>
     </ResponsiveContainer>
+  );
+}
+
+/** Custom label showing value + percentage at the end of each bar */
+function BarLabel(props: any) {
+  const { x, y, width, height: barHeight, value, index, theme } = props;
+  // Access the chart data from the parent — recharts passes the entry via props
+  const entry = props.content?.props?.data?.[index];
+  const pct = entry?.pct;
+
+  return (
+    <text
+      x={x + width + 6}
+      y={y + barHeight / 2}
+      fill={theme.tickFill}
+      fontSize={11}
+      dominantBaseline="central"
+    >
+      {formatCompact(value)}{pct !== undefined ? ` (${pct.toFixed(1)}%)` : ""}
+    </text>
   );
 }
 
@@ -241,14 +113,16 @@ export const BillingBreakdownChart = memo(function BillingBreakdownChart() {
   if (isLoading) return <LoadingCard lines={6} className="h-80" />;
   if (!data?.items?.length) return <EmptyState title="No billing data" />;
 
-  const chartData = data.items.map((item) => ({
-    name: item.billing_group,
-    value: item.total_net_amount,
-    pct: item.pct_of_total,
-    count: item.transaction_count,
-  }));
+  const chartData = data.items
+    .map((item) => ({
+      name: item.billing_group,
+      value: item.total_net_amount,
+      pct: item.pct_of_total,
+      count: item.transaction_count,
+    }))
+    .sort((a, b) => b.value - a.value);
 
-  const total = chartData.reduce((sum, d) => sum + d.value, 0);
+  const barHeight = Math.max(chartData.length * 48, 160);
 
   return (
     <>
@@ -259,10 +133,9 @@ export const BillingBreakdownChart = memo(function BillingBreakdownChart() {
           </h3>
           <SpotlightTrigger onClick={() => setSpotlight(true)} />
         </div>
-        <DonutInner
+        <HorizontalBarInner
           chartData={chartData}
-          total={total}
-          height={280}
+          height={barHeight}
           CHART_THEME={CHART_THEME}
         />
       </div>
@@ -272,10 +145,9 @@ export const BillingBreakdownChart = memo(function BillingBreakdownChart() {
         onClose={() => setSpotlight(false)}
         title="Billing Method Distribution"
       >
-        <DonutInner
+        <HorizontalBarInner
           chartData={chartData}
-          total={total}
-          height={420}
+          height={barHeight + 80}
           CHART_THEME={CHART_THEME}
         />
       </ChartSpotlight>

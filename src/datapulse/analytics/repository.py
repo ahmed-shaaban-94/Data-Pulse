@@ -71,7 +71,7 @@ class AnalyticsRepository:
         stmt = text(f"""
             SELECT {key_col}, {name_col}, SUM(total_sales) AS value
             FROM {table}
-            WHERE {where}
+            WHERE {where} AND {key_col} != -1
             GROUP BY {key_col}, {name_col}
             ORDER BY value DESC
             LIMIT :limit
@@ -168,8 +168,8 @@ class AnalyticsRepository:
 
         stmt = text("""
             WITH daily AS (
-                SELECT daily_gross_amount, daily_discount,
-                       mtd_gross_amount, ytd_gross_amount,
+                SELECT daily_net_amount, 0 AS daily_discount,
+                       mtd_net_amount, ytd_net_amount,
                        daily_transactions, daily_unique_customers,
                        daily_returns, mtd_transactions, ytd_transactions
                 FROM public_marts.metrics_summary
@@ -184,14 +184,14 @@ class AnalyticsRepository:
                 WHERE date_key = :date_key
             ),
             prev_month AS (
-                SELECT mtd_gross_amount
+                SELECT mtd_net_amount
                 FROM public_marts.metrics_summary
                 WHERE full_date = CAST(
                     CAST(:target_date AS date) - INTERVAL '1 month'
                 AS date)
             ),
             prev_year AS (
-                SELECT ytd_gross_amount
+                SELECT ytd_net_amount
                 FROM public_marts.metrics_summary
                 WHERE full_date = CAST(
                     CAST(:target_date AS date) - INTERVAL '1 year'
@@ -199,25 +199,25 @@ class AnalyticsRepository:
             ),
             sparkline AS (
                 SELECT json_agg(
-                    json_build_object('period', full_date, 'value', daily_gross_amount)
+                    json_build_object('period', full_date, 'value', daily_net_amount)
                     ORDER BY full_date
                 ) AS points
                 FROM public_marts.metrics_summary
                 WHERE full_date BETWEEN :sparkline_start AND :target_date
             )
             SELECT
-                d.daily_gross_amount,
+                d.daily_net_amount,
                 d.daily_discount,
-                d.mtd_gross_amount,
-                d.ytd_gross_amount,
+                d.mtd_net_amount,
+                d.ytd_net_amount,
                 d.daily_transactions,
                 d.daily_unique_customers,
                 d.daily_returns,
                 d.mtd_transactions,
                 d.ytd_transactions,
                 b.avg_basket_size,
-                pm.mtd_gross_amount AS prev_month_mtd,
-                py.ytd_gross_amount AS prev_year_ytd,
+                pm.mtd_net_amount AS prev_month_mtd,
+                py.ytd_net_amount AS prev_year_ytd,
                 sp.points AS sparkline_points
             FROM daily d
             LEFT JOIN basket b ON TRUE
@@ -257,9 +257,9 @@ class AnalyticsRepository:
                 sparkline=[],
             )
 
-        today_gross = Decimal(str(row["daily_gross_amount"]))
-        mtd_gross = Decimal(str(row["mtd_gross_amount"]))
-        ytd_gross = Decimal(str(row["ytd_gross_amount"]))
+        today_gross = Decimal(str(row["daily_net_amount"]))
+        mtd_gross = Decimal(str(row["mtd_net_amount"]))
+        ytd_gross = Decimal(str(row["ytd_net_amount"]))
         today_discount = Decimal(str(row["daily_discount"])) if row["daily_discount"] else _ZERO
         daily_transactions = int(row["daily_transactions"])
         daily_customers = int(row["daily_unique_customers"])
@@ -331,7 +331,7 @@ class AnalyticsRepository:
         if kind == "mom":
             # Get last 12 months' MTD net amounts (same day-of-month)
             stmt = text("""
-                SELECT mtd_gross_amount
+                SELECT mtd_net_amount
                 FROM public_marts.metrics_summary
                 WHERE EXTRACT(DAY FROM full_date) = EXTRACT(DAY FROM CAST(:td AS date))
                   AND full_date < CAST(:td AS date)
@@ -340,7 +340,7 @@ class AnalyticsRepository:
             """)
         else:  # yoy
             stmt = text("""
-                SELECT ytd_gross_amount
+                SELECT ytd_net_amount
                 FROM public_marts.metrics_summary
                 WHERE EXTRACT(MONTH FROM full_date) = EXTRACT(MONTH FROM CAST(:td AS date))
                   AND EXTRACT(DAY FROM full_date) = EXTRACT(DAY FROM CAST(:td AS date))
@@ -411,7 +411,7 @@ class AnalyticsRepository:
         stmt = text("""
             WITH range_agg AS (
                 SELECT
-                    ROUND(SUM(daily_gross_amount), 2) AS period_net,
+                    ROUND(SUM(daily_net_amount), 2) AS period_net,
                     SUM(daily_transactions)::INT     AS total_transactions,
                     SUM(daily_returns)::INT           AS total_returns,
                     SUM(daily_unique_customers)::INT  AS total_customers
@@ -419,7 +419,7 @@ class AnalyticsRepository:
                 WHERE full_date BETWEEN :start_date AND :end_date
             ),
             last_day AS (
-                SELECT mtd_gross_amount, ytd_gross_amount,
+                SELECT mtd_net_amount, ytd_net_amount,
                        mtd_transactions, ytd_transactions
                 FROM public_marts.metrics_summary
                 WHERE full_date = :end_date
@@ -433,7 +433,7 @@ class AnalyticsRepository:
                 WHERE date_key BETWEEN :start_key AND :end_key
             ),
             prev_period AS (
-                SELECT ROUND(SUM(daily_gross_amount), 2) AS prev_net
+                SELECT ROUND(SUM(daily_net_amount), 2) AS prev_net
                 FROM public_marts.metrics_summary
                 WHERE full_date BETWEEN
                     CAST(:start_date AS date) - (:end_date - :start_date + 1) * INTERVAL '1 day'
@@ -441,7 +441,7 @@ class AnalyticsRepository:
             ),
             sparkline AS (
                 SELECT json_agg(
-                    json_build_object('period', full_date, 'value', daily_gross_amount)
+                    json_build_object('period', full_date, 'value', daily_net_amount)
                     ORDER BY full_date
                 ) AS points
                 FROM public_marts.metrics_summary
@@ -452,8 +452,8 @@ class AnalyticsRepository:
                 r.total_transactions,
                 r.total_returns,
                 r.total_customers,
-                l.mtd_gross_amount,
-                l.ytd_gross_amount,
+                l.mtd_net_amount,
+                l.ytd_net_amount,
                 l.mtd_transactions,
                 l.ytd_transactions,
                 b.avg_basket_size,
@@ -498,10 +498,10 @@ class AnalyticsRepository:
 
         period_net = Decimal(str(row["period_net"]))
         mtd_gross = (
-            Decimal(str(row["mtd_gross_amount"])) if row["mtd_gross_amount"] is not None else _ZERO
+            Decimal(str(row["mtd_net_amount"])) if row["mtd_net_amount"] is not None else _ZERO
         )
         ytd_gross = (
-            Decimal(str(row["ytd_gross_amount"])) if row["ytd_gross_amount"] is not None else _ZERO
+            Decimal(str(row["ytd_net_amount"])) if row["ytd_net_amount"] is not None else _ZERO
         )
         total_transactions = int(row["total_transactions"] or 0)
         total_returns = int(row["total_returns"] or 0)
@@ -548,10 +548,10 @@ class AnalyticsRepository:
         )
 
     def get_kpi_sparkline(self, target_date: date, days: int = 7) -> list[TimeSeriesPoint]:
-        """Last N days of daily_gross_amount from metrics_summary."""
+        """Last N days of daily_net_amount from metrics_summary."""
         start_date = target_date - timedelta(days=days)
         stmt = text("""
-            SELECT full_date AS period, daily_gross_amount AS value
+            SELECT full_date AS period, daily_net_amount AS value
             FROM public_marts.metrics_summary
             WHERE full_date BETWEEN :start_date AND :target_date
             ORDER BY full_date
@@ -595,14 +595,49 @@ class AnalyticsRepository:
         return build_trend(list(rows))
 
     def get_top_products(self, filters: AnalyticsFilter) -> RankingResult:
-        """Return top-N products by net sales."""
+        """Return top-N products by net sales (excludes Services/Other origin)."""
         log.info("get_top_products", filters=filters.model_dump())
-        return self._get_ranking(
-            "public_marts.agg_sales_by_product",
-            "product_key",
-            "drug_name",
-            filters,
-        )
+        where, params = build_where(filters, use_year_month=True)
+        params["limit"] = filters.limit
+
+        stmt = text(f"""
+            SELECT product_key, drug_brand, SUM(total_sales) AS value
+            FROM public_marts.agg_sales_by_product
+            WHERE {where}
+              AND product_key != -1
+              AND COALESCE(origin, 'Other') IN ('Pharma', 'Non-pharma', 'HVI')
+            GROUP BY product_key, drug_brand
+            ORDER BY value DESC
+            LIMIT :limit
+        """)
+        rows = self._session.execute(stmt, params).fetchall()
+        return build_ranking(list(rows))
+
+    def get_origin_breakdown(self, filters: AnalyticsFilter) -> list[dict]:
+        """Revenue breakdown by product origin (Pharma, Non-pharma, HVI)."""
+        log.info("get_origin_breakdown", filters=filters.model_dump())
+        where, params = build_where(filters, use_year_month=True)
+
+        stmt = text(f"""
+            SELECT COALESCE(origin, 'Other') AS origin,
+                   ROUND(SUM(total_sales), 2) AS value,
+                   COUNT(DISTINCT product_key) AS product_count
+            FROM public_marts.agg_sales_by_product
+            WHERE {where} AND product_key != -1
+            GROUP BY COALESCE(origin, 'Other')
+            ORDER BY value DESC
+        """)
+        rows = self._session.execute(stmt, params).fetchall()
+        total = sum(float(r[1]) for r in rows)
+        return [
+            {
+                "origin": str(r[0]),
+                "value": float(r[1]),
+                "product_count": int(r[2]),
+                "pct": round(float(r[1]) / total * 100, 1) if total else 0,
+            }
+            for r in rows
+        ]
 
     def get_top_customers(self, filters: AnalyticsFilter) -> RankingResult:
         """Return top-N customers by net sales."""
@@ -615,13 +650,51 @@ class AnalyticsRepository:
         )
 
     def get_top_staff(self, filters: AnalyticsFilter) -> RankingResult:
-        """Return top-N staff members by net sales."""
+        """Return top-N staff members by net sales with active_count.
+
+        Active staff count uses 4 layers:
+        1. Exclude Unknown (staff_key = -1)
+        2. Exclude Services/Other origin transactions
+        3. Only non-return transactions
+        4. Exclude below 33% of average transaction count (data entry noise)
+        """
         log.info("get_top_staff", filters=filters.model_dump())
-        return self._get_ranking(
+        ranking = self._get_ranking(
             "public_marts.agg_sales_by_staff",
             "staff_key",
             "staff_name",
             filters,
+        )
+
+        # Compute active staff count with 4-layer filter
+        where, params = build_where(filters, use_year_month=True)
+        stmt = text(f"""
+            WITH staff_txns AS (
+                SELECT f.staff_key,
+                       COUNT(*) FILTER (WHERE NOT f.is_return) AS sale_count
+                FROM public_marts.fct_sales f
+                INNER JOIN public_marts.dim_date d ON f.date_key = d.date_key
+                INNER JOIN public_marts.dim_product p ON f.product_key = p.product_key
+                    AND f.tenant_id = p.tenant_id
+                WHERE {where}
+                  AND f.staff_key != -1
+                  AND COALESCE(p.origin, 'Other') IN ('Pharma', 'Non-pharma', 'HVI')
+                  AND NOT f.is_return
+                GROUP BY f.staff_key
+            ),
+            threshold AS (
+                SELECT AVG(sale_count) * 0.33 AS min_txns FROM staff_txns
+            )
+            SELECT COUNT(*) FROM staff_txns, threshold
+            WHERE sale_count >= min_txns
+        """)
+        row = self._session.execute(stmt, params).fetchone()
+        active = int(row[0]) if row else 0
+
+        return RankingResult(
+            items=ranking.items,
+            total=ranking.total,
+            active_count=active,
         )
 
     def get_site_performance(self, filters: AnalyticsFilter) -> RankingResult:

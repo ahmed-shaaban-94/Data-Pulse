@@ -21,7 +21,6 @@ export const KEYBOARD_SHORTCUTS: ShortcutAction[] = [
   { keys: ["g", "i"], action: "/insights", label: "Go to Insights" },
   { keys: ["g", "r"], action: "/returns", label: "Go to Returns" },
   { keys: ["g", "t"], action: "/goals", label: "Go to Goals" },
-  { keys: ["g", "l"], action: "/pipeline", label: "Go to Pipeline" },
 ];
 
 /**

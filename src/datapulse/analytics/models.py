@@ -97,6 +97,7 @@ class RankingResult(BaseModel):
 
     items: list[RankingItem]
     total: JsonDecimal
+    active_count: int | None = None
 
 
 class KPISummary(BaseModel):

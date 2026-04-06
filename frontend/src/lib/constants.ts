@@ -18,7 +18,6 @@ export const NAV_ITEMS = [
   { label: "Sites", href: "/sites", icon: "Building2" },
   { label: "Returns", href: "/returns", icon: "RotateCcw" },
   { label: "Reports", href: "/reports", icon: "FileBarChart" },
-  { label: "Pipeline", href: "/pipeline", icon: "GitBranch" },
   { label: "Alerts", href: "/alerts", icon: "Bell" },
   { label: "Insights", href: "/insights", icon: "Sparkles" },
   { label: "Billing", href: "/billing", icon: "CreditCard" },

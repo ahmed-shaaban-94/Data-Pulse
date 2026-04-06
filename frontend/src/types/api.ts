@@ -51,6 +51,7 @@ export interface RankingItem {
 export interface RankingResult {
   items: RankingItem[];
   total: number;
+  active_count?: number;
 }
 
 export interface ReturnAnalysis {
