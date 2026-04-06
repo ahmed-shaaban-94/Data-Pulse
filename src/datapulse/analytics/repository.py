@@ -49,6 +49,22 @@ class AnalyticsRepository:
     def __init__(self, session: Session) -> None:
         self._session = session
 
+    # Dimension JOIN config for fact-table-based rankings (day-level precision).
+    _DIM_JOIN: dict[str, tuple[str, str, str]] = {
+        "public_marts.agg_sales_by_product": (
+            "public_marts.dim_product", "product_key", "f.tenant_id = dim.tenant_id"
+        ),
+        "public_marts.agg_sales_by_customer": (
+            "public_marts.dim_customer", "customer_key", "f.tenant_id = dim.tenant_id"
+        ),
+        "public_marts.agg_sales_by_staff": (
+            "public_marts.dim_staff", "staff_key", "f.tenant_id = dim.tenant_id"
+        ),
+        "public_marts.agg_sales_by_site": (
+            "public_marts.dim_site", "site_key", "f.tenant_id = dim.tenant_id"
+        ),
+    }
+
     def _get_ranking(
         self,
         table: str,
@@ -58,7 +74,12 @@ class AnalyticsRepository:
         *,
         use_year_month: bool = True,
     ) -> RankingResult:
-        """Generic top-N ranking query against an aggregation table."""
+        """Top-N ranking query with day-level date precision.
+
+        Queries fct_sales directly with date_key filtering and JOINs the
+        appropriate dimension table to get the display name. This gives
+        exact day-range results instead of month-level approximation.
+        """
         if table not in ALLOWED_RANKING_TABLES:
             raise ValueError(f"Invalid ranking table: {table}")
         if key_col not in ALLOWED_RANKING_COLUMNS:
@@ -66,14 +87,19 @@ class AnalyticsRepository:
         if name_col not in ALLOWED_RANKING_COLUMNS:
             raise ValueError(f"Invalid ranking name column: {name_col}")
 
-        where, params = build_where(filters, use_year_month=use_year_month)
+        dim_table, dim_key, dim_join_cond = self._DIM_JOIN[table]
+        where, params = build_where(
+            filters, date_column="date_key", supported_fields=SITE_DATE_ONLY,
+        )
         params["limit"] = filters.limit
 
         stmt = text(f"""
-            SELECT {key_col}, {name_col}, SUM(total_sales) AS value
-            FROM {table}
-            WHERE {where} AND {key_col} != -1
-            GROUP BY {key_col}, {name_col}
+            SELECT f.{key_col}, dim.{name_col}, ROUND(SUM(f.sales), 2) AS value
+            FROM public_marts.fct_sales f
+            INNER JOIN {dim_table} dim
+                ON f.{key_col} = dim.{dim_key} AND {dim_join_cond}
+            WHERE {where} AND f.{key_col} != -1
+            GROUP BY f.{key_col}, dim.{name_col}
             ORDER BY value DESC
             LIMIT :limit
         """)
@@ -666,18 +692,25 @@ class AnalyticsRepository:
         return build_trend(list(rows))
 
     def get_top_products(self, filters: AnalyticsFilter) -> RankingResult:
-        """Return top-N products by net sales (excludes Services/Other origin)."""
+        """Return top-N products by net sales (excludes Services/Other origin).
+
+        Uses fct_sales with day-level date_key filtering for exact date range precision.
+        """
         log.info("get_top_products", filters=filters.model_dump())
-        where, params = build_where(filters, use_year_month=True)
+        where, params = build_where(
+            filters, date_column="date_key", supported_fields=SITE_DATE_ONLY,
+        )
         params["limit"] = filters.limit
 
         stmt = text(f"""
-            SELECT product_key, drug_brand, SUM(total_sales) AS value
-            FROM public_marts.agg_sales_by_product
+            SELECT f.product_key, p.drug_brand, ROUND(SUM(f.sales), 2) AS value
+            FROM public_marts.fct_sales f
+            INNER JOIN public_marts.dim_product p
+                ON f.product_key = p.product_key AND f.tenant_id = p.tenant_id
             WHERE {where}
-              AND product_key != -1
-              AND COALESCE(origin, 'Other') IN ('Pharma', 'Non-pharma', 'HVI')
-            GROUP BY product_key, drug_brand
+              AND f.product_key != -1
+              AND COALESCE(p.origin, 'Other') IN ('Pharma', 'Non-pharma', 'HVI')
+            GROUP BY f.product_key, p.drug_brand
             ORDER BY value DESC
             LIMIT :limit
         """)
@@ -687,15 +720,19 @@ class AnalyticsRepository:
     def get_origin_breakdown(self, filters: AnalyticsFilter) -> list[dict]:
         """Revenue breakdown by product origin (Pharma, Non-pharma, HVI)."""
         log.info("get_origin_breakdown", filters=filters.model_dump())
-        where, params = build_where(filters, use_year_month=True)
+        where, params = build_where(
+            filters, date_column="date_key", supported_fields=SITE_DATE_ONLY,
+        )
 
         stmt = text(f"""
-            SELECT COALESCE(origin, 'Other') AS origin,
-                   ROUND(SUM(total_sales), 2) AS value,
-                   COUNT(DISTINCT product_key) AS product_count
-            FROM public_marts.agg_sales_by_product
-            WHERE {where} AND product_key != -1
-            GROUP BY COALESCE(origin, 'Other')
+            SELECT COALESCE(p.origin, 'Other') AS origin,
+                   ROUND(SUM(f.sales), 2) AS value,
+                   COUNT(DISTINCT f.product_key) AS product_count
+            FROM public_marts.fct_sales f
+            INNER JOIN public_marts.dim_product p
+                ON f.product_key = p.product_key AND f.tenant_id = p.tenant_id
+            WHERE {where} AND f.product_key != -1
+            GROUP BY COALESCE(p.origin, 'Other')
             ORDER BY value DESC
         """)
         rows = self._session.execute(stmt, params).fetchall()

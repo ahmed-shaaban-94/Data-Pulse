@@ -16,19 +16,20 @@ from datapulse.analytics.models import (
     RevenueDriver,
     WaterfallAnalysis,
 )
-from datapulse.analytics.queries import build_where, safe_growth
+from datapulse.analytics.queries import SITE_DATE_ONLY, build_where, safe_growth
 from datapulse.logging import get_logger
 
 log = get_logger(__name__)
 
 _ZERO = Decimal("0")
 
-# Dimension configs: (table, key_col, name_col)
+# Dimension configs: (dim_table, key_col, name_col)
+# Queries now use fct_sales with dimension JOINs for day-level date precision
 _DIMENSIONS: dict[str, tuple[str, str, str]] = {
-    "product": ("public_marts.agg_sales_by_product", "product_key", "drug_name"),
-    "customer": ("public_marts.agg_sales_by_customer", "customer_key", "customer_name"),
-    "staff": ("public_marts.agg_sales_by_staff", "staff_key", "staff_name"),
-    "site": ("public_marts.agg_sales_by_site", "site_key", "site_name"),
+    "product": ("public_marts.dim_product", "product_key", "drug_name"),
+    "customer": ("public_marts.dim_customer", "customer_key", "customer_name"),
+    "staff": ("public_marts.dim_staff", "staff_key", "staff_name"),
+    "site": ("public_marts.dim_site", "site_key", "site_name"),
 }
 
 
@@ -115,15 +116,18 @@ class DiagnosticsRepository:
     def _decompose_dimension(
         self,
         dim_name: str,
-        table: str,
+        dim_table: str,
         key_col: str,
         name_col: str,
         current_filters: AnalyticsFilter,
         previous_filters: AnalyticsFilter,
     ) -> tuple[list[RevenueDriver], Decimal, Decimal]:
-        """Compare a single dimension between two periods via FULL OUTER JOIN."""
-        c_where, c_params = build_where(current_filters, use_year_month=True)
-        p_where, p_params = build_where(previous_filters, use_year_month=True)
+        """Compare a single dimension between two periods via FULL OUTER JOIN.
+
+        Uses fct_sales with dimension JOIN for day-level date precision.
+        """
+        c_where, c_params = build_where(current_filters, date_column="date_key", supported_fields=SITE_DATE_ONLY)
+        p_where, p_params = build_where(previous_filters, date_column="date_key", supported_fields=SITE_DATE_ONLY)
 
         # Prefix params to avoid collisions
         c_params_prefixed = {f"c_{k}": v for k, v in c_params.items()}
@@ -136,19 +140,21 @@ class DiagnosticsRepository:
         for key in p_params:
             p_where_prefixed = p_where_prefixed.replace(f":{key}", f":p_{key}")
 
-        # Single query: FULL OUTER JOIN + window-function totals (replaces 3 queries)
+        # Single query: FULL OUTER JOIN + window-function totals
         stmt = text(f"""
             WITH current_period AS (
-                SELECT {key_col}, {name_col}, SUM(total_sales) AS net
-                FROM {table}
+                SELECT f.{key_col}, d.{name_col}, ROUND(SUM(f.sales), 2) AS net
+                FROM public_marts.fct_sales f
+                INNER JOIN {dim_table} d ON f.{key_col} = d.{key_col} AND f.tenant_id = d.tenant_id
                 WHERE {c_where_prefixed}
-                GROUP BY {key_col}, {name_col}
+                GROUP BY f.{key_col}, d.{name_col}
             ),
             previous_period AS (
-                SELECT {key_col}, {name_col}, SUM(total_sales) AS net
-                FROM {table}
+                SELECT f.{key_col}, d.{name_col}, ROUND(SUM(f.sales), 2) AS net
+                FROM public_marts.fct_sales f
+                INNER JOIN {dim_table} d ON f.{key_col} = d.{key_col} AND f.tenant_id = d.tenant_id
                 WHERE {p_where_prefixed}
-                GROUP BY {key_col}, {name_col}
+                GROUP BY f.{key_col}, d.{name_col}
             ),
             joined AS (
                 SELECT
