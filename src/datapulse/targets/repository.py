@@ -381,11 +381,14 @@ class TargetsRepository:
         """Return recent alert log entries, optionally filtered to unacknowledged."""
         log.info("list_alert_logs", limit=limit, unacknowledged_only=unacknowledged_only)
         stmt = text("""
-            SELECT id, alert_config_id, alert_name, fired_at,
-                   metric_value, threshold_value, message, acknowledged
-            FROM public.alert_logs
-            WHERE (:ack_only = FALSE OR acknowledged = FALSE)
-            ORDER BY fired_at DESC
+            SELECT l.id, l.alert_config_id,
+                   COALESCE(c.alert_name, 'Unknown Alert') AS alert_name,
+                   l.fired_at, l.metric_value, l.threshold_value,
+                   l.message, l.acknowledged
+            FROM public.alerts_log l
+            LEFT JOIN public.alerts_config c ON l.alert_config_id = c.id
+            WHERE (:ack_only = FALSE OR l.acknowledged = FALSE)
+            ORDER BY l.fired_at DESC
             LIMIT :limit
         """)
         rows = (
@@ -399,7 +402,7 @@ class TargetsRepository:
         """Mark an alert log entry as acknowledged. Returns True if updated."""
         log.info("acknowledge_alert", alert_id=alert_id)
         stmt = text("""
-            UPDATE public.alert_logs
+            UPDATE public.alerts_log
             SET acknowledged = TRUE
             WHERE id = :alert_id AND acknowledged = FALSE
         """)
