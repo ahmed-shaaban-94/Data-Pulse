@@ -276,25 +276,28 @@ class AnalyticsService:
         return self._repo.get_return_analysis(f)
 
     # ------------------------------------------------------------------
-    # Detail methods (uncached — low volume, entity-specific)
+    # Detail methods (cached 300s — entity-specific)
     # ------------------------------------------------------------------
 
+    @cached(ttl=300, prefix=_CACHE_PREFIX)
     def get_product_detail(self, product_key: int) -> ProductPerformance | None:
-        """Detailed performance for a single product."""
+        """Detailed performance for a single product (cached 300s)."""
         log.info("product_detail", product_key=product_key)
         if self._detail_repo is None:
             raise RuntimeError("DetailRepository not configured")
         return self._detail_repo.get_product_detail(product_key)
 
+    @cached(ttl=300, prefix=_CACHE_PREFIX)
     def get_customer_detail(self, customer_key: int) -> CustomerAnalytics | None:
-        """Detailed analytics for a single customer."""
+        """Detailed analytics for a single customer (cached 300s)."""
         log.info("customer_detail", customer_key=customer_key)
         if self._detail_repo is None:
             raise RuntimeError("DetailRepository not configured")
         return self._detail_repo.get_customer_detail(customer_key)
 
+    @cached(ttl=300, prefix=_CACHE_PREFIX)
     def get_staff_detail(self, staff_key: int) -> StaffPerformance | None:
-        """Detailed performance for a single staff member."""
+        """Detailed performance for a single staff member (cached 300s)."""
         log.info("staff_detail", staff_key=staff_key)
         if self._detail_repo is None:
             raise RuntimeError("DetailRepository not configured")

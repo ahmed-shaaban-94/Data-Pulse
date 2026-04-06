@@ -19,11 +19,11 @@ import { LazySection } from "@/components/dashboard/lazy-section";
 // Below-fold: lazy load with loading skeleton
 const BillingBreakdownChart = dynamic(
   () => import("@/components/dashboard/billing-breakdown-chart").then(m => ({ default: m.BillingBreakdownChart })),
-  { loading: () => <LoadingCard lines={3} /> },
+  { loading: () => <LoadingCard lines={3} />, ssr: false },
 );
 const CustomerTypeChart = dynamic(
   () => import("@/components/dashboard/customer-type-chart").then(m => ({ default: m.CustomerTypeChart })),
-  { loading: () => <LoadingCard lines={3} /> },
+  { loading: () => <LoadingCard lines={3} />, ssr: false },
 );
 const QuickRankings = dynamic(
   () => import("@/components/dashboard/quick-rankings").then(m => ({ default: m.QuickRankings })),
@@ -35,11 +35,11 @@ const TopMoversCard = dynamic(
 );
 const CalendarHeatmap = dynamic(
   () => import("@/components/dashboard/calendar-heatmap").then(m => ({ default: m.CalendarHeatmap })),
-  { loading: () => <LoadingCard lines={3} /> },
+  { loading: () => <LoadingCard lines={3} />, ssr: false },
 );
 const EgyptMap = dynamic(
   () => import("@/components/dashboard/egypt-map").then(m => ({ default: m.EgyptMap })),
-  { loading: () => <LoadingCard lines={3} /> },
+  { loading: () => <LoadingCard lines={3} />, ssr: false },
 );
 const TargetProgress = dynamic(
   () => import("@/components/dashboard/target-progress").then(m => ({ default: m.TargetProgress })),
