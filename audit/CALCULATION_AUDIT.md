@@ -489,3 +489,157 @@
 - **NULL handling:** `COALESCE` used properly for financial defaults, `FILTER (WHERE ...)` for conditional counts
 
 ---
+
+## LAYER 5: Frontend (Next.js + TypeScript) ✅
+
+### Files Audited
+- `frontend/src/lib/formatters.ts`
+- `frontend/src/lib/chart-utils.ts`
+- `frontend/src/lib/health-thresholds.ts`
+- `frontend/src/lib/date-utils.ts`
+- `frontend/src/lib/utils.ts`
+- `frontend/src/hooks/use-count-up.ts`
+- `frontend/src/hooks/use-comparison-trend.ts`
+- `frontend/src/hooks/use-date-range.ts`
+- `frontend/src/components/dashboard/kpi-card.tsx`
+- `frontend/src/components/dashboard/target-progress.tsx`
+- `frontend/src/components/dashboard/calendar-heatmap.tsx`
+- `frontend/src/components/dashboard/monthly-trend-chart.tsx`
+- `frontend/src/components/dashboard/waterfall-chart.tsx`
+- `frontend/src/components/dashboard/billing-breakdown-chart.tsx`
+- `frontend/src/components/dashboard/customer-type-chart.tsx`
+- `frontend/src/components/dashboard/day-hero.tsx`
+- `frontend/src/components/dashboard/trend-kpi-cards.tsx`
+- `frontend/src/components/dashboard/forecast-card.tsx`
+- `frontend/src/components/comparison/comparison-kpi.tsx`
+- `frontend/src/components/comparison/period-picker.tsx`
+- `frontend/src/components/customers/health-dashboard.tsx`
+- `frontend/src/components/customers/rfm-matrix.tsx`
+- `frontend/src/components/custom-report/report-results.tsx`
+- `frontend/src/components/custom-report/report-summary.tsx`
+- `frontend/src/components/products/pareto-chart.tsx`
+- `frontend/src/components/goals/goals-overview.tsx`
+- `frontend/src/components/shared/ranking-table.tsx`
+- `frontend/src/components/shared/ranking-table-linked.tsx`
+- `frontend/src/components/shared/data-freshness.tsx`
+- `frontend/src/components/sites/radar-comparison.tsx`
+- `frontend/src/components/sites/site-detail-view.tsx`
+- `frontend/src/components/staff/gamified-leaderboard.tsx`
+- `frontend/src/components/alerts/alerts-overview.tsx`
+- `frontend/src/app/(app)/dashboard/report/page.tsx`
+- `frontend/src/app/(app)/reports/page.tsx`
+
+### Findings
+
+#### 🔴 [FE-1] Health dashboard division by zero when `dist.total === 0`
+- **File:** `frontend/src/components/customers/health-dashboard.tsx:41`
+- **Severity:** Critical
+- **Category:** Division by zero
+- **Current code:**
+  ```typescript
+  style={{ width: `${(b.count / dist.total) * 100}%` }}
+  ```
+- **Why it's wrong:** If all health bands are empty (no customers), `dist.total` = 0 → division produces `Infinity` → `width: "Infinity%"` → layout breaks.
+- **Suggested fix:**
+  ```typescript
+  style={{ width: `${dist.total > 0 ? (b.count / dist.total) * 100 : 0}%` }}
+  ```
+- **Test to add:** Vitest: render `HealthDashboard` with empty distribution, assert no NaN/Infinity in DOM.
+
+#### 🟡 [FE-2] Calendar heatmap ratio not clamped — opacity can exceed [0, 1]
+- **File:** `frontend/src/components/dashboard/calendar-heatmap.tsx:8-14`
+- **Severity:** Warning
+- **Category:** Unclamped ratio
+- **Current code:**
+  ```typescript
+  if (max === min) return isDark ? "var(--divider)" : "var(--divider)";
+  const ratio = (value - min) / (max - min);
+  const opacity = 0.2 + ratio * 0.8;
+  ```
+- **Why it matters:** If `value` falls outside `[min, max]` (possible with data updates after min/max computed), `ratio` can be > 1 or < 0, causing opacity outside [0.2, 1.0]. CSS `rgba` clamps automatically, but values like `opacity: 1.6` may behave differently across browsers.
+- **Suggested fix:**
+  ```typescript
+  const ratio = Math.min(Math.max((value - min) / (max - min), 0), 1);
+  ```
+
+#### 🟡 [FE-3] Data freshness `getMinutesAgo()` can return negative for future timestamps
+- **File:** `frontend/src/components/shared/data-freshness.tsx:11`
+- **Severity:** Warning
+- **Category:** Edge case
+- **Current code:**
+  ```typescript
+  function getMinutesAgo(date: Date): number {
+    return Math.floor((Date.now() - date.getTime()) / 60000);
+  }
+  ```
+- **Why it matters:** If the server timestamp is ahead of the client clock, this produces negative values like "-5m ago". Unlikely in production but possible with clock drift.
+- **Suggested fix:** `return Math.max(Math.floor((Date.now() - date.getTime()) / 60000), 0);`
+
+#### 🟡 [FE-4] Site detail view ratio formatting inconsistency — mixed decimal places
+- **File:** `frontend/src/components/sites/site-detail-view.tsx:44-46`
+- **Severity:** Warning
+- **Category:** Display inconsistency
+- **Current code:**
+  ```typescript
+  { label: "Walk-in Ratio", value: `${(site.walk_in_ratio * 100).toFixed(1)}%` },
+  { label: "Insurance Ratio", value: `${(site.insurance_ratio * 100).toFixed(1)}%` },
+  { label: "Return Rate", value: `${(site.return_rate * 100).toFixed(2)}%` },
+  ```
+- **Why it matters:** Walk-in and Insurance use 1 decimal, Return Rate uses 2. Inconsistent display for similar percentage metrics on the same card.
+- **Suggested fix:** Use `.toFixed(1)` for all three, or extract a `formatRatio()` helper.
+
+#### 🟡 [FE-5] Custom report `formatCell` calls `.toLocaleString()` on `unknown` type
+- **File:** `frontend/src/components/custom-report/report-results.tsx:55-70`
+- **Severity:** Warning
+- **Category:** Type safety
+- **Current code:**
+  ```typescript
+  function formatCell(value: unknown, colName?: string): string {
+    // ...
+    return value.toLocaleString("en-EG", { maximumFractionDigits: 1 });
+  }
+  ```
+- **Why it matters:** If `value` is an object, array, or undefined, `.toLocaleString()` may produce `"[object Object]"` or throw. Should add `typeof value === "number"` guard.
+- **Suggested fix:**
+  ```typescript
+  if (typeof value !== "number") return String(value ?? "");
+  ```
+
+#### 🟡 [FE-6] `formatCompact()` uses inconsistent decimal places for M vs K
+- **File:** `frontend/src/lib/formatters.ts:33-37`
+- **Severity:** Warning
+- **Category:** Display inconsistency
+- **Current code:**
+  ```typescript
+  if (Math.abs(value) >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`;
+  if (Math.abs(value) >= 1_000) return `${(value / 1_000).toFixed(0)}K`;
+  ```
+- **Why it matters:** Millions get 1 decimal (1.2M) but thousands get 0 (12K, not 12.3K). Minor cosmetic inconsistency.
+
+#### 🟢 [FE-7] `comparison-kpi.tsx` no NaN guard on delta when both values are 0
+- **File:** `frontend/src/components/comparison/comparison-kpi.tsx:15-17`
+- **Severity:** Suggestion
+- **Category:** Edge case
+- **Current code:**
+  ```typescript
+  const delta = previousValue !== 0
+    ? ((currentValue - previousValue) / previousValue) * 100
+    : 0;
+  ```
+- **Why it matters:** Correctly handles division by zero (returns 0), but when both are 0, shows "0.0% ↑" which could be misleading. Consider showing "—" or "N/A" instead.
+
+### Verified Correct (no issues)
+- **Progress ring SVG math:** `target-progress.tsx` — circumference, offset, clamping to [0, 150] all correct
+- **Return rate gauge:** Normalization and angle interpolation correct
+- **Count-up animation:** Easing function `easeOutExpo`, progress clamping, interpolation all correct
+- **Comparison period dates:** `use-comparison-trend.ts` — millisecond date math correct
+- **Target progress:** Division-by-zero guard (`m.target > 0`), height clamped to 100%
+- **Ranking table:** `Math.min(item.pct_of_total, 100)` correctly clamps bar width
+- **Radar comparison:** `Math.max(..., 1)` in maxValues prevents division by zero
+- **Staff leaderboard:** `Math.max(...items.map(i => i.value), 1)` — safe
+- **RFM matrix:** `reduce` sum with 0 initial — correct
+- **Report summary:** Empty array guard before average calculation
+- **Goals overview:** Same progress ring math as target-progress — correct
+- **Number formatters:** `formatCurrency`, `formatPercent`, `formatNumber` — proper locale, null handling
+
+---
