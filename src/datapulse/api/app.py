@@ -1,7 +1,5 @@
 """FastAPI application factory."""
 
-from __future__ import annotations
-
 import time
 import traceback
 import uuid as _uuid
@@ -29,6 +27,7 @@ from datapulse.api.routes import (
     export,
     forecasting,
     health,
+    members,
     notifications,
     onboarding,
     pipeline,
@@ -183,5 +182,7 @@ def create_app() -> FastAPI:
     app.include_router(notifications.router, prefix="/api/v1")
     app.include_router(annotations.router, prefix="/api/v1")
     app.include_router(dashboard_layouts.router, prefix="/api/v1")
+    app.include_router(members.router, prefix="/api/v1")
+    app.include_router(members.sectors_router, prefix="/api/v1")
 
     return app
