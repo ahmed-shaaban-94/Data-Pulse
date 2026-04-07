@@ -72,6 +72,10 @@ class Settings(BaseSettings):
     api_key_roles: list[str] = ["api-reader"]
     default_tenant_id: str = "1"
 
+    # RBAC — comma-separated emails that auto-register as owner/admin
+    owner_emails: list[str] = []  # First login with these emails → "owner" role
+    admin_emails: list[str] = []  # First login with these emails → "admin" role
+
     # Embed token signing
     embed_secret: str = ""
 

@@ -10,6 +10,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from datapulse.api.auth import get_current_user
+from datapulse.config import get_settings
 from datapulse.core.db import get_session_factory
 from datapulse.rbac.models import AccessContext, RoleKey
 from datapulse.rbac.repository import RBACRepository
@@ -34,12 +35,21 @@ def _get_rbac_session(
     return session
 
 
+def _build_rbac_service(session: Session) -> RBACService:
+    settings = get_settings()
+    repo = RBACRepository(session)
+    return RBACService(
+        repo,
+        owner_emails=settings.owner_emails,
+        admin_emails=settings.admin_emails,
+    )
+
+
 def get_rbac_service(
     user: Annotated[dict[str, Any], Depends(get_current_user)],
 ) -> RBACService:
     session = _get_rbac_session(user)
-    repo = RBACRepository(session)
-    return RBACService(repo)
+    return _build_rbac_service(session)
 
 
 def get_access_context(
@@ -54,8 +64,7 @@ def get_access_context(
     """
     session = _get_rbac_session(user)
     try:
-        repo = RBACRepository(session)
-        service = RBACService(repo)
+        service = _build_rbac_service(session)
 
         tenant_id = int(user.get("tenant_id", "1"))
         user_id = user.get("sub", "")

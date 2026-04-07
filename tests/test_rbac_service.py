@@ -100,31 +100,72 @@ class TestEnsureMemberExists:
         result = service.ensure_member_exists(1, "auth0|123", "test@example.com", "Test")
         repo.accept_invite.assert_called_once()
 
-    def test_first_member_becomes_owner(self):
+    def test_owner_email_gets_owner_role(self):
         repo = MagicMock()
         repo.get_member_by_user_id.return_value = None
         repo.get_member_by_email.return_value = None
-        repo.count_members.return_value = 0
         repo.create_member.return_value = _make_member(role_key="owner")
 
-        service = RBACService(repo)
-        service.ensure_member_exists(1, "auth0|123", "test@example.com", "Test")
+        service = RBACService(repo, owner_emails=["boss@company.com"])
+        service.ensure_member_exists(1, "auth0|123", "boss@company.com", "Boss")
         repo.create_member.assert_called_once_with(
             tenant_id=1,
             user_id="auth0|123",
-            email="test@example.com",
-            display_name="Test",
+            email="boss@company.com",
+            display_name="Boss",
             role_key="owner",
         )
 
-    def test_subsequent_member_becomes_viewer(self):
+    def test_admin_email_gets_admin_role(self):
         repo = MagicMock()
         repo.get_member_by_user_id.return_value = None
         repo.get_member_by_email.return_value = None
-        repo.count_members.return_value = 3
+        repo.create_member.return_value = _make_member(role_key="admin")
+
+        service = RBACService(repo, admin_emails=["manager@company.com"])
+        service.ensure_member_exists(1, "auth0|123", "manager@company.com", "Manager")
+        repo.create_member.assert_called_once_with(
+            tenant_id=1,
+            user_id="auth0|123",
+            email="manager@company.com",
+            display_name="Manager",
+            role_key="admin",
+        )
+
+    def test_unknown_email_gets_viewer_role(self):
+        repo = MagicMock()
+        repo.get_member_by_user_id.return_value = None
+        repo.get_member_by_email.return_value = None
         repo.create_member.return_value = _make_member()
 
-        service = RBACService(repo)
+        service = RBACService(repo, owner_emails=["boss@co.com"], admin_emails=["mgr@co.com"])
+        service.ensure_member_exists(1, "auth0|123", "random@example.com", "Random")
+        repo.create_member.assert_called_once_with(
+            tenant_id=1,
+            user_id="auth0|123",
+            email="random@example.com",
+            display_name="Random",
+            role_key="viewer",
+        )
+
+    def test_email_matching_is_case_insensitive(self):
+        repo = MagicMock()
+        repo.get_member_by_user_id.return_value = None
+        repo.get_member_by_email.return_value = None
+        repo.create_member.return_value = _make_member(role_key="owner")
+
+        service = RBACService(repo, owner_emails=["Boss@Company.com"])
+        service.ensure_member_exists(1, "auth0|123", "boss@company.com", "Boss")
+        repo.create_member.assert_called_once()
+        assert repo.create_member.call_args.kwargs["role_key"] == "owner"
+
+    def test_no_config_defaults_to_viewer(self):
+        repo = MagicMock()
+        repo.get_member_by_user_id.return_value = None
+        repo.get_member_by_email.return_value = None
+        repo.create_member.return_value = _make_member()
+
+        service = RBACService(repo)  # No owner_emails or admin_emails
         service.ensure_member_exists(1, "auth0|123", "test@example.com", "Test")
         repo.create_member.assert_called_once_with(
             tenant_id=1,

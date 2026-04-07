@@ -24,8 +24,15 @@ logger = structlog.get_logger()
 class RBACService:
     """Business logic for RBAC operations."""
 
-    def __init__(self, repo: RBACRepository) -> None:
+    def __init__(
+        self,
+        repo: RBACRepository,
+        owner_emails: list[str] | None = None,
+        admin_emails: list[str] | None = None,
+    ) -> None:
         self._repo = repo
+        self._owner_emails = {e.lower() for e in (owner_emails or [])}
+        self._admin_emails = {e.lower() for e in (admin_emails or [])}
 
     # ── Access Context ───────────────────────────────────────
 
@@ -58,9 +65,26 @@ class RBACService:
             is_admin=role_key in ("owner", "admin"),
         )
 
-    def ensure_member_exists(self, tenant_id: int, user_id: str, email: str, name: str) -> dict:
-        """Auto-register a user as a member on first login (viewer role).
+    def _resolve_auto_role(self, email: str) -> RoleKey:
+        """Determine the role for a new user based on configured email lists.
 
+        Priority:
+        1. Email in OWNER_EMAILS → "owner"
+        2. Email in ADMIN_EMAILS → "admin"
+        3. Otherwise → "viewer"
+        """
+        lower = email.lower()
+        if lower in self._owner_emails:
+            return "owner"
+        if lower in self._admin_emails:
+            return "admin"
+        return "viewer"
+
+    def ensure_member_exists(self, tenant_id: int, user_id: str, email: str, name: str) -> dict:
+        """Auto-register a user as a member on first login.
+
+        Role is determined by OWNER_EMAILS / ADMIN_EMAILS env variables.
+        If the user's email isn't in either list, they get "viewer" role.
         Called from the auth dependency to ensure every authenticated user
         has a tenant_members record. Returns the member dict.
         """
@@ -73,15 +97,17 @@ class RBACService:
         if invited and not invited.get("accepted_at"):
             return self._repo.accept_invite(invited["member_id"], user_id) or invited
 
-        # Auto-register as viewer
-        count = self._repo.count_members(tenant_id)
-        role = "owner" if count == 0 else "viewer"
+        # Determine role from config
+        role = self._resolve_auto_role(email)
         logger.info(
             "auto_register_member",
             tenant_id=tenant_id,
             user_id=user_id,
             email=email,
             role=role,
+            reason="owner_emails" if role == "owner" else (
+                "admin_emails" if role == "admin" else "default"
+            ),
         )
         return self._repo.create_member(
             tenant_id=tenant_id,
