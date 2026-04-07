@@ -22,7 +22,7 @@ export interface LineageGraph {
 export function useLineage() {
   const { data, error, isLoading } = useSWR<LineageGraph>(
     "/api/v1/lineage/graph",
-    () => fetchAPI<LineageGraph>("/lineage/graph"),
+    () => fetchAPI<LineageGraph>("/api/v1/lineage/graph"),
   );
 
   return {

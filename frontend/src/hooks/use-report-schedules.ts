@@ -21,7 +21,7 @@ export interface ReportSchedule {
 export function useReportSchedules() {
   const { data, error, isLoading, mutate } = useSWR<ReportSchedule[]>(
     "/api/v1/report-schedules",
-    () => fetchAPI<ReportSchedule[]>("/report-schedules"),
+    () => fetchAPI<ReportSchedule[]>("/api/v1/report-schedules"),
   );
 
   const createSchedule = async (body: {
@@ -31,7 +31,7 @@ export function useReportSchedules() {
     recipients: string[];
     enabled?: boolean;
   }) => {
-    await postAPI<ReportSchedule>("/report-schedules", body);
+    await postAPI<ReportSchedule>("/api/v1/report-schedules", body);
     mutate();
   };
 

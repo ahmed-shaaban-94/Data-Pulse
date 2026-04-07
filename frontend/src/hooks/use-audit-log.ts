@@ -39,8 +39,8 @@ export function useAuditLog(filters: AuditLogFilters = {}) {
   );
 
   const { data, error, isLoading, mutate } = useSWR<AuditLogPage>(
-    swrKey("/audit-log", params),
-    () => fetchAPI<AuditLogPage>("/audit-log", params),
+    swrKey("/api/v1/audit-log", params),
+    () => fetchAPI<AuditLogPage>("/api/v1/audit-log", params),
   );
 
   return {

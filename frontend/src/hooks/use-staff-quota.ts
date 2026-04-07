@@ -24,8 +24,8 @@ export function useStaffQuota(year?: number, month?: number) {
   if (month) params.month = String(month);
 
   const { data, error, isLoading } = useSWR<StaffQuota[]>(
-    swrKey("/analytics/staff/quota", params),
-    () => fetchAPI<StaffQuota[]>("/analytics/staff/quota", params),
+    swrKey("/api/v1/analytics/staff/quota", params),
+    () => fetchAPI<StaffQuota[]>("/api/v1/analytics/staff/quota", params),
   );
 
   return { data: data ?? [], error, isLoading };

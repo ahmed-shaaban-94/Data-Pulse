@@ -22,8 +22,8 @@ export function useChurnPredictions(riskLevel?: string, limit = 50) {
   if (riskLevel) params.risk_level = riskLevel;
 
   const { data, error, isLoading } = useSWR<ChurnPrediction[]>(
-    swrKey("/analytics/customers/churn", params),
-    () => fetchAPI<ChurnPrediction[]>("/analytics/customers/churn", params),
+    swrKey("/api/v1/analytics/customers/churn", params),
+    () => fetchAPI<ChurnPrediction[]>("/api/v1/analytics/customers/churn", params),
   );
 
   return { data: data ?? [], error, isLoading };

@@ -23,8 +23,8 @@ export interface QualityScorecard {
 
 export function useQualityScorecard(limit = 20) {
   const { data, error, isLoading } = useSWR<QualityScorecard>(
-    swrKey("/pipeline/quality/scorecard", { limit }),
-    () => fetchAPI<QualityScorecard>("/pipeline/quality/scorecard", { limit }),
+    swrKey("/api/v1/pipeline/quality/scorecard", { limit }),
+    () => fetchAPI<QualityScorecard>("/api/v1/pipeline/quality/scorecard", { limit }),
   );
 
   return {

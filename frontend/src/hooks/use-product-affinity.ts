@@ -13,8 +13,8 @@ export interface AffinityPair {
 
 export function useProductAffinity(productKey: number | undefined) {
   const { data, error, isLoading } = useSWR<AffinityPair[]>(
-    productKey ? swrKey(`/analytics/products/${productKey}/affinity`, {}) : null,
-    () => fetchAPI<AffinityPair[]>(`/analytics/products/${productKey}/affinity`),
+    productKey ? swrKey(`/api/v1/analytics/products/${productKey}/affinity`, {}) : null,
+    () => fetchAPI<AffinityPair[]>(`/api/v1/analytics/products/${productKey}/affinity`),
   );
 
   return { data: data ?? [], error, isLoading };
