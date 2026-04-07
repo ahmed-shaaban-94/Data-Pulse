@@ -22,7 +22,9 @@ from datapulse.api.routes import (
     analytics,
     annotations,
     anomalies,
+    audit,
     billing,
+    lineage,
     dashboard_layouts,
     embed,
     explore,
@@ -34,9 +36,12 @@ from datapulse.api.routes import (
     onboarding,
     pipeline,
     queries,
+    report_schedules,
     reports,
+    scenarios,
     search,
     targets,
+    upload,
     views,
 )
 from datapulse.config import get_settings
@@ -186,5 +191,10 @@ def create_app() -> FastAPI:
     app.include_router(dashboard_layouts.router, prefix="/api/v1")
     app.include_router(members.router, prefix="/api/v1")
     app.include_router(members.sectors_router, prefix="/api/v1")
+    app.include_router(audit.router, prefix="/api/v1")
+    app.include_router(lineage.router, prefix="/api/v1")
+    app.include_router(report_schedules.router, prefix="/api/v1")
+    app.include_router(upload.router, prefix="/api/v1")
+    app.include_router(scenarios.router, prefix="/api/v1")
 
     return app
