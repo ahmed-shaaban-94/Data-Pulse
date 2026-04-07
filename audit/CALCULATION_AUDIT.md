@@ -5,10 +5,10 @@
 
 ## Summary
 
-- 🔴 Critical: **7**
-- 🟡 Warnings: **16**
+- 🔴 Critical: **9**
+- 🟡 Warnings: **20**
 - 🟢 Suggestions: **7**
-- **Total findings: 30**
+- **Total findings: 36**
 
 | Layer | 🔴 | 🟡 | 🟢 | Files |
 |-------|-----|-----|-----|-------|
@@ -16,7 +16,7 @@
 | Pipeline & Forecasting | 1 | 3 | 1 | 6 |
 | Python Analytics | 4 | 5 | 2 | 14 |
 | dbt SQL Models | 0 | 4 | 2 | 26+7 |
-| Frontend (Next.js) | 1 | 5 | 1 | 35 |
+| Frontend (Next.js) | 3 | 9 | 1 | 35 |
 | Power BI DAX | 1 | 3 | 2 | 12 |
 
 ---
@@ -648,7 +648,80 @@
 - **RFM matrix:** `reduce` sum with 0 initial — correct
 - **Report summary:** Empty array guard before average calculation
 - **Goals overview:** Same progress ring math as target-progress — correct
-- **Number formatters:** `formatCurrency`, `formatPercent`, `formatNumber` — proper locale, null handling
+- **Number formatters:** `formatCurrency`, `formatNumber` — proper locale, null handling
+
+### Additional Findings (from deep agent audit)
+
+#### 🔴 [FE-8] `formatPercent` misused for absolute percentages — adds unwanted "+" prefix
+- **File:** Multiple:
+  - `frontend/src/app/(app)/dashboard/report/page.tsx:100,118,137` — `formatPercent(item.pct_of_total)` shows "+15.2%" for "15.2% of total"
+  - `frontend/src/components/dashboard/forecast-card.tsx:54` — `formatPercent(data.mape)` shows "+12.3%" for MAPE error magnitude
+  - `frontend/src/components/dashboard/target-progress.tsx:143` — `formatPercent(ytdPct)` shows "+85.0%" for 85% achievement
+  - `frontend/src/components/goals/goals-overview.tsx:33,90,240,314` — achievement percentages with "+"
+- **Severity:** Critical
+- **Category:** Semantic formatting error
+- **Current code:**
+  ```typescript
+  // formatters.ts:19
+  export function formatPercent(value: number) {
+    return `${value > 0 ? "+" : ""}${value.toFixed(1)}%`;
+  }
+  ```
+- **Why it's wrong:** `formatPercent` is designed for growth deltas ("+5.2%", "-3.1%"). Using it for absolute percentages (market share, achievement, MAPE) adds a misleading "+" prefix. A 25% market share shows as "+25.0%". A MAPE of 12% shows as "+12.3%".
+- **Suggested fix:** Create `formatAbsolutePercent`:
+  ```typescript
+  export function formatAbsolutePercent(value: number | null | undefined): string {
+    if (value === null || value === undefined) return "N/A";
+    return `${value.toFixed(1)}%`;
+  }
+  ```
+- **Test to add:** Vitest: assert `formatAbsolutePercent(25)` returns `"25.0%"` not `"+25.0%"`.
+
+#### 🔴 [FE-9] Double "++" prefix in forecast growing products
+- **File:** `frontend/src/components/dashboard/forecast-card.tsx:93`
+- **Severity:** Critical
+- **Category:** Display bug
+- **Current code:**
+  ```typescript
+  +{formatPercent(p.forecast_change_pct)}
+  ```
+- **Why it's wrong:** Template has literal `+`, then `formatPercent` adds another `+`. A 15% growth renders as `++15.0%`.
+- **Suggested fix:** Remove the hardcoded `+`: `{formatPercent(p.forecast_change_pct)}`
+
+#### 🟡 [FE-10] DayHero `Math.abs` + `formatPercent` contradicts arrow direction
+- **File:** `frontend/src/components/dashboard/day-hero.tsx:38`
+- **Severity:** Warning
+- **Category:** Contradictory visual cues
+- **Current code:**
+  ```typescript
+  {formatPercent(Math.abs(momGrowth))} vs last month
+  ```
+- **Why it matters:** `Math.abs` makes value positive, then `formatPercent` adds "+". A -15% decline shows as "+15.0% vs last month" with a red down arrow. The "+" contradicts the red/down visual.
+- **Suggested fix:** `${Math.abs(momGrowth).toFixed(1)}% vs last month` — no sign since arrow shows direction.
+
+#### 🟡 [FE-11] CSV download doesn't escape double quotes in cell values
+- **File:** `frontend/src/components/custom-report/report-results.tsx:208-211`
+- **Severity:** Warning
+- **Category:** Data corruption
+- **Current code:**
+  ```typescript
+  if (typeof cell === "string" && cell.includes(",")) return `"${cell}"`;
+  ```
+- **Why it matters:** If cell contains commas AND quotes (e.g., `Dr. Ahmed, "The Best"`), wrapping without escaping inner quotes produces malformed CSV.
+- **Suggested fix:** `return \`"${cell.replace(/"/g, '""')}"\`;` and also wrap if cell contains quotes or newlines.
+
+#### 🟡 [FE-12] NaN propagation in useCountUp when numericValue is NaN
+- **File:** `frontend/src/hooks/use-count-up.ts:37-48` via `frontend/src/components/dashboard/kpi-card.tsx:46`
+- **Severity:** Warning
+- **Category:** Edge case
+- **Why it matters:** `KPICard` checks `null`/`undefined` but not `NaN`. If API returns a non-parseable value, every animation frame renders "NaN" in the KPI card.
+- **Suggested fix:** Add `Number.isNaN(numericValue)` guard.
+
+#### 🟡 [FE-13] Inconsistent locale: `"ar-EG-u-nu-latn"` vs `"en-EG"` vs browser default
+- **File:** `frontend/src/lib/formatters.ts` vs `frontend/src/components/custom-report/report-results.tsx:62` vs `frontend/src/app/(app)/reports/page.tsx:252`
+- **Severity:** Warning
+- **Category:** Inconsistent formatting
+- **Why it matters:** Main formatters use `"ar-EG-u-nu-latn"`, report pages use `"en-EG"`, some components use no locale (browser default). The same number may format differently across pages.
 
 ---
 
