@@ -77,10 +77,8 @@ def _patch_get_settings_globally():
 
     patches = [patch(t, return_value=clean_settings) for t in _always_patch]
     for t in _optional_patch:
-        try:
+        with contextlib.suppress(AttributeError, ModuleNotFoundError):
             patches.append(patch(t, return_value=clean_settings))
-        except (AttributeError, ModuleNotFoundError):
-            pass  # Module not importable — skip this patch
 
     with contextlib.ExitStack() as stack:
         for p in patches:

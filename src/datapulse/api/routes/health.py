@@ -130,10 +130,7 @@ def health_check(request: Request) -> JSONResponse:
     status_code = 200 if overall == "healthy" else 503
 
     # Only expose component details to callers with a valid auth header
-    has_auth = bool(
-        request.headers.get("authorization")
-        or request.headers.get("x-api-key")
-    )
+    has_auth = bool(request.headers.get("authorization") or request.headers.get("x-api-key"))
     content: dict = {"status": overall}
     if has_auth:
         content["checks"] = checks
