@@ -359,3 +359,133 @@
 - `src/datapulse/bronze/loader.py` — data loading, correct batch progress calculation
 
 ---
+
+## LAYER 4: dbt SQL Models ✅
+
+### Files Audited
+- `dbt/models/staging/stg_sales.sql`
+- `dbt/models/bronze/bronze_sales.sql`
+- `dbt/models/marts/facts/fct_sales.sql`
+- `dbt/models/marts/dims/dim_date.sql`, `dim_customer.sql`, `dim_product.sql`, `dim_staff.sql`, `dim_site.sql`, `dim_billing.sql`
+- `dbt/models/marts/aggs/agg_sales_daily.sql`, `agg_sales_monthly.sql`, `agg_sales_by_customer.sql`, `agg_sales_by_product.sql`, `agg_sales_by_staff.sql`, `agg_sales_by_site.sql`, `agg_returns.sql`, `metrics_summary.sql`
+- `dbt/models/marts/features/feat_customer_segments.sql`, `feat_customer_health.sql`, `feat_product_lifecycle.sql`, `feat_revenue_daily_rolling.sql`, `feat_revenue_site_rolling.sql`, `feat_seasonality_daily.sql`, `feat_seasonality_monthly.sql`
+- `dbt/macros/governorate_map.sql`
+- `dbt/tests/assert_unknown_dimension_below_threshold.sql`
+- All schema YAML files
+
+### Findings
+
+#### 🟡 [DBT-1] `feat_customer_health.sql` recomputes weighted health score 5 times in CASE WHEN
+- **File:** `dbt/models/marts/features/feat_customer_health.sql:160-173`
+- **Severity:** Warning
+- **Category:** Repeated calculation / maintainability risk
+- **Current code:**
+  ```sql
+  -- Line 160: computed once
+  (recency_score * 0.30 + frequency_score * 0.25 + monetary_score * 0.25
+   + return_score * 0.10 + diversity_score * 0.10) AS health_score,
+
+  -- Lines 169-173: recomputed 4 times in CASE WHEN
+  CASE
+    WHEN (recency_score * 0.30 + ...) >= 80 THEN 'Excellent'
+    WHEN (recency_score * 0.30 + ...) >= 60 THEN 'Good'
+    WHEN (recency_score * 0.30 + ...) >= 40 THEN 'Fair'
+    ELSE 'Poor'
+  END AS health_band
+  ```
+- **Why it matters:** The exact same 5-term weighted formula is written 5 times. If weights change (e.g., recency from 0.30 to 0.35), all 5 must be updated. One missed update = wrong health band classification. PostgreSQL cannot reference a column alias in the same SELECT.
+- **Suggested fix:** Wrap in a CTE:
+  ```sql
+  , scored AS (
+    SELECT *, (recency_score * 0.30 + ...) AS health_score
+    FROM ...
+  )
+  SELECT *,
+    CASE WHEN health_score >= 80 THEN 'Excellent' ... END AS health_band
+  FROM scored
+  ```
+- **Test to add:** `test_health_band_matches_health_score` — verify band thresholds match score.
+
+#### 🟡 [DBT-2] Quantity precision inconsistency: `NUMERIC(18,4)` vs `ROUND(..., 2)` across aggregations
+- **File:** `dbt/models/marts/aggs/agg_sales_daily.sql:28` vs `agg_sales_by_site.sql:30` vs `agg_sales_by_staff.sql:30`
+- **Severity:** Warning
+- **Category:** Inconsistent precision
+- **Current code:**
+  ```sql
+  -- agg_sales_daily.sql:28 — 4 decimal precision
+  SUM(f.quantity)::NUMERIC(18,4) AS total_quantity,
+
+  -- agg_sales_by_site.sql:30 — 2 decimal precision
+  ROUND(SUM(f.quantity)::NUMERIC, 2) AS total_quantity,
+
+  -- agg_sales_by_staff.sql:30 — 2 decimal precision
+  ROUND(SUM(f.quantity)::NUMERIC, 2) AS total_quantity,
+  ```
+- **Why it matters:** If a product has quantity 0.3333 per unit, the daily agg preserves it as 0.3333 but site/staff aggs round to 0.33. Month-level totals could differ by up to 0.005 per row × thousands of rows.
+- **Suggested fix:** Use `SUM(f.quantity)::NUMERIC(18,4)` everywhere.
+
+#### 🟡 [DBT-3] `agg_sales_monthly.return_rate` has no dbt test — no bounds, no not_null
+- **File:** `dbt/models/marts/aggs/_aggs__models.yml:167-168`
+- **Severity:** Warning
+- **Category:** Missing dbt test for critical business metric
+- **Current code:**
+  ```yaml
+  - name: return_rate
+    description: "Ratio of returns to total transactions"
+    # NO TESTS
+  ```
+- **Why it matters:** `return_rate` is consumed by multiple Python endpoints, some multiplying by 100, some not (see PY-2). A NULL or negative return_rate would cascade through the analytics layer silently.
+- **Suggested fix:** Add tests:
+  ```yaml
+  - name: return_rate
+    tests:
+      - dbt_utils.accepted_range:
+          min_value: 0
+          max_value: 1
+          inclusive: true
+  ```
+- **Test to add:** Singular test asserting no return_rate exceeds 1.0 or is negative.
+
+#### 🟡 [DBT-4] `metrics_summary.daily_transactions` includes returns — inconsistent with Python layer
+- **File:** `dbt/models/marts/aggs/metrics_summary.sql:43`
+- **Severity:** Warning
+- **Category:** Business metric definition mismatch
+- **Current code:**
+  ```sql
+  SUM(a.transaction_count)::INT AS daily_transactions,
+  ```
+- **Why it matters:** This is the root cause of PY-1. `transaction_count` in `agg_sales_daily` = `COUNT(*)` including return rows. The metrics_summary passes this value to the Python layer, which sometimes uses it as-is (including returns) and sometimes subtracts returns manually. The definition should be consistent at the SQL level.
+- **Suggested fix:** Either: (a) rename to `daily_total_transactions` and add `daily_net_transactions = SUM(a.transaction_count) - SUM(a.return_count)`, or (b) define `daily_transactions` as net in the SQL.
+
+#### 🟢 [DBT-5] `feat_revenue_daily_rolling` uses 364-day lag for YoY — correct but undocumented
+- **File:** `dbt/models/marts/features/feat_revenue_daily_rolling.sql:100`
+- **Severity:** Suggestion
+- **Category:** Documentation
+- **Current code:**
+  ```sql
+  LAG(r.daily_gross_amount, 364) OVER (...) AS same_day_last_year
+  ```
+- **Why it matters:** Uses 364 (52 weeks × 7) instead of 365 to align same day-of-week. This is correct business practice but should have a comment explaining why.
+
+#### 🟢 [DBT-6] All aggregation models use full table materialization — incremental could improve performance
+- **File:** All `dbt/models/marts/aggs/*.sql`
+- **Severity:** Suggestion
+- **Category:** Performance
+- **Why it matters:** With 2.27M bronze rows and 1.13M fact rows, full table refreshes on every dbt run could be slow. Models like `agg_sales_daily` and `metrics_summary` are good candidates for incremental materialization with `unique_key`.
+
+### Verified Correct (no issues)
+- **Division protection:** All dbt models use `NULLIF(denominator, 0)` consistently
+- **Multi-tenant safety:** All JOINs include `tenant_id`, all window functions `PARTITION BY tenant_id`
+- **Financial precision:** Sales/discounts: `ROUND(..., 2)`, quantities: `NUMERIC(18,4)` (mostly)
+- **Window functions:** Correct `ROWS BETWEEN` frames in metrics_summary, rolling features
+- **Growth rates:** MoM/YoY in `agg_sales_monthly` use proper `NULLIF` protection
+- **RFM NTILE scoring:** `feat_customer_segments.sql:56` — `ORDER BY days_since_last DESC` gives NTILE(1) to oldest (worst), NTILE(5) to most recent (best) — **CORRECT** (comment confirms: "Higher score = better")
+- **Product lifecycle phases:** `feat_product_lifecycle.sql:94-104` — dormant quarter logic with `-1` buffer is **CORRECT** (provides 1-quarter grace period)
+- **Customer health scores:** Recency/frequency/monetary/return/diversity scoring math is sound
+- **Seasonality indices:** DOW and monthly divided by grand average, NULLIF protected
+- **Rolling averages:** 7/30/90-day windows use `ROWS BETWEEN N-1 PRECEDING AND CURRENT ROW` — correct
+- **Date dimension:** Egypt weekend (Fri/Sat) coded as `ISODOW IN (5, 6)` — correct
+- **GROUP BY completeness:** All non-aggregated columns present in GROUP BY across all models
+- **NULL handling:** `COALESCE` used properly for financial defaults, `FILTER (WHERE ...)` for conditional counts
+
+---
