@@ -643,3 +643,120 @@
 - **Number formatters:** `formatCurrency`, `formatPercent`, `formatNumber` — proper locale, null handling
 
 ---
+
+## LAYER 6: Power BI DAX Measures & TMDL ✅
+
+### Files Audited
+- `powerbi/saas_demo.SemanticModel/definition/tables/_Measures.tmdl` (99 DAX measures)
+- `powerbi/saas_demo.SemanticModel/definition/tables/fct_sales.tmdl`
+- `powerbi/saas_demo.SemanticModel/definition/tables/dim_date.tmdl`
+- `powerbi/saas_demo.SemanticModel/definition/tables/dim_customer.tmdl`
+- `powerbi/saas_demo.SemanticModel/definition/tables/dim_product.tmdl`
+- `powerbi/saas_demo.SemanticModel/definition/tables/dim_staff.tmdl`
+- `powerbi/saas_demo.SemanticModel/definition/tables/dim_site.tmdl`
+- `powerbi/saas_demo.SemanticModel/definition/tables/dim_billing.tmdl`
+- `powerbi/saas_demo.SemanticModel/definition/tables/Time Intelligence.tmdl`
+- `powerbi/saas_demo.SemanticModel/definition/tables/_ViewToggle.tmdl`
+- `powerbi/saas_demo.SemanticModel/definition/tables/_KPIDisplayMode.tmdl`
+- `powerbi/saas_demo.SemanticModel/definition/relationships.tmdl`
+
+### Findings
+
+#### 🔴 [PBI-1] Financial columns use `dataType: double` — float for money
+- **File:** `powerbi/saas_demo.SemanticModel/definition/tables/fct_sales.tmdl:66,74,83,92`
+- **Severity:** Critical
+- **Category:** Float for money
+- **Current code:**
+  ```
+  column quantity
+      dataType: double
+
+  column sales
+      dataType: double
+
+  column discount
+      dataType: double
+
+  column net_amount
+      dataType: double
+  ```
+- **Why it's wrong:** The PostgreSQL/dbt layer stores these as `NUMERIC(18,4)` / `ROUND(..., 2)` for exact decimal arithmetic. Power BI's `double` uses IEEE 754 which can produce artifacts like `1234.560000000001`. For financial reporting, this can cause rounding discrepancies: a SUM of 1M rows of doubles may differ from the dbt source by several EGP.
+- **Suggested fix:** Change `dataType: double` to `dataType: decimal` for `sales`, `discount`, `net_amount`, and `quantity`. This maps to Power BI's `Decimal Number` (128-bit) which preserves precision.
+- **Test to add:** Compare Power BI totals against dbt source for the same date range.
+
+#### 🟡 [PBI-2] `Unique Customers` counts unknown customer key (-1) in DISTINCTCOUNT
+- **File:** `powerbi/saas_demo.SemanticModel/definition/tables/_Measures.tmdl:52`
+- **Severity:** Warning
+- **Category:** Business logic
+- **Current code:**
+  ```dax
+  measure 'Unique Customers' = DISTINCTCOUNT(fct_sales[customer_key])
+  ```
+- **Why it matters:** `customer_key = -1` represents "Unknown" customers. DISTINCTCOUNT includes this value, inflating the customer count by 1 for periods with any unknown transactions. Should exclude -1:
+- **Suggested fix:**
+  ```dax
+  measure 'Unique Customers' =
+      CALCULATE(
+          DISTINCTCOUNT(fct_sales[customer_key]),
+          fct_sales[customer_key] <> -1
+      )
+  ```
+
+#### 🟡 [PBI-3] `Revenue vs PY Target %` hardcodes 10% growth target
+- **File:** `powerbi/saas_demo.SemanticModel/definition/tables/_Measures.tmdl:769-774`
+- **Severity:** Warning
+- **Category:** Hardcoded magic number
+- **Current code:**
+  ```dax
+  measure 'Revenue vs PY Target %' =
+      VAR _py = CALCULATE([Net Revenue], SAMEPERIODLASTYEAR(dim_date[full_date]))
+      VAR _target = _py * 1.1
+      RETURN DIVIDE(_current, _target, 0)
+  ```
+- **Why it matters:** The `1.1` (10% growth target) is hardcoded. Different periods, categories, or sites may have different targets. The platform already has a `sales_targets` table for custom targets.
+- **Suggested fix:** Either reference a targets table/parameter or document this as a fixed 10% benchmark.
+
+#### 🟡 [PBI-4] Growth measures use `ABS(_prev)` in denominator — masks sign of base period
+- **File:** `powerbi/saas_demo.SemanticModel/definition/tables/_Measures.tmdl:564,574,596,606,616`
+- **Severity:** Warning
+- **Category:** Business logic edge case
+- **Current code:**
+  ```dax
+  measure 'Revenue MoM %' =
+      VAR _current = [Net Revenue]
+      VAR _prev = CALCULATE([Net Revenue], PREVIOUSMONTH(dim_date[full_date]))
+      RETURN DIVIDE(_current - _prev, ABS(_prev), BLANK())
+  ```
+- **Why it matters:** Using `ABS(_prev)` means if previous month was -100 (net loss) and current is +50, growth = (50 - (-100)) / 100 = +150%. Without ABS, it would be (50 - (-100)) / (-100) = -150%. Both are debatable — `ABS` makes percentage direction always match the change direction, which is arguably more intuitive. This is a design choice but should be documented.
+
+#### 🟢 [PBI-5] Revenue mix percentage measures use REMOVEFILTERS correctly
+- **File:** `powerbi/saas_demo.SemanticModel/definition/tables/_Measures.tmdl:163,173,183,203,213`
+- **Severity:** Suggestion (positive finding)
+- **Details:** All revenue percentage measures (Cash %, Credit %, Delivery %, Insurance %, Walk-in %) correctly use `REMOVEFILTERS(dim_billing)` or `REMOVEFILTERS(fct_sales[is_walk_in])` for the "all" denominator. No `ALL()` vs `REMOVEFILTERS()` confusion. **Well done.**
+
+#### 🟢 [PBI-6] Direction measures could use SIGN() instead of nested IF
+- **File:** `powerbi/saas_demo.SemanticModel/definition/tables/_Measures.tmdl:622-674`
+- **Severity:** Suggestion
+- **Category:** Code simplification
+- **Current code:**
+  ```dax
+  IF(ISBLANK(_p), 0, IF(_c > _p, 1, IF(_c < _p, -1, 0)))
+  ```
+- **Suggested fix:**
+  ```dax
+  IF(ISBLANK(_p), 0, SIGN(_c - _p))
+  ```
+
+### Verified Correct (no issues)
+- **All `DIVIDE()` calls** use proper alternate result (0 or BLANK)
+- **Time intelligence:** `DATESMTD`, `DATESYTD`, `SAMEPERIODLASTYEAR`, `PREVIOUSMONTH` all reference `dim_date[full_date]` — correct date table
+- **Return measures:** Properly filter `fct_sales[is_return]`, use `ABS()` for absolute values
+- **Pareto (Top 20%):** `ROUNDUP(COUNTROWS * 0.2, 0)` with `TOPN` + `SUMX` — correct approach
+- **Staff/Product contribution:** `HASONEVALUE` guard prevents aggregation context errors
+- **RANKX measures:** Use `ALL()` correctly to rank across all items
+- **Data quality measures:** Correctly check for -1 keys, negative non-return quantities, orphan rows
+- **Relationships:** All 6 relationships are fact-to-dim, many-to-one, correct cardinality
+- **Conditional formatting colors:** Proper threshold cascading in `SWITCH(TRUE(), ...)`
+- **Display folders:** Well-organized: Core KPIs, Revenue Mix, Returns, Customer/Product/Staff Analytics, Time Intelligence, Conditional Formatting, Data Quality, Report Helpers
+
+---
