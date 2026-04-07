@@ -43,7 +43,7 @@ async def upload_files(request: Request, files: list[UploadFile]) -> list[Upload
             result = _service.save_temp_file(f.filename, content)
             results.append(result)
         except ValueError as e:
-            raise HTTPException(422, str(e))
+            raise HTTPException(422, str(e)) from e
     return results
 
 
@@ -53,8 +53,8 @@ def preview_file(request: Request, file_id: str) -> PreviewResult:
     """Preview first 100 rows of an uploaded file."""
     try:
         return _service.preview_file(file_id)
-    except FileNotFoundError:
-        raise HTTPException(404, "File not found")
+    except FileNotFoundError as e:
+        raise HTTPException(404, "File not found") from e
 
 
 @router.post("/confirm", response_model=ConfirmResponse)

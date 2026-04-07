@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback, useRef } from "react";
-import { Responsive, WidthProvider } from "react-grid-layout";
+import { ResponsiveGridLayout, type Layout } from "react-grid-layout";
 import {
   Save,
   Plus,
@@ -22,7 +22,7 @@ import {
 
 import "react-grid-layout/css/styles.css";
 
-const ResponsiveGridLayout = WidthProvider(Responsive);
+
 
 function WidgetPickerPanel({
   open,
@@ -249,15 +249,15 @@ export default function MyDashboardPage() {
         </div>
       ) : (
         <ResponsiveGridLayout
+          width={0}
           className="layout"
           layouts={{ lg: layout }}
           breakpoints={{ lg: 1024, md: 768, sm: 480, xs: 0 }}
           cols={{ lg: 4, md: 3, sm: 2, xs: 1 }}
           rowHeight={100}
-          isDraggable={!locked}
-          isResizable={!locked}
-          onLayoutChange={(newLayout) => handleLayoutChange(newLayout as LayoutItem[])}
-          draggableHandle=".drag-handle"
+          dragConfig={{ enabled: !locked, handle: ".drag-handle" }}
+          resizeConfig={{ enabled: !locked }}
+          onLayoutChange={(newLayout: Layout) => handleLayoutChange(newLayout as LayoutItem[])}
           margin={[12, 12]}
         >
           {layout.map((item) => (

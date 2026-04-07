@@ -46,9 +46,7 @@ def parse_lineage(dbt_dir: Path | None = None) -> LineageGraph:
     for sql_file in sorted(base.rglob("*.sql")):
         model_name = sql_file.stem
         layer, model_type = _classify_model(model_name)
-        nodes_map[model_name] = LineageNode(
-            name=model_name, layer=layer, model_type=model_type
-        )
+        nodes_map[model_name] = LineageNode(name=model_name, layer=layer, model_type=model_type)
 
         content = sql_file.read_text(encoding="utf-8", errors="ignore")
         for match in _REF_PATTERN.finditer(content):
@@ -56,9 +54,7 @@ def parse_lineage(dbt_dir: Path | None = None) -> LineageGraph:
             # Ensure upstream node exists
             if upstream not in nodes_map:
                 up_layer, up_type = _classify_model(upstream)
-                nodes_map[upstream] = LineageNode(
-                    name=upstream, layer=up_layer, model_type=up_type
-                )
+                nodes_map[upstream] = LineageNode(name=upstream, layer=up_layer, model_type=up_type)
             edges.append(LineageEdge(source=upstream, target=model_name))
 
     return LineageGraph(

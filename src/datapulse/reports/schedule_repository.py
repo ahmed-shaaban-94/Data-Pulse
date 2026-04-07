@@ -54,18 +54,26 @@ class ScheduleRepository:
             INSERT INTO public.report_schedules
                 (name, report_type, cron_expression, recipients, parameters, enabled)
             VALUES
-                (:name, :report_type, :cron_expression, :recipients::jsonb, :parameters::jsonb, :enabled)
+                (:name, :report_type, :cron_expression,
+                 :recipients::jsonb, :parameters::jsonb, :enabled)
             RETURNING id, name, report_type, cron_expression, recipients,
                       parameters, enabled, last_run_at, created_at, updated_at
         """)
-        row = self._session.execute(stmt, {
-            "name": data.name,
-            "report_type": data.report_type,
-            "cron_expression": data.cron_expression,
-            "recipients": json.dumps(data.recipients),
-            "parameters": json.dumps(data.parameters),
-            "enabled": data.enabled,
-        }).mappings().first()
+        row = (
+            self._session.execute(
+                stmt,
+                {
+                    "name": data.name,
+                    "report_type": data.report_type,
+                    "cron_expression": data.cron_expression,
+                    "recipients": json.dumps(data.recipients),
+                    "parameters": json.dumps(data.parameters),
+                    "enabled": data.enabled,
+                },
+            )
+            .mappings()
+            .first()
+        )
         self._session.flush()
         return self._row_to_response(dict(row))
 

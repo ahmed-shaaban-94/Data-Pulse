@@ -83,16 +83,20 @@ class ScenarioService:
             proj_cost = base_cost * cost_mult * volume_mult
             proj_margin = proj_rev - proj_cost
 
-            revenue_series.append(TimePoint(
-                month=row["month"],
-                baseline=base_rev,
-                projected=proj_rev,
-            ))
-            margin_series.append(TimePoint(
-                month=row["month"],
-                baseline=base_margin,
-                projected=proj_margin,
-            ))
+            revenue_series.append(
+                TimePoint(
+                    month=row["month"],
+                    baseline=base_rev,
+                    projected=proj_rev,
+                )
+            )
+            margin_series.append(
+                TimePoint(
+                    month=row["month"],
+                    baseline=base_margin,
+                    projected=proj_margin,
+                )
+            )
 
         return ScenarioResult(
             revenue_series=revenue_series,
@@ -106,9 +110,7 @@ class ScenarioService:
         base_total = sum(p.baseline for p in series)
         proj_total = sum(p.projected for p in series)
         abs_change = proj_total - base_total
-        pct_change = (
-            float(abs_change / base_total * _HUNDRED) if base_total else 0.0
-        )
+        pct_change = float(abs_change / base_total * _HUNDRED) if base_total else 0.0
         return ImpactSummary(
             baseline_total=base_total,
             projected_total=proj_total,

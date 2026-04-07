@@ -18,19 +18,23 @@ class AffinityRepository:
         """Get top co-purchased products for a given product."""
         stmt = text("""
             SELECT
-                CASE WHEN product_key_a = :pk THEN product_key_b ELSE product_key_a END AS related_key,
-                CASE WHEN product_key_a = :pk THEN product_name_b ELSE product_name_a END AS related_name,
+                CASE WHEN product_key_a = :pk
+                     THEN product_key_b ELSE product_key_a
+                END AS related_key,
+                CASE WHEN product_key_a = :pk
+                     THEN product_name_b ELSE product_name_a
+                END AS related_name,
                 co_occurrence_count,
                 support_pct,
-                CASE WHEN product_key_a = :pk THEN confidence_a_to_b ELSE confidence_b_to_a END AS confidence
+                CASE WHEN product_key_a = :pk
+                     THEN confidence_a_to_b ELSE confidence_b_to_a
+                END AS confidence
             FROM public_marts.feat_product_affinity
             WHERE product_key_a = :pk OR product_key_b = :pk
             ORDER BY co_occurrence_count DESC
             LIMIT :limit
         """)
-        rows = self._session.execute(
-            stmt, {"pk": product_key, "limit": limit}
-        ).mappings().all()
+        rows = self._session.execute(stmt, {"pk": product_key, "limit": limit}).mappings().all()
         return [dict(r) for r in rows]
 
     def get_top_pairs(self, limit: int = 20) -> list[dict]:

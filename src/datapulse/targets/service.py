@@ -8,6 +8,7 @@ from datapulse.targets.models import (
     AlertConfigResponse,
     AlertLogResponse,
     BudgetSummary,
+    QuarterlySummary,
     TargetCreate,
     TargetResponse,
     TargetSummary,
@@ -62,10 +63,8 @@ class TargetsService:
         log.info("service_target_summary", year=year)
         return self._repo.get_target_vs_actual(year)
 
-    def get_quarterly_summary(self, year: int) -> "QuarterlySummary":
+    def get_quarterly_summary(self, year: int) -> QuarterlySummary:
         """Get quarterly target vs actual summary for a year."""
-        from datapulse.targets.models import QuarterlySummary
-
         log.info("service_quarterly_summary", year=year)
         return self._repo.get_quarterly_summary(year)
 

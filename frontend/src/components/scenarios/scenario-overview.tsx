@@ -2,15 +2,15 @@
 
 import { useState } from "react";
 import {
-  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, Legend, Area, ComposedChart,
+  Line, XAxis, YAxis, CartesianGrid, Tooltip,
+  ResponsiveContainer, Legend, ComposedChart,
 } from "recharts";
 import { useChartTheme } from "@/hooks/use-chart-theme";
 import { useScenario, type Adjustment } from "@/hooks/use-scenario";
 import { LoadingCard } from "@/components/loading-card";
 import { ChartCard } from "@/components/shared/chart-card";
-import { formatCurrency, formatPercent } from "@/lib/formatters";
-import { Play, RotateCcw, TrendingUp, TrendingDown, DollarSign, Percent } from "lucide-react";
+import { formatCurrency } from "@/lib/formatters";
+import { Play, RotateCcw, TrendingUp, TrendingDown, Percent } from "lucide-react";
 
 function SliderInput({
   label,
@@ -191,12 +191,12 @@ export function ScenarioOverview() {
           <ChartCard title="Revenue: Baseline vs Projected">
             <ResponsiveContainer width="100%" height={300}>
               <ComposedChart data={result.revenue_series}>
-                <CartesianGrid strokeDasharray="3 3" stroke={theme.grid} />
-                <XAxis dataKey="month" tick={{ fill: theme.text, fontSize: 12 }} />
-                <YAxis tick={{ fill: theme.text, fontSize: 12 }} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
+                <CartesianGrid strokeDasharray="3 3" stroke={theme.gridStroke} />
+                <XAxis dataKey="month" tick={{ fill: theme.tickFill, fontSize: 12 }} />
+                <YAxis tick={{ fill: theme.tickFill, fontSize: 12 }} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
                 <Tooltip
-                  contentStyle={{ backgroundColor: theme.tooltipBg, border: `1px solid ${theme.grid}`, borderRadius: 8 }}
-                  labelStyle={{ color: theme.text }}
+                  contentStyle={{ backgroundColor: theme.tooltipBg, border: `1px solid ${theme.tooltipBorder}`, borderRadius: 8 }}
+                  labelStyle={{ color: theme.tooltipColor }}
                   formatter={(value: number) => [formatCurrency(value), ""]}
                 />
                 <Legend />
@@ -204,7 +204,7 @@ export function ScenarioOverview() {
                   type="monotone"
                   dataKey="baseline"
                   name="Baseline"
-                  stroke={theme.colors[0]}
+                  stroke={theme.chartBlue}
                   strokeWidth={2}
                   dot={false}
                 />
@@ -212,7 +212,7 @@ export function ScenarioOverview() {
                   type="monotone"
                   dataKey="projected"
                   name="Projected"
-                  stroke={theme.colors[1]}
+                  stroke={theme.chartAmber}
                   strokeWidth={2}
                   strokeDasharray="5 5"
                   dot={false}
@@ -225,12 +225,12 @@ export function ScenarioOverview() {
           <ChartCard title="Margin: Baseline vs Projected">
             <ResponsiveContainer width="100%" height={300}>
               <ComposedChart data={result.margin_series}>
-                <CartesianGrid strokeDasharray="3 3" stroke={theme.grid} />
-                <XAxis dataKey="month" tick={{ fill: theme.text, fontSize: 12 }} />
-                <YAxis tick={{ fill: theme.text, fontSize: 12 }} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
+                <CartesianGrid strokeDasharray="3 3" stroke={theme.gridStroke} />
+                <XAxis dataKey="month" tick={{ fill: theme.tickFill, fontSize: 12 }} />
+                <YAxis tick={{ fill: theme.tickFill, fontSize: 12 }} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
                 <Tooltip
-                  contentStyle={{ backgroundColor: theme.tooltipBg, border: `1px solid ${theme.grid}`, borderRadius: 8 }}
-                  labelStyle={{ color: theme.text }}
+                  contentStyle={{ backgroundColor: theme.tooltipBg, border: `1px solid ${theme.tooltipBorder}`, borderRadius: 8 }}
+                  labelStyle={{ color: theme.tooltipColor }}
                   formatter={(value: number) => [formatCurrency(value), ""]}
                 />
                 <Legend />
@@ -238,7 +238,7 @@ export function ScenarioOverview() {
                   type="monotone"
                   dataKey="baseline"
                   name="Baseline"
-                  stroke={theme.colors[2]}
+                  stroke={theme.chartBlue}
                   strokeWidth={2}
                   dot={false}
                 />
@@ -246,7 +246,7 @@ export function ScenarioOverview() {
                   type="monotone"
                   dataKey="projected"
                   name="Projected"
-                  stroke={theme.colors[3]}
+                  stroke={theme.accentColor}
                   strokeWidth={2}
                   strokeDasharray="5 5"
                   dot={false}

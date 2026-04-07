@@ -2,20 +2,19 @@
 
 from __future__ import annotations
 
-from decimal import Decimal
-from enum import Enum
+from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from datapulse.types import JsonDecimal
 
 
-class ChangeType(str, Enum):
+class ChangeType(StrEnum):
     percentage = "percentage"
     absolute = "absolute"
 
 
-class AdjustmentParam(str, Enum):
+class AdjustmentParam(StrEnum):
     price = "price"
     volume = "volume"
     cost = "cost"

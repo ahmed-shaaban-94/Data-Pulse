@@ -63,8 +63,6 @@ def update_schedule(
 
 @router.delete("/{schedule_id}", status_code=204)
 @limiter.limit("5/minute")
-def delete_schedule(
-    request: Request, repo: RepoDep, schedule_id: int = Path()
-) -> None:
+def delete_schedule(request: Request, repo: RepoDep, schedule_id: int = Path()) -> None:
     if not repo.delete_schedule(schedule_id):
         raise HTTPException(404, "Schedule not found")

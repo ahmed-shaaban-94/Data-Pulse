@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 
 from datapulse.config import Settings
 from datapulse.logging import get_logger
+from datapulse.pipeline.models import QualityScorecard, RunScore
 from datapulse.pipeline.quality import (
     STAGE_CHECKS,
     VALID_STAGES,
@@ -137,9 +138,8 @@ class QualityService:
         """Return persisted quality checks for a run, optionally filtered by stage."""
         return self._repo.get_checks_for_run(run_id, stage=stage)
 
-    def get_scorecard(self, limit: int = 20) -> "QualityScorecard":
+    def get_scorecard(self, limit: int = 20) -> QualityScorecard:
         """Build a quality scorecard from recent pipeline runs."""
-        from datapulse.pipeline.models import QualityScorecard, RunScore
 
         rows = self._repo.get_scorecard(limit=limit)
         runs = []

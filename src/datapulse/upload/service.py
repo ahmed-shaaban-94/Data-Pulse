@@ -65,17 +65,16 @@ class UploadService:
             if null_count > df.height * 0.5:
                 warnings.append(f"Column '{col}' has >50% nulls ({null_count}/{df.height})")
             sample = [str(v) for v in series.head(3).to_list() if v is not None]
-            columns.append(ColumnInfo(
-                name=col,
-                dtype=str(series.dtype),
-                null_count=null_count,
-                sample_values=sample,
-            ))
+            columns.append(
+                ColumnInfo(
+                    name=col,
+                    dtype=str(series.dtype),
+                    null_count=null_count,
+                    sample_values=sample,
+                )
+            )
 
-        sample_rows = [
-            [str(v) if v is not None else "" for v in row]
-            for row in df.head(10).rows()
-        ]
+        sample_rows = [[str(v) if v is not None else "" for v in row] for row in df.head(10).rows()]
 
         return PreviewResult(
             file_id=file_id,

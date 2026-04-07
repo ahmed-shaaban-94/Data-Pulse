@@ -18,6 +18,8 @@ from datapulse.targets.models import (
     BudgetOriginSummary,
     BudgetSummary,
     BudgetVsActualItem,
+    QuarterlySummary,
+    QuarterlyTargetVsActual,
     TargetCreate,
     TargetResponse,
     TargetSummary,
@@ -189,9 +191,8 @@ class TargetsRepository:
             ytd_achievement_pct=ytd_achievement,
         )
 
-    def get_quarterly_summary(self, year: int) -> "QuarterlySummary":
+    def get_quarterly_summary(self, year: int) -> QuarterlySummary:
         """Aggregate monthly targets vs actuals into quarterly buckets."""
-        from datapulse.targets.models import QuarterlySummary, QuarterlyTargetVsActual
 
         summary = self.get_target_vs_actual(year)
 
@@ -233,8 +234,19 @@ class TargetsRepository:
     # ------------------------------------------------------------------
 
     _MONTH_NAMES = [
-        "", "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-        "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+        "",
+        "Jan",
+        "Feb",
+        "Mar",
+        "Apr",
+        "May",
+        "Jun",
+        "Jul",
+        "Aug",
+        "Sep",
+        "Oct",
+        "Nov",
+        "Dec",
     ]
 
     def get_budget_vs_actual(self, year: int) -> BudgetSummary:
@@ -313,9 +325,7 @@ class TargetsRepository:
                     ytd_actual=oa,
                     ytd_variance=oa - ob,
                     ytd_achievement_pct=(
-                        (oa / ob * _HUNDRED).quantize(Decimal("0.01"))
-                        if ob != _ZERO
-                        else _ZERO
+                        (oa / ob * _HUNDRED).quantize(Decimal("0.01")) if ob != _ZERO else _ZERO
                     ),
                 )
             )
