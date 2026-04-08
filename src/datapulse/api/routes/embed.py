@@ -18,6 +18,7 @@ from sqlalchemy.orm import Session
 from datapulse.api.auth import get_current_user
 from datapulse.api.limiter import limiter
 from datapulse.core.db import get_session_factory
+from datapulse.core.serializers import serialise_value as _serialise
 from datapulse.embed.token import create_embed_token, validate_embed_token
 from datapulse.explore.manifest_parser import build_catalog
 from datapulse.explore.models import ExploreQuery, ExploreResult
@@ -86,6 +87,7 @@ def _get_embed_session(token_payload: dict) -> Session:
     tenant_id = token_payload.get("tenant_id", "1")
     session = get_session_factory()()
     session.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": tenant_id})
+    session.execute(text("SET LOCAL statement_timeout = '30s'"))
     return session
 
 
@@ -109,8 +111,9 @@ def embed_query(
     except jwt.InvalidTokenError as exc:
         raise HTTPException(status_code=401, detail="Invalid or expired embed token") from exc
 
-    session = _get_embed_session(payload)
+    session = None
     try:
+        session = _get_embed_session(payload)
         settings = get_settings()
         catalog = build_catalog(f"{settings.dbt_project_dir}/models")
 
@@ -142,25 +145,10 @@ def embed_query(
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except Exception as exc:
+        if session is not None:
+            session.rollback()
         log.error("embed_query_failed", error=str(exc))
         raise HTTPException(status_code=500, detail="Query execution failed") from exc
     finally:
-        session.close()
-
-
-def _serialise(value: Any) -> str | int | float | bool | None:
-    """Convert a DB value to a JSON-safe primitive."""
-    if value is None:
-        return None
-    from datetime import date, datetime
-    from decimal import Decimal
-
-    if isinstance(value, Decimal):
-        return float(value)
-    if isinstance(value, datetime):
-        return value.isoformat()
-    if isinstance(value, date):
-        return value.isoformat()
-    if isinstance(value, (int, float, bool, str)):
-        return value
-    return str(value)
+        if session is not None:
+            session.close()

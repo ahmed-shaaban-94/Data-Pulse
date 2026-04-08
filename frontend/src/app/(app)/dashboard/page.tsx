@@ -1,5 +1,7 @@
+"use client";
+
 import Link from "next/link";
-import { Printer, TrendingUp, Trophy, PieChart, Zap, Target, Calendar } from "lucide-react";
+import { Printer, TrendingUp, Trophy, PieChart, Zap, Target, Calendar, BarChart3 } from "lucide-react";
 import { Header } from "@/components/layout/header";
 import { Breadcrumbs } from "@/components/layout/breadcrumbs";
 import { PageTransition } from "@/components/layout/page-transition";
@@ -11,19 +13,22 @@ import dynamic from "next/dynamic";
 // Above-fold: regular imports (seen immediately)
 import { DayHeroConnected } from "@/components/dashboard/day-hero-connected";
 import { KPIGrid } from "@/components/dashboard/kpi-grid";
+import { NarrativeSummaryCard } from "@/components/dashboard/narrative-summary-card";
+import { InsightChips } from "@/components/dashboard/insight-chips";
 import { DailyTrendChart } from "@/components/dashboard/daily-trend-chart";
 import { MonthlyTrendChart } from "@/components/dashboard/monthly-trend-chart";
+import { TrendKPICards } from "@/components/dashboard/trend-kpi-cards";
 import { LastUpdated } from "@/components/dashboard/last-updated";
 import { LazySection } from "@/components/dashboard/lazy-section";
 
 // Below-fold: lazy load with loading skeleton
 const BillingBreakdownChart = dynamic(
   () => import("@/components/dashboard/billing-breakdown-chart").then(m => ({ default: m.BillingBreakdownChart })),
-  { loading: () => <LoadingCard lines={3} /> },
+  { loading: () => <LoadingCard lines={3} />, ssr: false },
 );
 const CustomerTypeChart = dynamic(
   () => import("@/components/dashboard/customer-type-chart").then(m => ({ default: m.CustomerTypeChart })),
-  { loading: () => <LoadingCard lines={3} /> },
+  { loading: () => <LoadingCard lines={3} />, ssr: false },
 );
 const QuickRankings = dynamic(
   () => import("@/components/dashboard/quick-rankings").then(m => ({ default: m.QuickRankings })),
@@ -33,13 +38,17 @@ const TopMoversCard = dynamic(
   () => import("@/components/dashboard/top-movers-card").then(m => ({ default: m.TopMoversCard })),
   { loading: () => <LoadingCard lines={3} /> },
 );
+const WhyChangedPanel = dynamic(
+  () => import("@/components/dashboard/why-changed-panel").then(m => ({ default: m.WhyChangedPanel })),
+  { loading: () => <LoadingCard lines={4} />, ssr: false },
+);
 const CalendarHeatmap = dynamic(
   () => import("@/components/dashboard/calendar-heatmap").then(m => ({ default: m.CalendarHeatmap })),
-  { loading: () => <LoadingCard lines={3} /> },
+  { loading: () => <LoadingCard lines={3} />, ssr: false },
 );
 const EgyptMap = dynamic(
   () => import("@/components/dashboard/egypt-map").then(m => ({ default: m.EgyptMap })),
-  { loading: () => <LoadingCard lines={3} /> },
+  { loading: () => <LoadingCard lines={3} />, ssr: false },
 );
 const TargetProgress = dynamic(
   () => import("@/components/dashboard/target-progress").then(m => ({ default: m.TargetProgress })),
@@ -73,19 +82,19 @@ export default function DashboardPage() {
       <CompareProvider>
       <div>
         <Breadcrumbs />
-        <div className="flex items-start justify-between">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <Header
             title="Executive Overview"
             description="Sales performance at a glance"
           />
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
             <CompareButton />
             <Link
               href="/dashboard/report"
-              className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium text-text-secondary transition-all hover:bg-accent/10 hover:text-accent"
+              className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm font-medium text-text-secondary transition-all hover:bg-accent/10 hover:text-accent"
             >
               <Printer className="h-4 w-4" />
-              Print Report
+              <span className="hidden sm:inline">Print Report</span>
             </Link>
             <LastUpdated />
           </div>
@@ -101,12 +110,21 @@ export default function DashboardPage() {
           {/* KPI Section */}
           <KPIGrid />
 
+          {/* Business Narrative & Insight Chips */}
+          <div className="mt-6 space-y-3">
+            <NarrativeSummaryCard />
+            <InsightChips />
+          </div>
+
           {/* Trends Section */}
           <div className="mt-10">
             <SectionHeader icon={TrendingUp} title="Trends" />
-            <div className="mt-4 grid gap-3 md:gap-4 lg:gap-6 lg:grid-cols-2">
-              <DailyTrendChart />
-              <MonthlyTrendChart />
+            <div className="mt-4 space-y-4">
+              <TrendKPICards />
+              <div className="grid gap-3 md:gap-4 lg:gap-6 lg:grid-cols-2">
+                <DailyTrendChart />
+                <MonthlyTrendChart />
+              </div>
             </div>
           </div>
 
@@ -141,29 +159,35 @@ export default function DashboardPage() {
             </div>
           </LazySection>
 
-          {/* Strategic Insights Section */}
+          {/* Revenue Drivers Section */}
           <LazySection minHeight="300px">
-            <div className="mt-10">
-              <SectionHeader icon={Target} title="Goals & Forecast" />
-              <div className="mt-4 grid gap-3 md:gap-4 lg:gap-6 lg:grid-cols-2">
-                <TargetProgress />
-                <ForecastCard />
+            <div className="mt-10" id="why-changed">
+              <SectionHeader icon={BarChart3} title="Revenue Drivers" />
+              <div className="mt-4">
+                <WhyChangedPanel />
               </div>
             </div>
           </LazySection>
 
-          {/* Geographic & Temporal Section */}
-          <LazySection minHeight="250px">
-            <div className="mt-10">
-              <SectionHeader icon={Calendar} title="Revenue Patterns" />
-              <div className="mt-4 grid gap-3 md:gap-4 lg:gap-6 lg:grid-cols-3">
-                <div className="lg:col-span-2">
-                  <CalendarHeatmap />
-                </div>
-                <EgyptMap />
-              </div>
+          {/* Strategic Insights Section — always visible (no lazy) */}
+          <div className="mt-10">
+            <SectionHeader icon={Target} title="Goals & Forecast" />
+            <div className="mt-4 grid gap-3 md:gap-4 lg:gap-6 lg:grid-cols-2">
+              <TargetProgress />
+              <ForecastCard />
             </div>
-          </LazySection>
+          </div>
+
+          {/* Geographic & Temporal Section — always visible (no lazy) */}
+          <div className="mt-10">
+            <SectionHeader icon={Calendar} title="Revenue Patterns" />
+            <div className="mt-4 grid gap-3 md:grid-cols-2 md:gap-4 lg:grid-cols-3 lg:gap-6">
+              <div className="md:col-span-2">
+                <CalendarHeatmap />
+              </div>
+              <EgyptMap />
+            </div>
+          </div>
         </DashboardContent>
       </div>
       </CompareProvider>

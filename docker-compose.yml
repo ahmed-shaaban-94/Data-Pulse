@@ -2,64 +2,6 @@ services:
   # ---------- Traefik REMOVED — Nginx on host handles reverse proxy ----------
   # Saves 128MB RAM and removes double-proxy latency.
 
-  prestart:
-    build:
-      context: .
-      target: prestart
-    container_name: datapulse-prestart
-    depends_on:
-      postgres:
-        condition: service_healthy
-    environment:
-      POSTGRES_USER: ${POSTGRES_USER:-datapulse}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
-      POSTGRES_DB: ${POSTGRES_DB:-datapulse}
-      PGPASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
-      DB_HOST: postgres
-    deploy:
-      resources:
-        limits:
-          memory: 256M
-          cpus: "0.25"
-    networks:
-      - backend
-
-  app:
-    build:
-      context: .
-      target: app
-    container_name: datapulse-app
-    restart: unless-stopped
-    depends_on:
-      postgres:
-        condition: service_healthy
-      prestart:
-        condition: service_completed_successfully
-    ports:
-      - "127.0.0.1:8888:8888"
-    environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-datapulse}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@postgres:5432/${POSTGRES_DB:-datapulse}
-      DBT_HOST: postgres
-      DBT_PROFILES_DIR: /app/dbt
-      POSTGRES_USER: ${POSTGRES_USER:-datapulse}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
-      POSTGRES_DB: ${POSTGRES_DB:-datapulse}
-    volumes:
-      - "${RAW_SALES_PATH:-./data/raw/sales}:/app/data/raw/sales"
-    healthcheck:
-      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8888')\""]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 30s
-    deploy:
-      resources:
-        limits:
-          memory: 2G
-          cpus: "1.0"
-    networks:
-      - backend
-
   api:
     build:
       context: .
@@ -69,8 +11,6 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      prestart:
-        condition: service_completed_successfully
       redis:
         condition: service_healthy
     environment:
@@ -81,12 +21,18 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-datapulse}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
       POSTGRES_DB: ${POSTGRES_DB:-datapulse}
+      PGPASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
+      DB_HOST: postgres
+      DB_READER_PASSWORD: ${DB_READER_PASSWORD:-}
       PIPELINE_WEBHOOK_SECRET: ${PIPELINE_WEBHOOK_SECRET:-}
       AUTH0_DOMAIN: ${AUTH0_DOMAIN:-}
       AUTH0_CLIENT_ID: ${AUTH0_CLIENT_ID:-}
       AUTH0_CLIENT_SECRET: ${AUTH0_CLIENT_SECRET:-}
       AUTH0_AUDIENCE: ${AUTH0_AUDIENCE:-}
       API_KEY: ${API_KEY:-}
+      # NOTE: API_KEY, AUTH0_CLIENT_SECRET, and PIPELINE_WEBHOOK_SECRET default
+      # to empty for local dev. In production, set them explicitly or use
+      # docker-compose.prod.yml which overrides with :? (required) syntax.
       SENTRY_DSN: ${SENTRY_DSN:-}
       SENTRY_ENVIRONMENT: ${SENTRY_ENVIRONMENT:-development}
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
@@ -99,11 +45,11 @@ services:
       - "127.0.0.1:8000:8000"
     command: ["uvicorn", "datapulse.api.app:create_app", "--host", "0.0.0.0", "--port", "8000", "--factory", "--workers", "2"]
     healthcheck:
-      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health')\""]
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health/ready')\""]
       interval: 10s
       timeout: 5s
       retries: 5
-      start_period: 15s
+      start_period: 45s
     deploy:
       resources:
         limits:
@@ -137,35 +83,6 @@ services:
         limits:
           memory: 2G
           cpus: "1.5"
-    networks:
-      - backend
-
-  pgadmin:
-    image: dpage/pgadmin4:8.14
-    container_name: datapulse-pgadmin
-    restart: unless-stopped
-    depends_on:
-      postgres:
-        condition: service_healthy
-    ports:
-      - "127.0.0.1:5050:80"
-    environment:
-      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@datapulse.dev}
-      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:?PGADMIN_PASSWORD must be set}
-      PGADMIN_CONFIG_SERVER_MODE: "False"
-    volumes:
-      - pgadmin_data:/var/lib/pgadmin
-    healthcheck:
-      test: ["CMD-SHELL", "wget -q --spider http://localhost:80/misc/ping || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 30s
-    deploy:
-      resources:
-        limits:
-          memory: 256M
-          cpus: "0.5"
     networks:
       - backend
 
@@ -247,7 +164,6 @@ services:
 
 volumes:
   pgdata:
-  pgadmin_data:
   redis_data:
 
 networks:

@@ -50,7 +50,11 @@ export function RadarComparison() {
 
   const getValue = (site: SiteDetail, metricKey: string): number => {
     switch (metricKey) {
-      case "revenue": return site.total_net_amount;
+      case "revenue": {
+        // Use filtered ranking value instead of all-time detail value
+        const ri = ranking?.items.find((r) => r.key === site.site_key);
+        return ri?.value ?? site.total_net_amount;
+      }
       case "transactions": return site.transaction_count;
       case "customers": return site.unique_customers;
       case "staff": return site.unique_staff;
@@ -110,20 +114,25 @@ export function RadarComparison() {
         </RadarChart>
       </ResponsiveContainer>
 
-      {/* Quick stats */}
+      {/* Quick stats — use filtered ranking data for revenue (not all-time detail) */}
       <div className="mt-3 grid grid-cols-2 gap-3">
-        {siteDetails.map((s, i) => (
-          <div key={s.site_key} className="rounded-lg border border-border p-3">
-            <div className="flex items-center gap-2 mb-1">
-              <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: CHART_COLORS[i % CHART_COLORS.length] }} />
-              <span className="text-xs font-semibold text-text-primary">{s.site_name}</span>
+        {siteDetails.map((s, i) => {
+          // Use the filtered ranking value if available, otherwise fall back to detail
+          const rankingItem = ranking?.items.find((r) => r.key === s.site_key);
+          const filteredRevenue = rankingItem?.value ?? s.total_net_amount;
+          return (
+            <div key={s.site_key} className="rounded-lg border border-border p-3">
+              <div className="flex items-center gap-2 mb-1">
+                <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: CHART_COLORS[i % CHART_COLORS.length] }} />
+                <span className="text-xs font-semibold text-text-primary">{s.site_name}</span>
+              </div>
+              <div className="grid grid-cols-2 gap-1 text-[10px]">
+                <span className="text-text-secondary">Revenue: <span className="text-text-primary">{formatCurrency(filteredRevenue)}</span></span>
+                <span className="text-text-secondary">Return Rate: <span className={s.return_rate > 5 ? "text-red-500" : "text-green-500"}>{(s.return_rate * 100).toFixed(1)}%</span></span>
+              </div>
             </div>
-            <div className="grid grid-cols-2 gap-1 text-[10px]">
-              <span className="text-text-secondary">Revenue: <span className="text-text-primary">{formatCurrency(s.total_net_amount)}</span></span>
-              <span className="text-text-secondary">Return Rate: <span className={s.return_rate > 5 ? "text-red-500" : "text-green-500"}>{(s.return_rate * 100).toFixed(1)}%</span></span>
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

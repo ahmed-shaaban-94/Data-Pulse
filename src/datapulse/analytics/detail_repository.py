@@ -141,6 +141,7 @@ class DetailRepository:
             drug_category=str(row["drug_category"]),
             total_quantity=Decimal(str(row["total_quantity"])),
             total_sales=Decimal(str(row["total_sales"])),
+            total_net_amount=Decimal(str(row["total_sales"])),
             return_rate=Decimal(str(row["return_rate"])),
             unique_customers=int(row["unique_customers"]),
             monthly_trend=trend,
@@ -195,7 +196,7 @@ class DetailRepository:
             customer_id=str(row["customer_id"]),
             customer_name=str(row["customer_name"]),
             total_quantity=Decimal(str(row["total_quantity"])),
-            total_sales=Decimal(str(row["total_sales"])),
+            total_net_amount=Decimal(str(row["total_sales"])),
             transaction_count=int(row["transaction_count"]),
             unique_products=int(row["unique_products"]),
             return_count=int(row["return_count"]),
@@ -253,7 +254,7 @@ class DetailRepository:
             staff_id=str(row["staff_id"]),
             staff_name=str(row["staff_name"]),
             staff_position=str(row["position"]),
-            total_sales=Decimal(str(row["total_sales"])),
+            total_net_amount=Decimal(str(row["total_sales"])),
             transaction_count=int(row["transaction_count"]),
             avg_transaction_value=(
                 Decimal(str(row["avg_transaction_value"]))
@@ -280,11 +281,11 @@ class DetailRepository:
                     SUM(a.unique_customers)      AS unique_customers,
                     SUM(a.unique_staff)          AS unique_staff,
                     COALESCE(
-                        SUM(a.walk_in_count)::NUMERIC
+                        SUM(a.walk_in_ratio * a.transaction_count)::NUMERIC
                         / NULLIF(SUM(a.transaction_count), 0), 0
                     )                            AS walk_in_ratio,
                     COALESCE(
-                        SUM(a.insurance_count)::NUMERIC
+                        SUM(a.insurance_ratio * a.transaction_count)::NUMERIC
                         / NULLIF(SUM(a.transaction_count), 0), 0
                     )                            AS insurance_ratio,
                     COALESCE(
@@ -299,16 +300,17 @@ class DetailRepository:
             ),
             trend AS (
                 SELECT json_agg(
-                    json_build_object('period', TO_CHAR(a.month, 'YYYY-MM'),
-                                      'value', t.total_sales)
-                    ORDER BY a.month
+                    json_build_object('period',
+                        a.year::TEXT || '-' || LPAD(a.month::TEXT, 2, '0'),
+                        'value', a.total_sales)
+                    ORDER BY a.year, a.month
                 ) AS points
                 FROM (
-                    SELECT month, SUM(total_sales) AS total_sales
+                    SELECT year, month, SUM(total_sales) AS total_sales
                     FROM public_marts.agg_sales_by_site
                     WHERE site_key = :site_key
-                    GROUP BY month
-                ) a, LATERAL (SELECT a.total_sales) t
+                    GROUP BY year, month
+                ) a
             )
             SELECT s.*, tr.points AS trend_points
             FROM summary s
@@ -325,7 +327,7 @@ class DetailRepository:
             site_code=str(row["site_code"]) if row["site_code"] else "",
             site_name=str(row["site_name"]),
             area_manager=str(row["area_manager"]) if row["area_manager"] else "",
-            total_sales=Decimal(str(row["total_sales"])),
+            total_net_amount=Decimal(str(row["total_sales"])),
             transaction_count=int(row["transaction_count"]),
             unique_customers=int(row["unique_customers"]),
             unique_staff=int(row["unique_staff"]),

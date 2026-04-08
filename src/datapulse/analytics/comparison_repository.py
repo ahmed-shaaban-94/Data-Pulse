@@ -17,6 +17,7 @@ from datapulse.analytics.models import (
     TopMovers,
 )
 from datapulse.analytics.queries import (
+    SITE_DATE_ONLY,
     build_where,
     safe_growth,
 )
@@ -31,7 +32,7 @@ _ENTITY_MAP: dict[str, tuple[str, str, str]] = {
     "product": (
         "public_marts.agg_sales_by_product",
         "product_key",
-        "drug_name",
+        "drug_brand",
     ),
     "customer": (
         "public_marts.agg_sales_by_customer",
@@ -43,6 +44,18 @@ _ENTITY_MAP: dict[str, tuple[str, str, str]] = {
         "staff_key",
         "staff_name",
     ),
+}
+
+# Map agg table -> (dim_table, dim_key) for fct_sales-based day-level queries
+_DIM_JOIN: dict[str, tuple[str, str, str]] = {
+    "public_marts.agg_sales_by_product": ("public_marts.dim_product", "product_key", "drug_brand"),
+    "public_marts.agg_sales_by_customer": (
+        "public_marts.dim_customer",
+        "customer_key",
+        "customer_name",
+    ),
+    "public_marts.agg_sales_by_staff": ("public_marts.dim_staff", "staff_key", "staff_name"),
+    "public_marts.agg_sales_by_site": ("public_marts.dim_site", "site_key", "site_name"),
 }
 
 
@@ -59,19 +72,65 @@ class ComparisonRepository:
         name_col: str,
         filters: AnalyticsFilter,
         limit: int,
+        *,
+        active_only: bool = False,
     ) -> dict[int, tuple[str, Decimal]]:
-        """Return {key: (name, total_sales)} for top entities."""
-        where, params = build_where(filters, use_year_month=True)
+        """Return {key: (name, total_sales)} for top entities.
+
+        When *active_only* is True (used for staff), excludes entities with
+        transaction counts below 33% of the average — same threshold used
+        by get_top_staff in the main repository.
+        """
+        where, params = build_where(
+            filters, date_column="date_key", supported_fields=SITE_DATE_ONLY
+        )
         params["limit"] = limit
 
-        stmt = text(f"""
-            SELECT {key_col}, {name_col}, SUM(total_sales) AS value
-            FROM {table}
-            WHERE {where}
-            GROUP BY {key_col}, {name_col}
-            ORDER BY value DESC
-            LIMIT :limit
-        """)
+        if active_only:
+            # Use the fct_sales-based active filter: exclude Unknown, Services/Other,
+            # returns, and staff below 33% of average transaction count
+            stmt = text(f"""
+                WITH staff_txns AS (
+                    SELECT f.staff_key,
+                           COUNT(*) FILTER (WHERE NOT f.is_return) AS sale_count
+                    FROM public_marts.fct_sales f
+                    INNER JOIN public_marts.dim_date d ON f.date_key = d.date_key
+                    INNER JOIN public_marts.dim_product p ON f.product_key = p.product_key
+                        AND f.tenant_id = p.tenant_id
+                    WHERE {where}
+                      AND f.staff_key != -1
+                      AND COALESCE(p.origin, 'Other') IN ('Pharma', 'Non-pharma', 'HVI')
+                      AND NOT f.is_return
+                    GROUP BY f.staff_key
+                ),
+                threshold AS (
+                    SELECT COALESCE(AVG(sale_count) * 0.33, 0) AS min_txns FROM staff_txns
+                ),
+                active_staff AS (
+                    SELECT staff_key FROM staff_txns, threshold
+                    WHERE sale_count >= min_txns
+                )
+                SELECT a.{key_col}, a.{name_col}, SUM(a.total_sales) AS value
+                FROM {table} a
+                INNER JOIN active_staff act ON a.{key_col} = act.staff_key
+                WHERE {where} AND a.{key_col} != -1
+                GROUP BY a.{key_col}, a.{name_col}
+                ORDER BY value DESC
+                LIMIT :limit
+            """)
+        else:
+            # Use fct_sales with dimension JOIN for day-level date precision
+            dim_table, dim_key, dim_join = _DIM_JOIN.get(table, (table, key_col, "1=1"))
+            stmt = text(f"""
+                SELECT f.{key_col}, dim.{name_col}, ROUND(SUM(f.sales), 2) AS value
+                FROM public_marts.fct_sales f
+                INNER JOIN {dim_table} dim
+                    ON f.{key_col} = dim.{dim_key} AND f.tenant_id = dim.tenant_id
+                WHERE {where} AND f.{key_col} != -1
+                GROUP BY f.{key_col}, dim.{name_col}
+                ORDER BY value DESC
+                LIMIT :limit
+            """)
         rows = self._session.execute(stmt, params).fetchall()
         return {int(r[0]): (str(r[1]), Decimal(str(r[2]))) for r in rows}
 
@@ -97,11 +156,24 @@ class ComparisonRepository:
 
         table, key_col, name_col = _ENTITY_MAP[entity_type]
 
-        # Fetch broader set to find movers (top 50 from each period)
-        fetch_limit = max(limit * 10, 50)
-        current = self._fetch_period_totals(table, key_col, name_col, current_filters, fetch_limit)
+        # Fetch broader set to find movers — need enough to catch big swings
+        fetch_limit = max(limit * 20, 100)
+        is_staff = entity_type == "staff"
+        current = self._fetch_period_totals(
+            table,
+            key_col,
+            name_col,
+            current_filters,
+            fetch_limit,
+            active_only=is_staff,
+        )
         previous = self._fetch_period_totals(
-            table, key_col, name_col, previous_filters, fetch_limit
+            table,
+            key_col,
+            name_col,
+            previous_filters,
+            fetch_limit,
+            active_only=is_staff,
         )
 
         movers: list[MoverItem] = []
@@ -115,10 +187,18 @@ class ComparisonRepository:
             if prev_val == _ZERO and curr_val == _ZERO:
                 continue
 
-            change = safe_growth(curr_val, prev_val)
-            if change is None:
-                # New entity (not in previous) — treat as +100%
-                change = Decimal("100.00")
+            # Compute growth percentage
+            if prev_val == _ZERO:
+                # New entrant (didn't exist in previous period) — treat as +100%
+                change = Decimal("100")
+            elif curr_val == _ZERO:
+                # Disappeared (existed before, gone now) — treat as -100%
+                change = Decimal("-100")
+            else:
+                growth = safe_growth(curr_val, prev_val)
+                if growth is None:
+                    continue
+                change = growth
 
             movers.append(
                 MoverItem(

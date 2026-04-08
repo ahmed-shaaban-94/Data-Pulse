@@ -67,6 +67,12 @@ def test_health_endpoint(api_client):
         mock_conn = MagicMock()
         mock_engine.return_value.connect.return_value.__enter__ = lambda s: mock_conn
         mock_engine.return_value.connect.return_value.__exit__ = lambda s, *a: None
+        mock_pool = MagicMock()
+        mock_pool.size.return_value = 5
+        mock_pool.checkedout.return_value = 1
+        mock_pool.overflow.return_value = 0
+        mock_pool._max_overflow = 10
+        mock_engine.return_value.pool = mock_pool
         resp = client.get("/health")
     assert resp.status_code == 200
     data = resp.json()
@@ -249,6 +255,7 @@ def test_product_detail_found(api_client):
         drug_category="Analgesic",
         total_quantity=Decimal("500"),
         total_sales=Decimal("10000"),
+        total_net_amount=Decimal("10000"),
         return_rate=Decimal("0.02"),
         unique_customers=50,
     )
@@ -275,7 +282,7 @@ def test_customer_detail_found(api_client):
         customer_id="C001",
         customer_name="Pharmacy X",
         total_quantity=Decimal("1000"),
-        total_sales=Decimal("50000"),
+        total_net_amount=Decimal("50000"),
         transaction_count=200,
         unique_products=30,
         return_count=5,

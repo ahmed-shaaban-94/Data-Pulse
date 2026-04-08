@@ -12,11 +12,16 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request, Response
 from pydantic import BaseModel, Field
+from sqlalchemy.orm import Session
 
+from datapulse.analytics.affinity_repository import AffinityRepository
+from datapulse.analytics.churn_repository import ChurnRepository
 from datapulse.analytics.models import (
     ABCAnalysis,
+    AffinityPair,
     AnalyticsFilter,
     BillingBreakdown,
+    ChurnPrediction,
     CustomerAnalytics,
     CustomerHealthScore,
     CustomerTypeBreakdown,
@@ -35,13 +40,14 @@ from datapulse.analytics.models import (
     SegmentSummary,
     SiteDetail,
     StaffPerformance,
+    StaffQuota,
     TopMovers,
     TrendResult,
     WaterfallAnalysis,
 )
 from datapulse.analytics.service import AnalyticsService
 from datapulse.api.auth import get_current_user
-from datapulse.api.deps import get_analytics_service
+from datapulse.api.deps import get_analytics_service, get_tenant_session
 from datapulse.api.limiter import limiter
 
 router = APIRouter(
@@ -138,21 +144,17 @@ def get_dashboard(
     request: Request,
     response: Response,
     service: ServiceDep,
+    params: Annotated[AnalyticsQueryParams, Depends()],
     target_date: Annotated[date | None, Query()] = None,
-    start_date: Annotated[date | None, Query()] = None,
-    end_date: Annotated[date | None, Query()] = None,
 ) -> DashboardData:
     """Composite dashboard endpoint — KPI + trends + rankings + filters in one call.
 
-    When *start_date* and *end_date* are supplied the KPI cards reflect the
-    aggregate totals for that range and the trends/rankings are filtered to it.
-    Falls back to the legacy single-day *target_date* behaviour when omitted.
+    Accepts all standard analytics filters (date range, site, category, brand, staff).
+    Falls back to a 30-day window from the latest data date when no range is given.
     """
     _set_cache(response, 600)
-    date_range: DateRange | None = None
-    if start_date is not None and end_date is not None:
-        date_range = DateRange(start_date=start_date, end_date=end_date)
-    return service.get_dashboard_data(target_date=target_date, date_range=date_range)
+    filters = _to_filter(params)
+    return service.get_dashboard_data(target_date=target_date, filters=filters)
 
 
 @router.get("/date-range", response_model=DataDateRange)
@@ -296,6 +298,19 @@ def get_customer_type_breakdown(
     """Walk-in vs insurance vs other distribution by month."""
     _set_cache(response, 300)
     return service.get_customer_type_breakdown(_to_filter(params))
+
+
+@router.get("/origin-breakdown")
+@limiter.limit("60/minute")
+def get_origin_breakdown(
+    request: Request,
+    response: Response,
+    service: ServiceDep,
+    params: Annotated[AnalyticsQueryParams, Depends()],
+) -> list[dict]:
+    """Revenue breakdown by product origin (Pharma, Non-pharma, HVI, etc.)."""
+    _set_cache(response, 300)
+    return service.get_origin_breakdown(_to_filter(params))
 
 
 @router.get("/top-movers", response_model=TopMovers)
@@ -516,3 +531,51 @@ def get_at_risk_customers(
     """At-risk and critical customers, lowest score first."""
     _set_cache(response, 300)
     return service.get_at_risk_customers(limit=limit)
+
+
+@router.get("/staff/quota", response_model=list[StaffQuota])
+@limiter.limit("60/minute")
+def get_staff_quota(
+    request: Request,
+    response: Response,
+    service: ServiceDep,
+    year: int | None = Query(None),
+    month: int | None = Query(None),
+    limit: Annotated[int, Query(ge=1, le=200)] = 50,
+) -> list:
+    """Staff quota attainment — actual vs target per staff member."""
+    _set_cache(response, 300)
+    rows = service._repo.get_staff_quota(year=year, month=month, limit=limit)
+    return [StaffQuota(**r) for r in rows]
+
+
+@router.get("/products/{product_key}/affinity", response_model=list[AffinityPair])
+@limiter.limit("60/minute")
+def get_product_affinity(
+    request: Request,
+    response: Response,
+    session: Annotated[Session, Depends(get_tenant_session)],
+    product_key: int,
+    limit: Annotated[int, Query(ge=1, le=50)] = 10,
+) -> list:
+    """Top co-purchased products for a given product."""
+    _set_cache(response, 600)
+    repo = AffinityRepository(session)
+    rows = repo.get_affinity_for_product(product_key, limit=limit)
+    return [AffinityPair(**r) for r in rows]
+
+
+@router.get("/customers/churn", response_model=list[ChurnPrediction])
+@limiter.limit("60/minute")
+def get_churn_predictions(
+    request: Request,
+    response: Response,
+    session: Annotated[Session, Depends(get_tenant_session)],
+    risk_level: str | None = Query(None),
+    limit: Annotated[int, Query(ge=1, le=200)] = 50,
+) -> list:
+    """Customer churn predictions sorted by probability."""
+    _set_cache(response, 300)
+    repo = ChurnRepository(session)
+    rows = repo.get_churn_predictions(risk_level=risk_level, limit=limit)
+    return [ChurnPrediction(**r) for r in rows]

@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useMemo } from "react";
 import {
   BarChart,
   Bar,
@@ -13,41 +14,78 @@ import {
 } from "recharts";
 import { useChartTheme } from "@/hooks/use-chart-theme";
 import { formatCurrency, formatPercent } from "@/lib/formatters";
+import { cn } from "@/lib/utils";
 import type { WaterfallAnalysis } from "@/types/api";
 
-interface WaterfallChartProps {
-  data: WaterfallAnalysis;
+const DIM_TABS = [
+  { key: "product", label: "Products" },
+  { key: "customer", label: "Customers" },
+  { key: "staff", label: "Staff" },
+  { key: "site", label: "Sites" },
+] as const;
+
+type DimensionKey = (typeof DIM_TABS)[number]["key"];
+
+export interface WaterfallChartProps {
+  data?: WaterfallAnalysis;
 }
 
 export function WaterfallChart({ data }: WaterfallChartProps) {
   const theme = useChartTheme();
+  const [activeDim, setActiveDim] = useState<DimensionKey>("product");
 
-  if (!data.drivers.length) {
+  // Group drivers by dimension
+  const driversByDim = useMemo(() => {
+    if (!data) return {};
+    const grouped: Record<string, typeof data.drivers> = {};
+    for (const d of data.drivers) {
+      (grouped[d.dimension] ??= []).push(d);
+    }
+    return grouped;
+  }, [data]);
+
+  // Only show tabs that have data
+  const availableTabs = useMemo(
+    () => DIM_TABS.filter((t) => (driversByDim[t.key]?.length ?? 0) > 0),
+    [driversByDim],
+  );
+
+  if (!data || !data.drivers.length) {
     return (
       <div className="rounded-lg border border-border bg-card p-6">
         <h3 className="text-lg font-semibold mb-2">Revenue Change Drivers</h3>
-        <p className="text-muted-foreground text-sm">
+        <p className="text-text-secondary text-sm">
           No significant drivers found for this period.
         </p>
       </div>
     );
   }
 
-  const chartData = data.drivers.slice(0, 10).map((d) => ({
-    name: d.entity_name.length > 20 ? d.entity_name.slice(0, 18) + "..." : d.entity_name,
-    fullName: d.entity_name,
-    impact: d.impact,
-    impactPct: d.impact_pct,
-    dimension: d.dimension,
-    direction: d.direction,
-  }));
+  // If selected tab has no data, fall back to first available
+  const effectiveDim =
+    (driversByDim[activeDim]?.length ?? 0) > 0
+      ? activeDim
+      : availableTabs[0]?.key ?? "product";
+
+  const filteredDrivers = driversByDim[effectiveDim] ?? [];
+  const chartData = filteredDrivers.slice(0, 10).map((d) => {
+    const rawName = d.entity_name;
+    return {
+      name: rawName.length > 22 ? rawName.slice(0, 20) + "..." : rawName,
+      fullName: rawName,
+      impact: d.impact,
+      impactPct: d.impact_pct,
+      dimension: d.dimension,
+      direction: d.direction,
+    };
+  });
 
   return (
     <div className="rounded-lg border border-border bg-card p-6">
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex flex-col gap-3 mb-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h3 className="text-lg font-semibold">Revenue Change Drivers</h3>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-sm text-text-secondary">
             Total change: {formatCurrency(data.total_change)}
             {data.total_change_pct != null && (
               <span
@@ -60,18 +98,39 @@ export function WaterfallChart({ data }: WaterfallChartProps) {
             )}
           </p>
         </div>
-        <div className="flex gap-3 text-xs">
-          <span className="flex items-center gap-1">
-            <span className="w-3 h-3 rounded bg-emerald-500 inline-block" /> Positive
-          </span>
-          <span className="flex items-center gap-1">
-            <span className="w-3 h-3 rounded bg-red-500 inline-block" /> Negative
-          </span>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center rounded-lg border border-border bg-page/50 p-0.5">
+            {availableTabs.map((tab) => (
+              <button
+                key={tab.key}
+                onClick={() => setActiveDim(tab.key)}
+                className={cn(
+                  "rounded-md px-3 py-1 text-xs font-medium transition-all",
+                  effectiveDim === tab.key
+                    ? "bg-accent/20 text-accent shadow-sm"
+                    : "text-text-secondary hover:text-accent hover:bg-accent/10",
+                )}
+              >
+                {tab.label}
+                <span className="ml-1 opacity-60">
+                  ({driversByDim[tab.key]?.length ?? 0})
+                </span>
+              </button>
+            ))}
+          </div>
+          <div className="flex gap-2 text-xs">
+            <span className="flex items-center gap-1">
+              <span className="w-2.5 h-2.5 rounded bg-emerald-500 inline-block" /> Up
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="w-2.5 h-2.5 rounded bg-red-500 inline-block" /> Down
+            </span>
+          </div>
         </div>
       </div>
 
-      <ResponsiveContainer width="100%" height={Math.max(300, chartData.length * 40)}>
-        <BarChart data={chartData} layout="vertical" margin={{ left: 10, right: 30 }}>
+      <ResponsiveContainer width="100%" height={Math.max(280, chartData.length * 36)}>
+        <BarChart data={chartData} layout="vertical" margin={{ left: 20, right: 30 }}>
           <CartesianGrid strokeDasharray="3 3" stroke={theme.gridStroke} />
           <XAxis
             type="number"
@@ -82,7 +141,7 @@ export function WaterfallChart({ data }: WaterfallChartProps) {
           <YAxis
             type="category"
             dataKey="name"
-            width={150}
+            width={180}
             stroke={theme.tickFill}
             fontSize={11}
           />
@@ -95,7 +154,7 @@ export function WaterfallChart({ data }: WaterfallChartProps) {
             }}
             formatter={(value: number, _name: string, props: any) => [
               `${formatCurrency(value)} (${formatPercent(props.payload.impactPct)})`,
-              props.payload.dimension,
+              "Impact",
             ]}
             labelFormatter={(label) => {
               const item = chartData.find((d) => d.name === label);
@@ -103,7 +162,7 @@ export function WaterfallChart({ data }: WaterfallChartProps) {
             }}
           />
           <ReferenceLine x={0} stroke={theme.tickFill} strokeWidth={1} />
-          <Bar dataKey="impact" radius={[0, 4, 4, 0]}>
+          <Bar dataKey="impact" radius={[0, 4, 4, 0]} animationDuration={600}>
             {chartData.map((entry, index) => (
               <Cell
                 key={index}

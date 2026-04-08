@@ -97,6 +97,7 @@ class RankingResult(BaseModel):
 
     items: list[RankingItem]
     total: JsonDecimal
+    active_count: int | None = None
 
 
 class KPISummary(BaseModel):
@@ -113,6 +114,8 @@ class KPISummary(BaseModel):
     # Growth (based on gross)
     mom_growth_pct: JsonDecimal | None = None
     yoy_growth_pct: JsonDecimal | None = None
+    # Units (quantity — returns are negative)
+    daily_quantity: JsonDecimal = Field(default=Decimal("0"))
     daily_transactions: int
     daily_customers: int
     avg_basket_size: JsonDecimal = Field(default=Decimal("0"))
@@ -136,7 +139,7 @@ class ProductPerformance(BaseModel):
     drug_category: str
     total_quantity: JsonDecimal
     total_sales: JsonDecimal
-    total_sales: JsonDecimal
+    total_net_amount: JsonDecimal
     return_rate: JsonDecimal
     unique_customers: int
     monthly_trend: list[TimeSeriesPoint] = []
@@ -151,7 +154,7 @@ class CustomerAnalytics(BaseModel):
     customer_id: str
     customer_name: str
     total_quantity: JsonDecimal
-    total_sales: JsonDecimal
+    total_net_amount: JsonDecimal
     transaction_count: int
     unique_products: int
     return_count: int
@@ -167,7 +170,7 @@ class StaffPerformance(BaseModel):
     staff_id: str
     staff_name: str
     staff_position: str
-    total_sales: JsonDecimal
+    total_net_amount: JsonDecimal
     transaction_count: int
     avg_transaction_value: JsonDecimal
     unique_customers: int
@@ -180,7 +183,9 @@ class ReturnAnalysis(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     drug_name: str
+    drug_brand: str = ""
     customer_name: str
+    origin: str = ""
     return_quantity: JsonDecimal
     return_amount: JsonDecimal
     return_count: int
@@ -232,7 +237,7 @@ class BillingBreakdownItem(BaseModel):
 
     billing_group: str
     transaction_count: int
-    total_sales: JsonDecimal
+    total_net_amount: JsonDecimal
     pct_of_total: JsonDecimal
 
 
@@ -243,7 +248,7 @@ class BillingBreakdown(BaseModel):
 
     items: list[BillingBreakdownItem]
     total_transactions: int
-    total_sales: JsonDecimal
+    total_net_amount: JsonDecimal
 
 
 class CustomerTypeBreakdownItem(BaseModel):
@@ -308,7 +313,7 @@ class SiteDetail(BaseModel):
     site_code: str
     site_name: str
     area_manager: str
-    total_sales: JsonDecimal
+    total_net_amount: JsonDecimal
     transaction_count: int
     unique_customers: int
     unique_staff: int
@@ -325,7 +330,7 @@ class ProductInCategory(BaseModel):
 
     product_key: int
     drug_name: str
-    total_sales: JsonDecimal
+    total_net_amount: JsonDecimal
     transaction_count: int
 
 
@@ -335,7 +340,7 @@ class BrandGroup(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     brand: str
-    total_sales: JsonDecimal
+    total_net_amount: JsonDecimal
     products: list[ProductInCategory]
 
 
@@ -345,7 +350,7 @@ class CategoryGroup(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     category: str
-    total_sales: JsonDecimal
+    total_net_amount: JsonDecimal
     brands: list[BrandGroup]
 
 
@@ -538,3 +543,52 @@ class AnomalyAlert(BaseModel):
     is_suppressed: bool = False
     suppression_reason: str | None = None
     acknowledged: bool = False
+
+
+class ChurnPrediction(BaseModel):
+    """Customer churn prediction result."""
+
+    model_config = ConfigDict(frozen=True)
+
+    customer_key: int
+    customer_name: str
+    health_score: JsonDecimal
+    health_band: str
+    recency_days: int
+    frequency_3m: int
+    monetary_3m: JsonDecimal
+    trend: str
+    rfm_segment: str
+    churn_probability: JsonDecimal
+    risk_level: str
+
+
+class AffinityPair(BaseModel):
+    """A pair of frequently co-purchased products."""
+
+    model_config = ConfigDict(frozen=True)
+
+    related_key: int
+    related_name: str
+    co_occurrence_count: int
+    support_pct: JsonDecimal
+    confidence: JsonDecimal
+
+
+class StaffQuota(BaseModel):
+    """Staff quota attainment for a given period."""
+
+    model_config = ConfigDict(frozen=True)
+
+    staff_key: int
+    staff_name: str
+    staff_position: str | None = None
+    year: int
+    month: int
+    actual_revenue: JsonDecimal
+    actual_transactions: int | None = None
+    target_revenue: JsonDecimal | None = None
+    target_transactions: JsonDecimal | None = None
+    revenue_achievement_pct: JsonDecimal | None = None
+    transactions_achievement_pct: JsonDecimal | None = None
+    revenue_variance: JsonDecimal | None = None

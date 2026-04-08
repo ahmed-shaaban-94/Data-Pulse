@@ -37,8 +37,10 @@ daily_totals AS (
         d.year,
         d.month,
         ROUND(SUM(a.total_sales), 2)             AS daily_gross_amount,
+        ROUND(SUM(a.total_net_amount), 2)        AS daily_net_amount,
         ROUND(SUM(a.total_discount), 2)          AS daily_discount,
-        SUM(a.transaction_count)::INT            AS daily_transactions,
+        SUM(a.total_quantity)::NUMERIC(18,4)     AS daily_quantity,
+        SUM(a.transaction_count)::INT            AS daily_transactions,  -- includes returns
         SUM(a.return_count)::INT                 AS daily_returns,
         COALESCE(dc.daily_unique_customers, 0)   AS daily_unique_customers
     FROM {{ ref('agg_sales_daily') }} a
@@ -53,9 +55,11 @@ SELECT
     t.full_date,
     t.year,
     t.month,
-    -- Daily values (gross only — net deliberately excluded)
+    -- Daily values
     t.daily_gross_amount,
+    t.daily_net_amount,
     t.daily_discount,
+    t.daily_quantity,
     t.daily_transactions,
     t.daily_returns,
     t.daily_unique_customers,
@@ -68,6 +72,14 @@ SELECT
         ),
         2
     ) AS mtd_gross_amount,
+    ROUND(
+        SUM(t.daily_net_amount) OVER (
+            PARTITION BY t.tenant_id, t.year, t.month
+            ORDER BY t.full_date
+            ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+        ),
+        2
+    ) AS mtd_net_amount,
     SUM(t.daily_transactions) OVER (
         PARTITION BY t.tenant_id, t.year, t.month
         ORDER BY t.full_date
@@ -82,6 +94,14 @@ SELECT
         ),
         2
     ) AS ytd_gross_amount,
+    ROUND(
+        SUM(t.daily_net_amount) OVER (
+            PARTITION BY t.tenant_id, t.year
+            ORDER BY t.full_date
+            ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+        ),
+        2
+    ) AS ytd_net_amount,
     SUM(t.daily_transactions) OVER (
         PARTITION BY t.tenant_id, t.year
         ORDER BY t.full_date
@@ -89,5 +109,5 @@ SELECT
     )::INT AS ytd_transactions
 FROM daily_totals t
 {% if is_incremental() %}
-WHERE t.full_date >= CURRENT_DATE - INTERVAL '3 days'
+WHERE t.full_date >= DATE_TRUNC('year', CURRENT_DATE)
 {% endif %}

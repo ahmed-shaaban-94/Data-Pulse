@@ -8,6 +8,8 @@ export interface KPISummary {
   // Growth (based on gross)
   mom_growth_pct: number | null;
   yoy_growth_pct: number | null;
+  // Units (quantity — returns are negative, so sum is net units)
+  daily_quantity: number;
   daily_transactions: number;
   daily_customers: number;
   avg_basket_size: number;
@@ -51,16 +53,25 @@ export interface RankingItem {
 export interface RankingResult {
   items: RankingItem[];
   total: number;
+  active_count?: number;
 }
 
 export interface ReturnAnalysis {
   drug_name: string;
-  product_name?: string;
+  drug_brand: string;
   customer_name: string;
+  origin: string;
   return_quantity: number;
   return_amount: number;
   return_count: number;
   return_rate?: number;
+}
+
+export interface FilterOptions {
+  categories: string[];
+  brands: string[];
+  sites: Array<{ key: number; label: string }>;
+  staff: Array<{ key: number; label: string }>;
 }
 
 export interface HealthStatus {
@@ -461,6 +472,32 @@ export interface TargetVsActual {
 export interface TargetSummary {
   monthly_targets: TargetVsActual[];
   ytd_target: number;
+  ytd_actual: number;
+  ytd_achievement_pct: number;
+}
+
+export interface BudgetVsActualItem {
+  month: number;
+  month_name: string;
+  origin: string;
+  budget: number;
+  actual: number;
+  variance: number;
+  achievement_pct: number;
+}
+
+export interface BudgetOriginSummary {
+  origin: string;
+  ytd_budget: number;
+  ytd_actual: number;
+  ytd_variance: number;
+  ytd_achievement_pct: number;
+}
+
+export interface BudgetSummary {
+  monthly: BudgetVsActualItem[];
+  by_origin: BudgetOriginSummary[];
+  ytd_budget: number;
   ytd_actual: number;
   ytd_achievement_pct: number;
 }

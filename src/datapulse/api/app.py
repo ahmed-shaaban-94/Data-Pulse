@@ -1,7 +1,5 @@
 """FastAPI application factory."""
 
-from __future__ import annotations
-
 import time
 import traceback
 import uuid as _uuid
@@ -10,6 +8,7 @@ import sentry_sdk
 import structlog
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
@@ -21,20 +20,29 @@ from datapulse.api.routes import (
     analytics,
     annotations,
     anomalies,
+    audit,
     billing,
+    branding,
     dashboard_layouts,
     embed,
     explore,
     export,
     forecasting,
+    gamification,
     health,
+    lineage,
+    members,
     notifications,
     onboarding,
     pipeline,
     queries,
+    report_schedules,
     reports,
+    reseller,
+    scenarios,
     search,
     targets,
+    upload,
     views,
 )
 from datapulse.config import get_settings
@@ -75,6 +83,9 @@ def create_app() -> FastAPI:
     )
     app.state.limiter = limiter
     app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)  # type: ignore[arg-type]
+
+    # GZip compression for API responses (minimum 500 bytes)
+    app.add_middleware(GZipMiddleware, minimum_size=500)
 
     # CORS for Next.js dev server
     app.add_middleware(
@@ -179,5 +190,16 @@ def create_app() -> FastAPI:
     app.include_router(notifications.router, prefix="/api/v1")
     app.include_router(annotations.router, prefix="/api/v1")
     app.include_router(dashboard_layouts.router, prefix="/api/v1")
+    app.include_router(members.router, prefix="/api/v1")
+    app.include_router(members.sectors_router, prefix="/api/v1")
+    app.include_router(audit.router, prefix="/api/v1")
+    app.include_router(lineage.router, prefix="/api/v1")
+    app.include_router(report_schedules.router, prefix="/api/v1")
+    app.include_router(upload.router, prefix="/api/v1")
+    app.include_router(scenarios.router, prefix="/api/v1")
+    app.include_router(gamification.router, prefix="/api/v1")
+    app.include_router(branding.router, prefix="/api/v1")
+    app.include_router(branding.public_router, prefix="/api/v1")
+    app.include_router(reseller.router, prefix="/api/v1")
 
     return app

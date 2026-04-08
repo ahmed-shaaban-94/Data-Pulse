@@ -5,9 +5,12 @@ import { useTopProducts } from "@/hooks/use-top-products";
 import { useTopCustomers } from "@/hooks/use-top-customers";
 import { useTopStaff } from "@/hooks/use-top-staff";
 import { useFilters } from "@/contexts/filter-context";
-import { formatCurrency, formatNumber, formatPercent } from "@/lib/formatters";
+import { formatCurrency, formatNumber, formatPercent, formatAbsolutePercent } from "@/lib/formatters";
 import { LoadingCard } from "@/components/loading-card";
-import { Printer } from "lucide-react";
+import { NarrativeSummaryCard } from "@/components/dashboard/narrative-summary-card";
+import { InsightChips } from "@/components/dashboard/insight-chips";
+import { Printer, FileDown } from "lucide-react";
+import { usePdfExport } from "@/hooks/use-pdf-export";
 
 export default function PrintReportPage() {
   const { filters } = useFilters();
@@ -16,6 +19,7 @@ export default function PrintReportPage() {
   const { data: customers, isLoading: custLoading } = useTopCustomers(filters);
   const { data: staff, isLoading: staffLoading } = useTopStaff(filters);
 
+  const { isExporting, exportDashboardPdf } = usePdfExport();
   const isLoading = sumLoading || prodLoading || custLoading || staffLoading;
 
   if (isLoading) {
@@ -44,14 +48,27 @@ export default function PrintReportPage() {
             })}
           </p>
         </div>
-        <button
-          onClick={() => window.print()}
-          className="flex items-center gap-2 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-page transition-colors hover:bg-accent/90 print:hidden"
-        >
-          <Printer className="h-4 w-4" />
-          Print
-        </button>
+        <div className="flex items-center gap-2 print:hidden">
+          <button
+            onClick={() => exportDashboardPdf(filters?.start_date, filters?.end_date)}
+            disabled={isExporting}
+            className="flex items-center gap-2 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-page transition-colors hover:bg-accent/90 disabled:opacity-60"
+          >
+            <FileDown className="h-4 w-4" />
+            {isExporting ? "Exporting..." : "Download PDF"}
+          </button>
+          <button
+            onClick={() => window.print()}
+            className="flex items-center gap-2 rounded-lg border border-border px-4 py-2 text-sm font-medium text-text-primary transition-colors hover:bg-divider"
+          >
+            <Printer className="h-4 w-4" />
+            Print
+          </button>
+        </div>
       </div>
+
+      {/* Business Narrative */}
+      <NarrativeSummaryCard variant="print" />
 
       {/* KPI Summary */}
       {summary && (
@@ -60,13 +77,13 @@ export default function PrintReportPage() {
             Key Performance Indicators
           </h2>
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-            <KPICell label="Today Gross" value={formatCurrency(summary.today_gross)} />
-            <KPICell label="MTD Gross" value={formatCurrency(summary.mtd_gross)} />
-            <KPICell label="YTD Gross" value={formatCurrency(summary.ytd_gross)} />
-            <KPICell label="Daily Transactions" value={formatNumber(summary.daily_transactions)} />
+            <KPICell label="Selected Period Revenue" value={formatCurrency(summary.today_gross)} />
+            <KPICell label="Month-to-Date Revenue" value={formatCurrency(summary.mtd_gross)} />
+            <KPICell label="Year-to-Date Revenue" value={formatCurrency(summary.ytd_gross)} />
+            <KPICell label="Completed Transactions" value={formatNumber(summary.daily_transactions)} />
             <KPICell label="Daily Customers" value={formatNumber(summary.daily_customers)} />
             <KPICell
-              label="MoM Growth"
+              label="Growth"
               value={summary.mom_growth_pct !== null ? formatPercent(summary.mom_growth_pct) : "N/A"}
             />
             <KPICell
@@ -76,6 +93,9 @@ export default function PrintReportPage() {
           </div>
         </section>
       )}
+
+      {/* Insight Chips */}
+      <InsightChips variant="print" />
 
       {/* Top Products */}
       {products && products.items.length > 0 && (
@@ -89,17 +109,17 @@ export default function PrintReportPage() {
               `#${item.rank}`,
               item.name,
               formatCurrency(item.value),
-              formatPercent(item.pct_of_total),
+              formatAbsolutePercent(item.pct_of_total),
             ])}
           />
         </section>
       )}
 
-      {/* Top Customers */}
+      {/* Top Revenue Sources */}
       {customers && customers.items.length > 0 && (
         <section>
           <h2 className="mb-4 text-lg font-semibold text-text-primary print:text-black">
-            Top Customers
+            Top Revenue Sources
           </h2>
           <ReportTable
             headers={["Rank", "Customer", "Revenue", "% of Total"]}
@@ -107,7 +127,7 @@ export default function PrintReportPage() {
               `#${item.rank}`,
               item.name,
               formatCurrency(item.value),
-              formatPercent(item.pct_of_total),
+              formatAbsolutePercent(item.pct_of_total),
             ])}
           />
         </section>
@@ -125,7 +145,7 @@ export default function PrintReportPage() {
               `#${item.rank}`,
               item.name,
               formatCurrency(item.value),
-              formatPercent(item.pct_of_total),
+              formatAbsolutePercent(item.pct_of_total),
             ])}
           />
         </section>

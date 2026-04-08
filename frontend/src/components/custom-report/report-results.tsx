@@ -42,18 +42,29 @@ const CURRENCY_COLS = new Set([
   "avg_order_value",
 ]);
 
+/** Columns that should display as plain integers (no thousand separators) */
+const PLAIN_INT_COLS = new Set([
+  "year",
+  "month",
+  "quarter",
+  "year_month",
+  "year_quarter",
+  "day_of_week",
+]);
+
 function formatCell(value: unknown, colName?: string): string {
   if (value === null || value === undefined) return "\u2014";
-  if (typeof value === "number") {
-    if (colName && CURRENCY_COLS.has(colName)) {
-      return value.toLocaleString("en-EG", {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-      });
-    }
-    return value.toLocaleString("en-EG", { maximumFractionDigits: 1 });
+  if (typeof value !== "number") return String(value ?? "");
+  if (colName && PLAIN_INT_COLS.has(colName)) {
+    return String(value);
   }
-  return String(value);
+  if (colName && CURRENCY_COLS.has(colName)) {
+    return value.toLocaleString("en-EG", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+  }
+  return value.toLocaleString("en-EG", { maximumFractionDigits: 1 });
 }
 
 function ResultTable({ result }: { result: ExploreResult }) {
@@ -194,7 +205,9 @@ function downloadCSV(result: ExploreResult) {
   const rows = result.rows.map((row) =>
     row.map((cell) => {
       if (cell === null || cell === undefined) return "";
-      if (typeof cell === "string" && cell.includes(",")) return `"${cell}"`;
+      if (typeof cell === "string" && (cell.includes(",") || cell.includes('"') || cell.includes("\n"))) {
+        return `"${cell.replace(/"/g, '""')}"`;
+      }
       return String(cell);
     }).join(","),
   );

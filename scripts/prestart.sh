@@ -4,6 +4,7 @@ set -euo pipefail
 # prestart.sh — Run SQL migrations in order before the API starts.
 # Expects DATABASE_URL or individual PG* env vars to be set.
 # For migration 002: set DB_READER_PASSWORD env var for the reader role password.
+# If DB_READER_PASSWORD is not set, a fallback value is used.
 
 DB_HOST="${DB_HOST:-postgres}"
 DB_PORT="${DB_PORT:-5432}"
@@ -11,6 +12,21 @@ DB_NAME="${POSTGRES_DB:-datapulse}"
 DB_USER="${POSTGRES_USER:-datapulse}"
 
 MIGRATIONS_DIR="${MIGRATIONS_DIR:-/app/migrations}"
+
+# Use fallback DB_READER_PASSWORD if not provided
+if [ -z "${DB_READER_PASSWORD:-}" ]; then
+    DB_READER_PASSWORD="datapulse_reader_$(date +%s)"
+    echo "[prestart] WARNING: DB_READER_PASSWORD not set. Using fallback password."
+    echo "[prestart] Set DB_READER_PASSWORD in .env for a fixed password."
+fi
+
+echo "[prestart] Connecting to ${DB_HOST}:${DB_PORT}/${DB_NAME} as ${DB_USER}..."
+
+# Test connection first
+if ! psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -c "SELECT 1" > /dev/null 2>&1; then
+    echo "[prestart] ERROR: Cannot connect to database. Check POSTGRES_PASSWORD and DB_HOST."
+    exit 1
+fi
 
 echo "[prestart] Running SQL migrations from ${MIGRATIONS_DIR}..."
 
@@ -39,14 +55,10 @@ for f in "${MIGRATIONS_DIR}"/*.sql; do
 
     echo "[prestart] Applying: ${fname}"
 
-    # Prepend GUC settings for migrations that need db_reader_password
-    if [ -n "${DB_READER_PASSWORD:-}" ]; then
-        (echo "SET app.db_reader_password = '${DB_READER_PASSWORD}';" ; cat "$f") | \
-            psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -v ON_ERROR_STOP=1
-    else
-        psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" \
-            -v ON_ERROR_STOP=1 -f "$f"
-    fi
+    # Always prepend GUC setting — harmless for migrations that don't use it,
+    # required for migration 002 which checks current_setting('app.db_reader_password')
+    (echo "SET app.db_reader_password = '${DB_READER_PASSWORD}';" ; cat "$f") | \
+        psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -v ON_ERROR_STOP=1
 
     psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" \
         -c "INSERT INTO public.schema_migrations (filename) VALUES ('${fname}') ON CONFLICT (filename) DO NOTHING"

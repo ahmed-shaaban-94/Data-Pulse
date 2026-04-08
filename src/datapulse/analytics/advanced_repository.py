@@ -29,39 +29,73 @@ class AdvancedRepository:
         self._session = session
 
     def get_abc_analysis(self, filters: AnalyticsFilter, entity: str = "product") -> ABCAnalysis:
-        """ABC/Pareto analysis — classify products (or customers) by revenue contribution."""
+        """ABC/Pareto analysis — uses drug_cluster for products, revenue-based for customers.
+
+        Products with Services or Other origin are excluded.
+        drug_cluster values: A, B, C, D, GT, N, Uncategorized, Unknown
+        Mapped to ABC: A→A, B→B, C/D/GT/N/Uncategorized/Unknown→C
+        """
         if entity == "product":
             table = "public_marts.agg_sales_by_product"
-            key_col, name_col = "product_key", "drug_name"
+            key_col, name_col = "product_key", "drug_brand"
         else:
             table = "public_marts.agg_sales_by_customer"
             key_col, name_col = "customer_key", "customer_name"
 
         where, params = build_where(filters, use_year_month=True)
 
-        stmt = text(f"""
-            WITH ranked AS (
-                SELECT {key_col} AS key, {name_col} AS name,
-                       SUM(total_sales) AS value
-                FROM {table}
-                WHERE {where}
-                GROUP BY {key_col}, {name_col}
-                HAVING SUM(total_sales) > 0
-                ORDER BY value DESC
-            ),
-            cumulative AS (
-                SELECT key, name, value,
-                       ROW_NUMBER() OVER (ORDER BY value DESC) AS rank,
-                       SUM(value) OVER () AS total,
-                       SUM(value) OVER (ORDER BY value DESC)
-                           / NULLIF(SUM(value) OVER (), 0) * 100 AS cumulative_pct
-                FROM ranked
-            )
-            SELECT key, name, value, rank, cumulative_pct, total
-            FROM cumulative
-            ORDER BY rank
-            LIMIT 200
-        """)
+        if entity == "product":
+            # Use drug_cluster for ABC class, exclude Services/Other origins
+            stmt = text(f"""
+                WITH ranked AS (
+                    SELECT {key_col} AS key, {name_col} AS name,
+                           SUM(total_sales) AS value,
+                           MAX(drug_cluster) AS cluster
+                    FROM {table}
+                    WHERE {where}
+                      AND COALESCE(origin, 'Other') IN ('Pharma', 'Non-pharma')
+                    GROUP BY {key_col}, {name_col}
+                    HAVING SUM(total_sales) > 0
+                    ORDER BY value DESC
+                ),
+                cumulative AS (
+                    SELECT key, name, value, cluster,
+                           ROW_NUMBER() OVER (ORDER BY value DESC) AS rank,
+                           SUM(value) OVER () AS total,
+                           SUM(value) OVER (ORDER BY value DESC)
+                               / NULLIF(SUM(value) OVER (), 0) * 100 AS cumulative_pct
+                    FROM ranked
+                )
+                SELECT key, name, value, rank, cumulative_pct, total, cluster
+                FROM cumulative
+                ORDER BY rank
+                LIMIT 200
+            """)
+        else:
+            stmt = text(f"""
+                WITH ranked AS (
+                    SELECT {key_col} AS key, {name_col} AS name,
+                           SUM(total_sales) AS value
+                    FROM {table}
+                    WHERE {where}
+                    GROUP BY {key_col}, {name_col}
+                    HAVING SUM(total_sales) > 0
+                    ORDER BY value DESC
+                ),
+                cumulative AS (
+                    SELECT key, name, value,
+                           ROW_NUMBER() OVER (ORDER BY value DESC) AS rank,
+                           SUM(value) OVER () AS total,
+                           SUM(value) OVER (ORDER BY value DESC)
+                               / NULLIF(SUM(value) OVER (), 0) * 100 AS cumulative_pct
+                    FROM ranked
+                )
+                SELECT key, name, value, rank, cumulative_pct, total, NULL AS cluster
+                FROM cumulative
+                ORDER BY rank
+                LIMIT 200
+            """)
+
         rows = self._session.execute(stmt, params).fetchall()
         if not rows:
             return ABCAnalysis(
@@ -82,16 +116,29 @@ class AdvancedRepository:
 
         for r in rows:
             cum_pct = Decimal(str(r[4]))
-            if cum_pct <= 80:
+            cluster = str(r[6]) if r[6] else None
+
+            # For products: use drug_cluster; for customers: use cumulative %
+            if cluster and cluster in ("A",):
                 abc_class = "A"
-                a_count += 1
-                a_value += Decimal(str(r[2]))
+            elif cluster and cluster in ("B",):
+                abc_class = "B"
+            elif cluster:
+                abc_class = "C"
+            elif cum_pct <= 80:
+                abc_class = "A"
             elif cum_pct <= 95:
                 abc_class = "B"
+            else:
+                abc_class = "C"
+
+            if abc_class == "A":
+                a_count += 1
+                a_value += Decimal(str(r[2]))
+            elif abc_class == "B":
                 b_count += 1
                 b_value += Decimal(str(r[2]))
             else:
-                abc_class = "C"
                 c_count += 1
                 c_value += Decimal(str(r[2]))
 
@@ -122,10 +169,11 @@ class AdvancedRepository:
         stmt = text("""
             SELECT full_date, daily_gross_amount
             FROM public_marts.metrics_summary
-            WHERE EXTRACT(YEAR FROM full_date) = :year
+            WHERE full_date >= MAKE_DATE(:year, 1, 1)
+              AND full_date < MAKE_DATE(:year_next, 1, 1)
             ORDER BY full_date
         """)
-        rows = self._session.execute(stmt, {"year": year}).fetchall()
+        rows = self._session.execute(stmt, {"year": year, "year_next": year + 1}).fetchall()
         if not rows:
             return HeatmapData(cells=[], min_value=_ZERO, max_value=_ZERO)
 
@@ -138,22 +186,15 @@ class AdvancedRepository:
         where, params = build_where(filters, use_year_month=True)
 
         stmt = text(f"""
-            WITH monthly AS (
-                SELECT year || '-' || LPAD(month::TEXT, 2, '0') AS period,
-                       SUM(return_count) AS return_count,
-                       SUM(return_amount) AS return_amount,
-                       SUM(total_sales) AS total_amount
-                FROM public_marts.agg_sales_monthly
-                WHERE {where}
-                GROUP BY year, month
-                ORDER BY year, month
-            )
-            SELECT period, return_count,
-                   ABS(return_amount) AS return_amount,
-                   CASE WHEN total_amount > 0
-                        THEN ROUND(ABS(return_amount) / total_amount * 100, 2)
-                        ELSE 0 END AS return_rate
-            FROM monthly
+            SELECT year || '-' || LPAD(month::TEXT, 2, '0') AS period,
+                   SUM(return_count)::INT AS return_count,
+                   ROUND(ABS(SUM(total_discount)), 2) AS return_amount,
+                   ROUND(AVG(return_rate), 4) AS return_rate,
+                   SUM(transaction_count)::INT AS transaction_count
+            FROM public_marts.agg_sales_monthly
+            WHERE {where}
+            GROUP BY year, month
+            ORDER BY year, month
         """)
         rows = self._session.execute(stmt, params).fetchall()
         if not rows:
@@ -176,9 +217,10 @@ class AdvancedRepository:
 
         total_returns = sum(p.return_count for p in points)
         total_amount = Decimal(sum(p.return_amount for p in points))
+        total_transactions = sum(int(r[4]) if r[4] else 0 for r in rows)
         avg_rate = (
-            Decimal(sum(p.return_rate for p in points) / len(points)).quantize(Decimal("0.01"))
-            if points
+            (Decimal(total_returns) / Decimal(total_transactions)).quantize(Decimal("0.0001"))
+            if total_transactions > 0
             else _ZERO
         )
 

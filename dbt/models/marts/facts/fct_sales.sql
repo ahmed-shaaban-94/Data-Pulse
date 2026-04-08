@@ -62,7 +62,7 @@ SELECT
         COALESCE(s.site_code, '') || '|' ||
         COALESCE(s.quantity::TEXT, '') || '|' ||
         COALESCE(s.billing_way, '')
-    ), 8))::BIT(32)::INT AS sales_key,
+    ), 16))::BIT(64)::BIGINT AS sales_key,
 
     -- Tenant
     s.tenant_id,
@@ -80,10 +80,10 @@ SELECT
     s.billing_way,
 
     -- Measures (rounded to 2 decimals)
-    -- Only gross (sales) + discount; net deliberately excluded
     ROUND(s.quantity::NUMERIC, 2)               AS quantity,
     ROUND(s.sales::NUMERIC, 2)                  AS sales,
     ROUND(s.discount::NUMERIC, 2)               AS discount,
+    ROUND(s.net_amount::NUMERIC, 2)             AS net_amount,
 
     -- Flags
     s.is_return,

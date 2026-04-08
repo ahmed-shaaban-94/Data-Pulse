@@ -1,7 +1,7 @@
 """Session-scoped test configuration for DataPulse.
 
 Problem: The project's .env file contains extra keys (POSTGRES_USER,
-POSTGRES_PASSWORD, POSTGRES_DB, PGADMIN_EMAIL, PGADMIN_PASSWORD) that
+POSTGRES_PASSWORD, POSTGRES_DB) that
 pydantic-settings rejects as "extra_forbidden" when Settings() is called.
 
 Solution: Patch get_settings() at the session level so every call to
@@ -38,6 +38,22 @@ def _disable_rate_limiting():
 
 
 @pytest.fixture(autouse=True, scope="session")
+def _disable_redis_cache():
+    """Disable Redis caching so service tests hit the real (mocked) functions.
+
+    The cache module itself is tested in test_cache.py using local mocks,
+    so this global disable doesn't affect those tests — they mock
+    get_redis_client() directly.
+    """
+    with (
+        patch("datapulse.cache_decorator.cache_get", return_value=None),
+        patch("datapulse.cache_decorator.cache_set"),
+        patch("datapulse.cache.get_redis_client", return_value=None),
+    ):
+        yield
+
+
+@pytest.fixture(autouse=True, scope="session")
 def _patch_get_settings_globally():
     """Replace get_settings() with a version that never reads the .env file.
 
@@ -52,21 +68,37 @@ def _patch_get_settings_globally():
     clean_settings = Settings(_env_file=None, api_key="test-api-key", database_url="")
     get_settings.cache_clear()
 
-    # Also patch the imported references in each module that uses get_settings
-    with (
-        patch("datapulse.core.config.get_settings", return_value=clean_settings),
-        patch("datapulse.config.get_settings", return_value=clean_settings),
-        patch("datapulse.import_pipeline.validator.get_settings", return_value=clean_settings),
-        patch("datapulse.import_pipeline.reader.get_settings", return_value=clean_settings),
-        patch("datapulse.bronze.loader.get_settings", return_value=clean_settings),
-        patch("datapulse.api.deps.get_settings", return_value=clean_settings),
-        patch("datapulse.api.app.get_settings", return_value=clean_settings),
-        patch("datapulse.api.auth.get_settings", return_value=clean_settings),
-        patch("datapulse.embed.token.get_settings", return_value=clean_settings),
-        patch("datapulse.api.routes.explore.get_settings", return_value=clean_settings),
-        patch("datapulse.scheduler.get_settings", return_value=clean_settings),
-        patch("datapulse.cache.get_settings", return_value=clean_settings),
-    ):
+    # Patch the imported references in each module that uses get_settings.
+    # Modules that may fail to import (e.g. scheduler needs apscheduler)
+    # use create=True so the patch succeeds even if the attribute can't be resolved.
+    _always_patch = [
+        "datapulse.core.config.get_settings",
+        "datapulse.config.get_settings",
+        "datapulse.import_pipeline.validator.get_settings",
+        "datapulse.import_pipeline.reader.get_settings",
+        "datapulse.bronze.loader.get_settings",
+        "datapulse.api.deps.get_settings",
+        "datapulse.api.app.get_settings",
+        "datapulse.api.auth.get_settings",
+        "datapulse.embed.token.get_settings",
+        "datapulse.api.routes.explore.get_settings",
+        "datapulse.cache.get_settings",
+    ]
+    # Modules with heavy third-party deps that may not be importable in test env
+    _optional_patch = [
+        "datapulse.scheduler.get_settings",
+    ]
+
+    import contextlib
+
+    patches = [patch(t, return_value=clean_settings) for t in _always_patch]
+    for t in _optional_patch:
+        with contextlib.suppress(AttributeError, ModuleNotFoundError):
+            patches.append(patch(t, return_value=clean_settings))
+
+    with contextlib.ExitStack() as stack:
+        for p in patches:
+            stack.enter_context(p)
         yield
 
     get_settings.cache_clear()
