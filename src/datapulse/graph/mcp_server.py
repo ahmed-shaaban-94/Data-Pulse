@@ -17,17 +17,27 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
-from mcp.server.fastmcp import FastMCP
-
 from datapulse.graph import store
 from datapulse.graph.indexer import index
 
-mcp = FastMCP("datapulse-graph")
+try:
+    from mcp.server.fastmcp import FastMCP
+
+    mcp = FastMCP("datapulse-graph")
+except ImportError:
+    mcp = None  # type: ignore[assignment]
 
 _PROJECT_ROOT = str(Path(__file__).resolve().parents[3])
 
 
-@mcp.tool()
+def _tool():
+    """Decorator that registers with MCP if available, otherwise no-op."""
+    if mcp is not None:
+        return mcp.tool()
+    return lambda fn: fn
+
+
+@_tool()
 def dp_impact(
     symbol_name: str,
     max_depth: int = 3,
@@ -74,7 +84,7 @@ def dp_impact(
     return json.dumps(output, indent=2)
 
 
-@mcp.tool()
+@_tool()
 def dp_context(
     symbol_name: str,
 ) -> str:
@@ -93,7 +103,7 @@ def dp_context(
     return json.dumps(result, indent=2)
 
 
-@mcp.tool()
+@_tool()
 def dp_query(
     query: str,
     kind: str | None = None,
@@ -140,7 +150,7 @@ def dp_query(
     )
 
 
-@mcp.tool()
+@_tool()
 def dp_detect_changes() -> str:
     """Map current git changes to affected symbols and their dependencies.
 
@@ -233,6 +243,8 @@ def _ensure_indexed() -> None:
 
 
 def main() -> None:
+    if mcp is None:
+        raise ImportError("mcp package required: pip install 'datapulse[graph]'")
     mcp.run(transport="stdio")
 
 
