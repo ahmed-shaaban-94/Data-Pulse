@@ -269,3 +269,37 @@ models:
         description: "Actual / Target * 100 for transactions"
       - name: revenue_variance
         description: "Actual revenue minus target revenue"
+
+  # -- feat_gamification_events ---------------------------------------------------
+  - name: feat_gamification_events
+    description: "Monthly gamification metrics per staff for badge evaluation. Grain: (tenant_id, staff_key, year, month). Aggregates sales, returns, growth, and quota achievement."
+    meta:
+      label: "Gamification Events"
+    columns:
+      - name: tenant_id
+        tests: [not_null]
+      - name: staff_key
+        description: "FK to dim_staff"
+        tests: [not_null]
+      - name: year
+        tests: [not_null]
+      - name: month
+        tests: [not_null]
+      - name: staff_name
+        description: "Staff member name"
+      - name: monthly_revenue
+        description: "Total net revenue for the month"
+      - name: monthly_txn_count
+        description: "Number of transactions in the month"
+      - name: monthly_customers
+        description: "Unique customers served in the month"
+      - name: monthly_returns
+        description: "Number of returns in the month"
+      - name: total_sales_count
+        description: "Cumulative total sales count (running total)"
+      - name: mom_growth_pct
+        description: "Month-over-month revenue growth percentage"
+      - name: consecutive_100pct_months
+        description: "Number of consecutive months at 100%+ quota achievement (up to 3)"
+      - name: revenue_achievement_pct
+        description: "Revenue quota achievement percentage"

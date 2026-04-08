@@ -10,6 +10,7 @@ import { OnboardingOverlay } from "@/components/onboarding/onboarding-overlay";
 import { NotificationBell } from "@/components/notifications/notification-bell";
 import { NotificationCenter } from "@/components/notifications/notification-center";
 import { KeyboardShortcutsHelp } from "@/components/keyboard-shortcuts-help";
+import { BrandProvider } from "@/components/branding/brand-provider";
 import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
 import { useAIAnomalies } from "@/hooks/use-ai-anomalies";
 import { useAlertLog } from "@/hooks/use-alerts";
@@ -49,7 +50,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     <Providers>
       <ErrorBoundary>
         <ToastProvider>
-          <AppShell>{children}</AppShell>
+          <BrandProvider>
+            <AppShell>{children}</AppShell>
+          </BrandProvider>
         </ToastProvider>
       </ErrorBoundary>
     </Providers>

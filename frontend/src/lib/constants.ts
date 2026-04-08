@@ -40,6 +40,8 @@ export const NAV_ITEMS = [
   { label: "Team", href: "/team", icon: "Shield" },
   { label: "Data Lineage", href: "/lineage", icon: "GitBranch" },
   { label: "Data Quality", href: "/quality", icon: "ShieldCheck" },
+  { label: "Gamification", href: "/gamification", icon: "Trophy" },
+  { label: "Branding", href: "/branding", icon: "Palette" },
   { label: "Audit Log", href: "/audit", icon: "ScrollText" },
   { label: "Billing", href: "/billing", icon: "CreditCard" },
 ] as const;
