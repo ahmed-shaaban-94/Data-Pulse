@@ -1,29 +1,23 @@
-import 'package:flutter_appauth/flutter_appauth.dart';
+import 'package:auth0_flutter/auth0_flutter.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import '../../config/constants.dart';
 
 class AuthService {
-  final FlutterAppAuth _appAuth = const FlutterAppAuth();
+  late final Auth0 _auth0;
   static const _storage = FlutterSecureStorage();
+
+  AuthService() {
+    _auth0 = Auth0(AppConstants.authDomain, AppConstants.authClientId);
+  }
 
   Future<bool> login() async {
     try {
-      final result = await _appAuth.authorizeAndExchangeCode(
-        AuthorizationTokenRequest(
-          AppConstants.authClientId,
-          AppConstants.authRedirectUri,
-          issuer: AppConstants.authIssuer,
-          scopes: ['openid', 'profile', 'email'],
-          promptValues: ['login'],
-        ),
-      );
-
-      if (result != null) {
-        await _saveTokens(result);
-        return true;
-      }
-      return false;
+      final credentials = await _auth0
+          .webAuthentication(scheme: 'com.datapulse.app')
+          .login(useHTTPS: true);
+      await _saveCredentials(credentials);
+      return true;
     } catch (e) {
       return false;
     }
@@ -34,27 +28,24 @@ class AuthService {
       final refreshToken = await _storage.read(key: 'refresh_token');
       if (refreshToken == null) return false;
 
-      final result = await _appAuth.token(
-        TokenRequest(
-          AppConstants.authClientId,
-          AppConstants.authRedirectUri,
-          issuer: AppConstants.authIssuer,
-          refreshToken: refreshToken,
-        ),
+      final credentials = await _auth0.api.renewCredentials(
+        refreshToken: refreshToken,
       );
-
-      if (result != null) {
-        await _saveTokens(result);
-        return true;
-      }
-      return false;
+      await _saveCredentials(credentials);
+      return true;
     } catch (e) {
       return false;
     }
   }
 
   Future<void> logout() async {
-    await _storage.deleteAll();
+    try {
+      await _auth0
+          .webAuthentication(scheme: 'com.datapulse.app')
+          .logout(useHTTPS: true);
+    } finally {
+      await _storage.deleteAll();
+    }
   }
 
   Future<String?> getAccessToken() async {
@@ -66,15 +57,11 @@ class AuthService {
     return token != null;
   }
 
-  Future<void> _saveTokens(TokenResponse result) async {
-    if (result.accessToken != null) {
-      await _storage.write(key: 'access_token', value: result.accessToken);
+  Future<void> _saveCredentials(Credentials credentials) async {
+    await _storage.write(key: 'access_token', value: credentials.accessToken);
+    if (credentials.refreshToken != null) {
+      await _storage.write(key: 'refresh_token', value: credentials.refreshToken);
     }
-    if (result.refreshToken != null) {
-      await _storage.write(key: 'refresh_token', value: result.refreshToken);
-    }
-    if (result.idToken != null) {
-      await _storage.write(key: 'id_token', value: result.idToken);
-    }
+    await _storage.write(key: 'id_token', value: credentials.idToken);
   }
 }
