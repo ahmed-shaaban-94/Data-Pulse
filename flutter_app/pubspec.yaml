@@ -29,7 +29,7 @@ dependencies:
   fl_chart: ^0.66.2
 
   # Auth
-  flutter_appauth: ^6.0.3
+  auth0_flutter: ^2.0.0-beta.1
   flutter_secure_storage: ^9.0.0
 
   # JSON Serialization
