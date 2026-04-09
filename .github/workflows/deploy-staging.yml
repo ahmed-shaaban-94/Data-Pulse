@@ -120,6 +120,12 @@ jobs:
               -f docker-compose.prod.yml \
               up -d --remove-orphans || echo "::warning::docker compose up exited non-zero — checking health..."
 
+            # Immediate diagnostics — surface the real error before waiting
+            echo "=== Container status after up ==="
+            docker compose -f docker-compose.yml -f docker-compose.prod.yml ps || true
+            echo "=== API logs (startup) ==="
+            docker compose -f docker-compose.yml -f docker-compose.prod.yml logs --tail=80 api 2>&1 || true
+
             # Health check — API
             echo "=== Health check: API ==="
             API_OK=false
