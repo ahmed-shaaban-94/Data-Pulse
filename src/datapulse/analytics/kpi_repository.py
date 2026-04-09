@@ -1,4 +1,5 @@
 """KPI and filter-options query methods for the analytics layer."""
+
 from __future__ import annotations
 
 from datetime import date, timedelta

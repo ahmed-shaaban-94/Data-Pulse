@@ -1,4 +1,5 @@
 """Time-series trend query methods for the analytics layer."""
+
 from __future__ import annotations
 
 from sqlalchemy import text
