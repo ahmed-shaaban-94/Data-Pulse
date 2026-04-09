@@ -147,14 +147,21 @@ jobs:
               -f docker-compose.prod.yml \
               pull
 
-            # Deploy — recreate all services to ensure nginx picks up new upstreams.
-            # Without --force-recreate, nginx keeps stale references to old api/frontend
-            # containers and returns 503 until manually restarted.
+            # Deploy in two phases:
+            # 1. Bring up infra (postgres, redis) normally — no recreate needed
+            # 2. Force-recreate app services (api, frontend, nginx) so nginx
+            #    picks up new upstream container IPs and the config is reloaded.
+            #    --force-recreate on postgres/redis would cause a cold DB restart
+            #    making /health return 503 for minutes.
             echo "=== Starting deployment ==="
             docker compose \
               -f docker-compose.yml \
               -f docker-compose.prod.yml \
-              up -d --remove-orphans --force-recreate || echo "::warning::docker compose up exited non-zero — checking health..."
+              up -d --remove-orphans postgres redis || echo "::warning::infra up exited non-zero"
+            docker compose \
+              -f docker-compose.yml \
+              -f docker-compose.prod.yml \
+              up -d --remove-orphans --force-recreate api frontend nginx || echo "::warning::app up exited non-zero — checking health..."
 
             # Immediate diagnostics — surface the real error before waiting
             echo "=== Container status after up ==="
@@ -162,11 +169,13 @@ jobs:
             echo "=== API logs (startup) ==="
             docker compose -f docker-compose.yml -f docker-compose.prod.yml logs --tail=80 api 2>&1 || true
 
-            # Health check — API via nginx internal port (bypasses SSL/server_name)
+            # Health check — API liveness via nginx internal port.
+            # Uses /health/live (always 200 if process is alive) not /health
+            # (returns 503 until DB is ready). Readiness is tested in smoke tests.
             echo "=== Health check: API ==="
             API_OK=false
             for i in $(seq 1 24); do
-              HTTP_CODE=$(curl -s -o /dev/null -w '%{http_code}' --connect-timeout 5 http://localhost:8080/health 2>/dev/null || echo "000")
+              HTTP_CODE=$(curl -s -o /dev/null -w '%{http_code}' --connect-timeout 5 http://localhost:8080/health/live 2>/dev/null || echo "000")
               if [ "$HTTP_CODE" = "200" ]; then
                 echo "API health check PASSED on attempt $i"
                 API_OK=true
