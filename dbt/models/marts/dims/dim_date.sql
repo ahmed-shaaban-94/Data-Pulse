@@ -1,7 +1,17 @@
 {{
     config(
         materialized='table',
-        schema='marts'
+        schema='marts',
+        post_hook=[
+            "ALTER TABLE {{ this }} ENABLE ROW LEVEL SECURITY",
+            "ALTER TABLE {{ this }} FORCE ROW LEVEL SECURITY",
+            "DROP POLICY IF EXISTS owner_all ON {{ this }}",
+            "CREATE POLICY owner_all ON {{ this }} FOR ALL TO datapulse USING (true) WITH CHECK (true)",
+            "DROP POLICY IF EXISTS reader_tenant ON {{ this }}",
+            "CREATE POLICY reader_tenant ON {{ this }} FOR SELECT TO datapulse_reader USING (true)",
+            "CREATE INDEX IF NOT EXISTS idx_dim_date_date_key ON {{ this }} (date_key)",
+            "CREATE INDEX IF NOT EXISTS idx_dim_date_full_date ON {{ this }} (full_date)"
+        ]
     )
 }}
 
