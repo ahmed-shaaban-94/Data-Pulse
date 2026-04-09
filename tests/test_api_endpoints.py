@@ -80,11 +80,11 @@ def test_health_endpoint(api_client):
         ),
         patch(
             "datapulse.api.routes.health._check_dbt_freshness",
-            return_value={"status": "ok", "last_updated_at": "2026-04-09T12:00:00", "age_hours": 2.0},
+            return_value={"status": "ok", "last_updated_at": "2026-04-09T12:00:00"},
         ),
         patch(
             "datapulse.api.routes.health._check_data_freshness",
-            return_value={"status": "ok", "last_loaded_at": "2026-04-09T12:00:00", "age_hours": 2.0},
+            return_value={"status": "ok", "last_loaded_at": "2026-04-09T12:00:00"},
         ),
     ):
         mock_conn = MagicMock()
@@ -121,11 +121,11 @@ def test_health_endpoint_unauthenticated(api_client):
         ),
         patch(
             "datapulse.api.routes.health._check_dbt_freshness",
-            return_value={"status": "ok", "last_updated_at": "2026-04-09T12:00:00", "age_hours": 2.0},
+            return_value={"status": "ok", "last_updated_at": "2026-04-09T12:00:00"},
         ),
         patch(
             "datapulse.api.routes.health._check_data_freshness",
-            return_value={"status": "ok", "last_loaded_at": "2026-04-09T12:00:00", "age_hours": 2.0},
+            return_value={"status": "ok", "last_loaded_at": "2026-04-09T12:00:00"},
         ),
     ):
         mock_conn = MagicMock()
