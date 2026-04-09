@@ -107,7 +107,7 @@ def _check_pool() -> dict:
 @router.get("/health")
 def health_check(
     request: Request,
-    user: dict[str, Any] | None = Depends(get_optional_user),
+    user: dict[str, Any] | None = Depends(get_optional_user),  # noqa: B008
 ) -> JSONResponse:
     """Full health check — database, Redis, query executor, connection pool.
 

@@ -47,10 +47,9 @@ export function useMembers() {
     return res;
   }
 
-  async function updateMember(memberId: number, updates: Record<string, unknown>) {
-    const res = await patchAPI<MemberResponse>(`/api/v1/members/${memberId}`, updates);
+  async function updateMember(memberId: number, updates: Record<string, unknown>): Promise<void> {
+    await patchAPI<MemberResponse>(`/api/v1/members/${memberId}`, updates);
     mutate();
-    return res;
   }
 
   async function removeMember(memberId: number) {

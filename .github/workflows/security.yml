@@ -84,4 +84,4 @@ jobs:
       - name: Run Bandit
         run: |
           pip install "bandit[toml]"
-          bandit -r src/ -ll -x src/datapulse/migrations
+          bandit -r src/ -ll -c pyproject.toml
