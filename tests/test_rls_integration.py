@@ -25,9 +25,7 @@ would not be caught by these tests.
 from __future__ import annotations
 
 import contextlib
-from unittest.mock import MagicMock, call, patch
-
-import pytest
+from unittest.mock import MagicMock, patch
 
 from datapulse.api.deps import get_tenant_session
 
