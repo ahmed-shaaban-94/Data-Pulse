@@ -1,5 +1,7 @@
 "use client";
 
+"use client";
+
 import { useState } from "react";
 import {
   Users,
@@ -15,6 +17,7 @@ import {
   ChevronDown,
 } from "lucide-react";
 import { useMembers, useMyAccess, useRoles, useSectors } from "@/hooks/use-members";
+import { useToast } from "@/components/ui/toast";
 import type { MemberResponse, RoleKey, SectorResponse } from "@/types/members";
 
 const ROLE_COLORS: Record<RoleKey, string> = {
@@ -646,6 +649,7 @@ export default function TeamPage() {
   const { access, isLoading: accessLoading } = useMyAccess();
   const { members, isLoading: membersLoading, inviteMember, updateMember, removeMember } = useMembers();
   const { sectors, isLoading: sectorsLoading, createSector, deleteSector } = useSectors();
+  const { success, error: toastError } = useToast();
   const [inviteOpen, setInviteOpen] = useState(false);
   const [editingMember, setEditingMember] = useState<MemberResponse | null>(null);
 
@@ -653,8 +657,46 @@ export default function TeamPage() {
   const canManage = access?.is_admin ?? false;
   const actorRole = access?.role_key ?? "viewer";
 
-  function handleToggleActive(memberId: number, active: boolean) {
-    updateMember(memberId, { is_active: active });
+  async function handleToggleActive(memberId: number, active: boolean) {
+    try {
+      await updateMember(memberId, { is_active: active });
+      success(active ? "Member activated" : "Member deactivated");
+    } catch {
+      toastError("Failed to update member status");
+    }
+  }
+
+  async function handleRemoveMember(memberId: number) {
+    try {
+      await removeMember(memberId);
+      success("Member removed");
+    } catch {
+      toastError("Failed to remove member");
+    }
+  }
+
+  async function handleInviteMember(email: string, role: RoleKey, name: string, sectorIds: number[]) {
+    await inviteMember(email, role, name, sectorIds);
+    success(`Invitation sent to ${email}`);
+  }
+
+  async function handleUpdateMember(memberId: number, updates: Record<string, unknown>) {
+    await updateMember(memberId, updates);
+    success("Member updated");
+  }
+
+  async function handleCreateSector(data: { sector_key: string; sector_name: string; description?: string; site_codes?: string[] }) {
+    await createSector(data);
+    success(`Sector "${data.sector_name}" created`);
+  }
+
+  async function handleDeleteSector(sectorId: number) {
+    try {
+      await deleteSector(sectorId);
+      success("Sector deleted");
+    } catch {
+      toastError("Failed to delete sector");
+    }
   }
 
   if (isLoading) {
@@ -725,7 +767,7 @@ export default function TeamPage() {
               isCurrentUser={m.user_id === access?.user_id}
               canManage={canManage}
               actorRole={actorRole}
-              onRemove={removeMember}
+              onRemove={handleRemoveMember}
               onEdit={setEditingMember}
               onToggleActive={handleToggleActive}
             />
@@ -753,10 +795,10 @@ export default function TeamPage() {
               key={s.sector_id}
               sector={s}
               canManage={canManage}
-              onDelete={deleteSector}
+              onDelete={handleDeleteSector}
             />
           ))}
-          {canManage && <CreateSectorForm onSubmit={async (data) => { await createSector(data); }} />}
+          {canManage && <CreateSectorForm onSubmit={handleCreateSector} />}
         </div>
       </section>
 
@@ -764,7 +806,7 @@ export default function TeamPage() {
       <InviteDialog
         open={inviteOpen}
         onClose={() => setInviteOpen(false)}
-        onInvite={async (email, role, name, sectorIds) => { await inviteMember(email, role, name, sectorIds); }}
+        onInvite={handleInviteMember}
         sectors={sectors || []}
         actorRole={actorRole}
       />
@@ -773,7 +815,7 @@ export default function TeamPage() {
         <EditMemberDialog
           member={editingMember}
           onClose={() => setEditingMember(null)}
-          onSave={updateMember}
+          onSave={handleUpdateMember}
           sectors={sectors || []}
           actorRole={actorRole}
         />

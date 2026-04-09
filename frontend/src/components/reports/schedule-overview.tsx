@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useReportSchedules } from "@/hooks/use-report-schedules";
 import { LoadingCard } from "@/components/loading-card";
 import { ErrorRetry } from "@/components/error-retry";
+import { useToast } from "@/components/ui/toast";
 import { Plus, Clock, Trash2, ToggleLeft, ToggleRight } from "lucide-react";
 
 const CRON_PRESETS = [
@@ -15,6 +16,7 @@ const CRON_PRESETS = [
 export function ScheduleOverview() {
   const { schedules, isLoading, error, createSchedule, toggleSchedule, deleteSchedule } =
     useReportSchedules();
+  const { success, error: toastError } = useToast();
   const [showForm, setShowForm] = useState(false);
   const [name, setName] = useState("");
   const [reportType, setReportType] = useState("dashboard");
@@ -26,15 +28,38 @@ export function ScheduleOverview() {
 
   const handleCreate = async () => {
     if (!name) return;
-    await createSchedule({
-      name,
-      report_type: reportType,
-      cron_expression: cron,
-      recipients: recipients.split(",").map((e) => e.trim()).filter(Boolean),
-    });
-    setShowForm(false);
-    setName("");
-    setRecipients("");
+    try {
+      await createSchedule({
+        name,
+        report_type: reportType,
+        cron_expression: cron,
+        recipients: recipients.split(",").map((e) => e.trim()).filter(Boolean),
+      });
+      success(`Schedule "${name}" created`);
+      setShowForm(false);
+      setName("");
+      setRecipients("");
+    } catch {
+      toastError("Failed to create schedule");
+    }
+  };
+
+  const handleToggle = async (id: number, enabled: boolean) => {
+    try {
+      await toggleSchedule(id, enabled);
+      success(enabled ? "Schedule enabled" : "Schedule disabled");
+    } catch {
+      toastError("Failed to update schedule");
+    }
+  };
+
+  const handleDelete = async (id: number) => {
+    try {
+      await deleteSchedule(id);
+      success("Schedule deleted");
+    } catch {
+      toastError("Failed to delete schedule");
+    }
   };
 
   return (
@@ -109,7 +134,7 @@ export function ScheduleOverview() {
               )}
             </div>
             <button
-              onClick={() => toggleSchedule(s.id, !s.enabled)}
+              onClick={() => handleToggle(s.id, !s.enabled)}
               className="text-text-secondary hover:text-accent"
               title={s.enabled ? "Disable" : "Enable"}
             >
@@ -120,7 +145,7 @@ export function ScheduleOverview() {
               )}
             </button>
             <button
-              onClick={() => deleteSchedule(s.id)}
+              onClick={() => handleDelete(s.id)}
               className="text-text-secondary hover:text-red-500"
             >
               <Trash2 className="h-4 w-4" />

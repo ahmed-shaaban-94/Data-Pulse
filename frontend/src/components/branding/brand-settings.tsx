@@ -5,6 +5,7 @@ import { useBranding, type BrandingConfig } from "@/hooks/use-branding";
 import { postAPI } from "@/lib/api-client";
 import { API_BASE_URL } from "@/lib/constants";
 import { LoadingCard } from "@/components/loading-card";
+import { useToast } from "@/components/ui/toast";
 import { Save, RotateCcw } from "lucide-react";
 
 async function updateBranding(data: Partial<BrandingConfig>): Promise<BrandingConfig> {
@@ -22,6 +23,7 @@ async function updateBranding(data: Partial<BrandingConfig>): Promise<BrandingCo
 
 export function BrandSettings() {
   const { data: branding, isLoading, mutate } = useBranding();
+  const { success, error: toastError } = useToast();
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState<Partial<BrandingConfig>>({});
@@ -42,8 +44,11 @@ export function BrandSettings() {
       const updated = await updateBranding(form);
       mutate(updated, false);
       setForm({});
+      success("Branding settings saved");
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Failed to save");
+      const msg = err instanceof Error ? err.message : "Failed to save";
+      setError(msg);
+      toastError(msg);
     } finally {
       setSaving(false);
     }
