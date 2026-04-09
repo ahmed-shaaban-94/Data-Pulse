@@ -107,6 +107,7 @@ module = [
     "apscheduler.*",
     "openpyxl.*",
     "prometheus_fastapi_instrumentator.*",
+    "mcp.*",
 ]
 ignore_missing_imports = true
 
