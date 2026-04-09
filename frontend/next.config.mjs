@@ -1,5 +1,10 @@
 import { withSentryConfig } from "@sentry/nextjs";
+import bundleAnalyzer from "@next/bundle-analyzer";
 import createNextIntlPlugin from "next-intl/plugin";
+
+const withBundleAnalyzer = bundleAnalyzer({
+  enabled: process.env.ANALYZE === "true",
+});
 
 const withNextIntl = createNextIntlPlugin("./src/i18n/request.ts");
 
@@ -7,20 +12,8 @@ const withNextIntl = createNextIntlPlugin("./src/i18n/request.ts");
 const nextConfig = {
   output: "standalone",
   experimental: {
-    scrollRestoration: true,
-    optimizePackageImports: [
-      "lucide-react",
-      "recharts",
-      "date-fns",
-      "framer-motion",
-      "react-day-picker",
-      "@radix-ui/react-popover",
-      "@radix-ui/react-dialog",
-      "@radix-ui/react-dropdown-menu",
-      "@radix-ui/react-tooltip",
-    ],
+    optimizePackageImports: ["lucide-react", "recharts", "date-fns"],
   },
-  compress: true,
   // Proxy /api/v1/* and /health to the FastAPI backend.
   // This lets NEXT_PUBLIC_API_URL stay empty (same-origin requests from the
   // browser) while the Next.js server forwards the calls to the API container.
@@ -58,50 +51,6 @@ const nextConfig = {
           },
         ],
       },
-      {
-        // Cache static assets (fonts, images, etc.)
-        source: "/(.*)\\.(woff2|woff|ttf|ico|png|jpg|jpeg|svg|webp)",
-        headers: [
-          {
-            key: "Cache-Control",
-            value: "public, max-age=31536000, immutable",
-          },
-        ],
-      },
-      {
-        // PWA manifest — short cache so updates propagate quickly
-        source: "/manifest.json",
-        headers: [
-          {
-            key: "Cache-Control",
-            value: "public, max-age=3600, stale-while-revalidate=86400",
-          },
-        ],
-      },
-      {
-        // Service worker must not be cached aggressively
-        source: "/sw.js",
-        headers: [
-          {
-            key: "Cache-Control",
-            value: "no-cache, no-store, must-revalidate",
-          },
-          {
-            key: "Service-Worker-Allowed",
-            value: "/",
-          },
-        ],
-      },
-      {
-        // Short cache for API proxy responses with stale-while-revalidate
-        source: "/api/v1/:path*",
-        headers: [
-          {
-            key: "Cache-Control",
-            value: "private, max-age=30, stale-while-revalidate=60",
-          },
-        ],
-      },
     ];
   },
 };
@@ -115,7 +64,11 @@ const sentryConfig = withSentryConfig(withNextIntl(nextConfig), {
   telemetry: false,
 });
 
-// Only wrap with Sentry if DSN is configured
-export default process.env.NEXT_PUBLIC_SENTRY_DSN
+// Build the final config:
+// - Always: bundle analyzer wrapper (no-op unless ANALYZE=true)
+// - Conditionally: Sentry wrapper (only when DSN is set)
+const baseConfig = process.env.NEXT_PUBLIC_SENTRY_DSN
   ? sentryConfig
   : withNextIntl(nextConfig);
+
+export default withBundleAnalyzer(baseConfig);

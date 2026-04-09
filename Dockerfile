@@ -19,7 +19,12 @@ COPY migrations/ migrations/
 # ── API stage: production server ─────────────────────────────────
 FROM base AS api
 
-RUN pip install --no-cache-dir "."
+COPY requirements.lock .
+RUN pip install --no-cache-dir --require-hashes -r requirements.lock \
+    && pip install --no-cache-dir --no-deps .
+
+# Tell datapulse.lineage.parser where to find dbt models at runtime
+ENV APP_ROOT=/app
 
 # Include migration scripts — entrypoint runs them before uvicorn
 COPY scripts/prestart.sh /app/scripts/prestart.sh

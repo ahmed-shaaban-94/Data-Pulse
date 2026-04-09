@@ -15,6 +15,7 @@ env:
   IMAGE_PREFIX: ${{ github.repository_owner }}/data-pulse
 
 jobs:
+  # ── Step 1: Build & push Docker images ───────────────────────────────
   build-push:
     name: Build & Push Images
     runs-on: ubuntu-latest
@@ -56,13 +57,46 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+  # ── Step 2: Deploy to staging server ─────────────────────────────────
   deploy:
     name: Deploy to Staging
     needs: [build-push]
     runs-on: ubuntu-latest
-    environment: staging
+    environment: deploy
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 20
+
+      - name: Deployment summary
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          SHA="${{ github.event.workflow_run.head_sha }}"
+          SHORT_SHA="${SHA:0:7}"
+
+          {
+            echo "## Staging Deployment"
+            echo ""
+            echo "| Field | Value |"
+            echo "|-------|-------|"
+            echo "| **Branch** | \`main\` |"
+            echo "| **Commit** | \`$SHORT_SHA\` |"
+            echo "| **Author** | $(git log -1 --format='%an' "$SHA" 2>/dev/null || echo 'N/A') |"
+            echo "| **Message** | $(git log -1 --format='%s' "$SHA" 2>/dev/null || echo 'N/A') |"
+            echo "| **CI Run** | [#${{ github.event.workflow_run.run_number }}](${{ github.event.workflow_run.html_url }}) |"
+            echo "| **Deployed at** | $(date -u +'%Y-%m-%d %H:%M UTC') |"
+            echo ""
+            echo "### Recent Commits"
+            echo '```'
+            git log --oneline -10 "$SHA" 2>/dev/null || echo "Could not fetch log"
+            echo '```'
+            echo ""
+            echo "### Changed Files (last 5 commits)"
+            echo '```'
+            git diff --stat "$SHA~5..$SHA" 2>/dev/null || echo "Could not compute diff"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Copy compose files to server
         uses: appleboy/scp-action@v0.1.7
@@ -75,17 +109,24 @@ jobs:
 
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1
+        env:
+          API_KEY: ${{ secrets.API_KEY }}
+          PIPELINE_WEBHOOK_SECRET: ${{ secrets.PIPELINE_WEBHOOK_SECRET }}
+          NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
+          DB_READER_PASSWORD: ${{ secrets.DB_READER_PASSWORD }}
         with:
           host: ${{ secrets.STAGING_HOST }}
           username: ${{ secrets.STAGING_USER }}
           key: ${{ secrets.STAGING_SSH_KEY }}
+          envs: API_KEY,PIPELINE_WEBHOOK_SECRET,NEXTAUTH_SECRET,POSTGRES_PASSWORD,REDIS_PASSWORD,DB_READER_PASSWORD
           script: |
             set -e
             cd ${{ secrets.STAGING_DEPLOY_PATH }}
             export IMAGE_TAG=staging
-            export API_KEY="${{ secrets.API_KEY }}"
-            export PIPELINE_WEBHOOK_SECRET="${{ secrets.PIPELINE_WEBHOOK_SECRET }}"
-            export NEXTAUTH_SECRET="${{ secrets.NEXTAUTH_SECRET }}"
+            # Secrets are available as env vars (passed via envs: — not in shell history)
+            export POSTGRES_PASSWORD REDIS_PASSWORD DB_READER_PASSWORD
 
             # Save current image digests for rollback
             echo "=== Saving current state for rollback ==="
@@ -106,12 +147,19 @@ jobs:
               -f docker-compose.prod.yml \
               pull
 
-            # Deploy
+            # Deploy — allow non-zero exit so the health-check loop below
+            # can run and dump diagnostic logs on failure instead of aborting.
             echo "=== Starting deployment ==="
             docker compose \
               -f docker-compose.yml \
               -f docker-compose.prod.yml \
-              up -d --remove-orphans
+              up -d --remove-orphans || echo "::warning::docker compose up exited non-zero — checking health..."
+
+            # Immediate diagnostics — surface the real error before waiting
+            echo "=== Container status after up ==="
+            docker compose -f docker-compose.yml -f docker-compose.prod.yml ps || true
+            echo "=== API logs (startup) ==="
+            docker compose -f docker-compose.yml -f docker-compose.prod.yml logs --tail=80 api 2>&1 || true
 
             # Health check — API
             echo "=== Health check: API ==="
@@ -228,3 +276,30 @@ jobs:
                 dbt deps --profiles-dir . && \
                 dbt run --profiles-dir . \
               " || echo "::warning::dbt run failed — data models may be stale"
+
+      - name: Post-deploy status
+        if: always()
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.STAGING_HOST }}
+          username: ${{ secrets.STAGING_USER }}
+          key: ${{ secrets.STAGING_SSH_KEY }}
+          script: |
+            cd ${{ secrets.STAGING_DEPLOY_PATH }}
+
+            echo "=== Final Container Status ==="
+            docker compose \
+              -f docker-compose.yml \
+              -f docker-compose.prod.yml \
+              ps --format "table {{.Name}}\t{{.Status}}\t{{.Ports}}"
+
+            echo ""
+            echo "=== Recent Logs (last 15 lines per service) ==="
+            for svc in api frontend postgres; do
+              echo "--- $svc ---"
+              docker compose \
+                -f docker-compose.yml \
+                -f docker-compose.prod.yml \
+                logs --tail=15 "$svc" 2>&1 || true
+              echo ""
+            done
