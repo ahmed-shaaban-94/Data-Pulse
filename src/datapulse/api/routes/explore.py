@@ -14,9 +14,9 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from datapulse.api.auth import get_current_user
 from datapulse.api.deps import get_tenant_session
 from datapulse.api.limiter import limiter
+from datapulse.rbac.dependencies import require_permission
 from datapulse.config import get_settings
 from datapulse.explore.manifest_parser import get_catalog as _get_cached_catalog
 from datapulse.explore.manifest_parser import invalidate_catalog
@@ -34,7 +34,7 @@ log = get_logger(__name__)
 router = APIRouter(
     prefix="/explore",
     tags=["explore"],
-    dependencies=[Depends(get_current_user)],
+    dependencies=[Depends(require_permission("analytics:custom_query"))],
 )
 
 

@@ -15,9 +15,9 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
 
 from datapulse.analytics.service import AnalyticsService
-from datapulse.api.auth import get_current_user
 from datapulse.api.deps import get_analytics_service
 from datapulse.api.limiter import limiter
+from datapulse.rbac.dependencies import require_permission
 from datapulse.logging import get_logger
 
 log = get_logger(__name__)
@@ -25,7 +25,7 @@ log = get_logger(__name__)
 router = APIRouter(
     prefix="/export",
     tags=["export"],
-    dependencies=[Depends(get_current_user)],
+    dependencies=[Depends(require_permission("analytics:export"))],
 )
 
 ServiceDep = Annotated[AnalyticsService, Depends(get_analytics_service)]
