@@ -1,4 +1,5 @@
 """Return analysis and staff quota query methods for the analytics layer."""
+
 from __future__ import annotations
 
 from decimal import Decimal

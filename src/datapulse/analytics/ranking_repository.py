@@ -1,4 +1,5 @@
 """Product/customer/staff/site ranking query methods for the analytics layer."""
+
 from __future__ import annotations
 
 from decimal import Decimal
