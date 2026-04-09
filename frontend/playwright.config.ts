@@ -1,43 +1,50 @@
 import { defineConfig, devices } from "@playwright/test";
 
+const isCi = !!process.env.CI;
+
+// Mobile project uses a narrow viewport where the sidebar is a drawer —
+// tests that assert sidebar elements fail because the drawer is closed.
+// Run mobile tests locally with a real backend; CI runs only chromium.
+const projects = [
+  {
+    name: "chromium",
+    use: { ...devices["Desktop Chrome"] },
+  },
+  ...(isCi
+    ? []
+    : [
+        {
+          name: "mobile",
+          use: { ...devices["Pixel 5"] },
+        },
+      ]),
+];
+
 export default defineConfig({
   testDir: "./e2e",
   fullyParallel: true,
-  forbidOnly: !!process.env.CI,
-  retries: process.env.CI ? 1 : 0,
-  workers: process.env.CI ? 1 : undefined,
+  forbidOnly: isCi,
+  retries: isCi ? 1 : 0,
+  workers: isCi ? 1 : undefined,
   reporter: "html",
 
   // In CI: mint a NextAuth session cookie before tests run so protected
   // routes are accessible. Skipped in local dev (uses real Auth0 flow).
-  globalSetup: process.env.CI ? "./e2e/global-setup.ts" : undefined,
+  globalSetup: isCi ? "./e2e/global-setup.ts" : undefined,
 
   use: {
     baseURL: "http://localhost:3000",
     // Use the pre-minted session in CI; tests that need a fresh unauthenticated
     // context (auth.spec.ts) override this via browser.newContext({ storageState: undefined }).
-    storageState: process.env.CI ? "e2e/.auth/user.json" : undefined,
+    storageState: isCi ? "e2e/.auth/user.json" : undefined,
     trace: "on-first-retry",
     screenshot: "only-on-failure",
   },
-  projects: [
-    {
-      name: "chromium",
-      use: { ...devices["Desktop Chrome"] },
-    },
-    {
-      // Pixel 5 uses Mobile Chrome (Chromium) — CI only installs Chromium,
-      // so iPhone 13 (WebKit) cannot run there.
-      name: "mobile",
-      use: { ...devices["Pixel 5"] },
-    },
-  ],
+  projects,
   webServer: {
-    command: process.env.CI
-      ? "node .next/standalone/server.js"
-      : "npm run dev",
+    command: isCi ? "node .next/standalone/server.js" : "npm run dev",
     url: "http://localhost:3000",
-    reuseExistingServer: !process.env.CI,
+    reuseExistingServer: !isCi,
     timeout: 120000,
   },
 });
