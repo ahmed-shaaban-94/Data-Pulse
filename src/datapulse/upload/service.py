@@ -6,6 +6,8 @@ import shutil
 import uuid
 from pathlib import Path
 
+from fastapi import HTTPException
+
 from datapulse.logging import get_logger
 from datapulse.upload.models import ColumnInfo, PreviewResult, UploadedFile
 
@@ -42,6 +44,11 @@ class UploadService:
     def preview_file(self, file_id: str) -> PreviewResult:
         """Read first N rows from an uploaded file and return preview."""
         import polars as pl
+
+        try:
+            uuid.UUID(file_id)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid file ID format")
 
         matching = list(TEMP_DIR.glob(f"{file_id}.*"))
         if not matching:
@@ -90,6 +97,11 @@ class UploadService:
         self._raw_dir.mkdir(parents=True, exist_ok=True)
         moved = []
         for fid in file_ids:
+            try:
+                uuid.UUID(fid)
+            except ValueError:
+                raise HTTPException(status_code=400, detail="Invalid file ID format")
+
             matching = list(TEMP_DIR.glob(f"{fid}.*"))
             if not matching:
                 continue
