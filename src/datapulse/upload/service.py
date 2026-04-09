@@ -46,11 +46,11 @@ class UploadService:
         import polars as pl
 
         try:
-            uuid.UUID(file_id)
+            normalized_id = str(uuid.UUID(file_id))
         except ValueError:
             raise HTTPException(status_code=400, detail="Invalid file ID format")
 
-        matching = list(TEMP_DIR.glob(f"{file_id}.*"))
+        matching = list(TEMP_DIR.glob(f"{normalized_id}.*"))
         if not matching:
             raise FileNotFoundError(f"File {file_id} not found")
 
@@ -98,11 +98,11 @@ class UploadService:
         moved = []
         for fid in file_ids:
             try:
-                uuid.UUID(fid)
+                normalized_fid = str(uuid.UUID(fid))
             except ValueError:
                 raise HTTPException(status_code=400, detail="Invalid file ID format")
 
-            matching = list(TEMP_DIR.glob(f"{fid}.*"))
+            matching = list(TEMP_DIR.glob(f"{normalized_fid}.*"))
             if not matching:
                 continue
             src = matching[0]

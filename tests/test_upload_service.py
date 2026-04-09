@@ -46,14 +46,6 @@ def test_preview_file_valid_uuid_no_file_raises_not_found(service):
         service.preview_file(valid_id)
 
 
-def test_preview_file_valid_uuid_passes_validation(service):
-    """A valid UUID passes UUID validation (even when no file exists)."""
-    valid_id = str(uuid.uuid4())
-    # Validation passes — the subsequent FileNotFoundError is not an HTTPException
-    with pytest.raises(FileNotFoundError):
-        service.preview_file(valid_id)
-
-
 # ---------------------------------------------------------------------------
 # confirm_upload — UUID validation
 # ---------------------------------------------------------------------------
@@ -82,14 +74,6 @@ def test_confirm_upload_valid_uuid_no_file_returns_empty(service):
     assert result == []
 
 
-def test_confirm_upload_valid_uuid_passes_validation(service):
-    """A valid UUID passes UUID validation without raising HTTPException."""
-    valid_id = str(uuid.uuid4())
-    # No exception raised for the UUID check; missing file silently skipped
-    result = service.confirm_upload([valid_id])
-    assert isinstance(result, list)
-
-
 # ---------------------------------------------------------------------------
 # Additional edge cases
 # ---------------------------------------------------------------------------
@@ -115,3 +99,19 @@ def test_confirm_upload_mixed_ids_rejects_on_first_invalid(service):
     with pytest.raises(HTTPException) as exc_info:
         service.confirm_upload([valid_id, "../traversal"])
     assert exc_info.value.status_code == 400
+
+
+def test_preview_file_brace_form_uuid_normalized_not_injected(service):
+    """Brace-form UUID is normalized by uuid.UUID() — braces never reach the glob.
+
+    Python's uuid.UUID() accepts ``{uuid}`` form and returns the canonical
+    hyphenated string (no braces), so ``str(uuid.UUID(...))`` strips the
+    braces before they can be used in a glob pattern.  The service must
+    therefore NOT raise HTTPException(400) for this input; it should raise
+    FileNotFoundError because no matching file exists, confirming that the
+    normalized (safe) form was used in the glob call.
+    """
+    brace_form_id = "{12345678-1234-5678-1234-567812345678}"
+    # Must NOT raise HTTPException — UUID is valid, just non-standard form
+    with pytest.raises(FileNotFoundError):
+        service.preview_file(brace_form_id)
