@@ -1,7 +1,5 @@
 "use client";
 
-"use client";
-
 import { useState } from "react";
 import {
   Users,
@@ -18,6 +16,7 @@ import {
 } from "lucide-react";
 import { useMembers, useMyAccess, useRoles, useSectors } from "@/hooks/use-members";
 import { useToast } from "@/components/ui/toast";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import type { MemberResponse, RoleKey, SectorResponse } from "@/types/members";
 
 const ROLE_COLORS: Record<RoleKey, string> = {
@@ -652,6 +651,8 @@ export default function TeamPage() {
   const { success, error: toastError } = useToast();
   const [inviteOpen, setInviteOpen] = useState(false);
   const [editingMember, setEditingMember] = useState<MemberResponse | null>(null);
+  const [confirmRemove, setConfirmRemove] = useState<{ id: number; name: string } | null>(null);
+  const [confirmDeleteSector, setConfirmDeleteSector] = useState<{ id: number; name: string } | null>(null);
 
   const isLoading = accessLoading || membersLoading || sectorsLoading;
   const canManage = access?.is_admin ?? false;
@@ -666,12 +667,20 @@ export default function TeamPage() {
     }
   }
 
-  async function handleRemoveMember(memberId: number) {
+  function requestRemoveMember(memberId: number) {
+    const member = members?.find((m) => m.member_id === memberId);
+    setConfirmRemove({ id: memberId, name: member?.display_name || member?.email || "member" });
+  }
+
+  async function handleRemoveMember() {
+    if (!confirmRemove) return;
     try {
-      await removeMember(memberId);
+      await removeMember(confirmRemove.id);
       success("Member removed");
     } catch {
       toastError("Failed to remove member");
+    } finally {
+      setConfirmRemove(null);
     }
   }
 
@@ -690,12 +699,20 @@ export default function TeamPage() {
     success(`Sector "${data.sector_name}" created`);
   }
 
-  async function handleDeleteSector(sectorId: number) {
+  function requestDeleteSector(sectorId: number) {
+    const sector = sectors?.find((s) => s.sector_id === sectorId);
+    setConfirmDeleteSector({ id: sectorId, name: sector?.sector_name || "sector" });
+  }
+
+  async function handleDeleteSector() {
+    if (!confirmDeleteSector) return;
     try {
-      await deleteSector(sectorId);
+      await deleteSector(confirmDeleteSector.id);
       success("Sector deleted");
     } catch {
       toastError("Failed to delete sector");
+    } finally {
+      setConfirmDeleteSector(null);
     }
   }
 
@@ -767,7 +784,7 @@ export default function TeamPage() {
               isCurrentUser={m.user_id === access?.user_id}
               canManage={canManage}
               actorRole={actorRole}
-              onRemove={handleRemoveMember}
+              onRemove={requestRemoveMember}
               onEdit={setEditingMember}
               onToggleActive={handleToggleActive}
             />
@@ -795,7 +812,7 @@ export default function TeamPage() {
               key={s.sector_id}
               sector={s}
               canManage={canManage}
-              onDelete={handleDeleteSector}
+              onDelete={requestDeleteSector}
             />
           ))}
           {canManage && <CreateSectorForm onSubmit={handleCreateSector} />}
@@ -820,6 +837,26 @@ export default function TeamPage() {
           actorRole={actorRole}
         />
       )}
+
+      <ConfirmDialog
+        open={!!confirmRemove}
+        title="Remove Member"
+        description={`Are you sure you want to remove ${confirmRemove?.name}? They will lose access immediately.`}
+        confirmLabel="Remove"
+        variant="danger"
+        onConfirm={handleRemoveMember}
+        onCancel={() => setConfirmRemove(null)}
+      />
+
+      <ConfirmDialog
+        open={!!confirmDeleteSector}
+        title="Delete Sector"
+        description={`Delete sector "${confirmDeleteSector?.name}"? Members assigned to this sector will lose their sector-based access.`}
+        confirmLabel="Delete"
+        variant="danger"
+        onConfirm={handleDeleteSector}
+        onCancel={() => setConfirmDeleteSector(null)}
+      />
     </div>
   );
 }

@@ -5,6 +5,7 @@ import { useReportSchedules } from "@/hooks/use-report-schedules";
 import { LoadingCard } from "@/components/loading-card";
 import { ErrorRetry } from "@/components/error-retry";
 import { useToast } from "@/components/ui/toast";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Plus, Clock, Trash2, ToggleLeft, ToggleRight } from "lucide-react";
 
 const CRON_PRESETS = [
@@ -22,6 +23,7 @@ export function ScheduleOverview() {
   const [reportType, setReportType] = useState("dashboard");
   const [cron, setCron] = useState("0 8 * * 1");
   const [recipients, setRecipients] = useState("");
+  const [confirmDelete, setConfirmDelete] = useState<{ id: number; name: string } | null>(null);
 
   if (isLoading && schedules.length === 0) return <LoadingCard className="h-64" />;
   if (error) return <ErrorRetry title="Failed to load schedules" />;
@@ -53,12 +55,15 @@ export function ScheduleOverview() {
     }
   };
 
-  const handleDelete = async (id: number) => {
+  const handleDelete = async () => {
+    if (!confirmDelete) return;
     try {
-      await deleteSchedule(id);
+      await deleteSchedule(confirmDelete.id);
       success("Schedule deleted");
     } catch {
       toastError("Failed to delete schedule");
+    } finally {
+      setConfirmDelete(null);
     }
   };
 
@@ -145,7 +150,7 @@ export function ScheduleOverview() {
               )}
             </button>
             <button
-              onClick={() => handleDelete(s.id)}
+              onClick={() => setConfirmDelete({ id: s.id, name: s.name })}
               className="text-text-secondary hover:text-red-500"
             >
               <Trash2 className="h-4 w-4" />
@@ -158,6 +163,16 @@ export function ScheduleOverview() {
           </div>
         )}
       </div>
+
+      <ConfirmDialog
+        open={!!confirmDelete}
+        title="Delete Schedule"
+        description={`Delete schedule "${confirmDelete?.name}"? Automated reports will stop sending.`}
+        confirmLabel="Delete"
+        variant="danger"
+        onConfirm={handleDelete}
+        onCancel={() => setConfirmDelete(null)}
+      />
     </div>
   );
 }
