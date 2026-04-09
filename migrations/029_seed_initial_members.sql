@@ -2,24 +2,25 @@
 -- Run order: after 028_create_resellers.sql
 -- Idempotent: ON CONFLICT DO UPDATE — safe to re-run
 
--- admin@rahmaqanater.org  → owner  (full access + billing)
--- dr.engy@saas.com        → admin  (all except billing:manage)
+-- Replace with actual admin emails before running in production
+-- owner@example.com  → owner  (full access + billing)
+-- admin@example.com  → admin  (all except billing:manage)
 
 INSERT INTO public.tenant_members (tenant_id, user_id, email, display_name, role_id, is_active)
 VALUES
     (
         1,
-        'admin@rahmaqanater.org',
-        'admin@rahmaqanater.org',
-        'Admin Rahmaqanater',
+        'owner@example.com',
+        'owner@example.com',
+        'Owner',
         (SELECT role_id FROM public.roles WHERE role_key = 'owner'),
         TRUE
     ),
     (
         1,
-        'dr.engy@saas.com',
-        'dr.engy@saas.com',
-        'Dr. Engy',
+        'admin@example.com',
+        'admin@example.com',
+        'Admin',
         (SELECT role_id FROM public.roles WHERE role_key = 'admin'),
         TRUE
     )

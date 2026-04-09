@@ -73,13 +73,14 @@ class Settings(BaseSettings):
     default_tenant_id: str = "1"
 
     # RBAC — emails that auto-register with elevated roles on first login
-    owner_emails: list[str] = ["admin@rahmaqanater.org"]
-    admin_emails: list[str] = ["dr.engy@saas.com"]
+    # Set via OWNER_EMAILS / ADMIN_EMAILS env vars (comma-separated). Empty = no auto-elevation.
+    owner_emails: list[str] = []
+    admin_emails: list[str] = []
 
     # Embed token signing
     embed_secret: str = ""
 
-    # Auth0 OIDC (replaces Keycloak — see Wild Wolf beta release plan)
+    # Auth0 OIDC
     auth0_domain: str = ""  # e.g. "datapulse.us.auth0.com"
     auth0_client_id: str = ""  # Application Client ID
     auth0_client_secret: str = ""  # Application Client Secret
