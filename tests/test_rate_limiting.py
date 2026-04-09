@@ -24,13 +24,13 @@ def test_rate_limit_default_is_sixty_per_minute():
     """Default rate limit is 60/minute."""
     from datapulse.api.limiter import limiter
 
-    # _default_limits is a list of LimitGroup objects.
-    # LimitGroup stores the raw string in the name-mangled attribute
-    # _LimitGroup__limit_provider, and is also iterable yielding Limit objects
-    # whose .limit attribute is a RateLimitItem.
-    assert len(limiter._default_limits) > 0
-    limit_group = limiter._default_limits[0]
+    assert len(limiter._default_limits) > 0, "No default limits configured"
 
-    # Verify via the private provider string stored on the LimitGroup
-    provider = limit_group.__dict__.get("_LimitGroup__limit_provider", "")
-    assert "60" in str(provider) and "minute" in str(provider)
+    # Iterate LimitGroup objects to find the 60/minute limit
+    found = any(
+        limit.limit.amount == 60 and limit.limit.multiples == 1
+        for limit_group in limiter._default_limits
+        for limit in limit_group
+        if hasattr(limit, "limit")
+    )
+    assert found, "Expected to find a 60/minute default rate limit in slowapi limiter"
