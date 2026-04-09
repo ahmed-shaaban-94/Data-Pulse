@@ -1,6 +1,12 @@
 import { test, expect } from "@playwright/test";
 
+// Dashboard and product tests require a live API backend.
+// They are skipped in CI (no backend) and should be run against staging/local full stack.
+const needsBackend = !!process.env.CI;
+
 test.describe("Enhancement 3 — Dashboard Upgrades", () => {
+  test.skip(needsBackend, "requires live API backend — run against staging");
+
   test.beforeEach(async ({ page }) => {
     await page.goto("/dashboard");
     // Wait for dashboard to load
@@ -65,6 +71,8 @@ test.describe("Enhancement 3 — Dashboard Upgrades", () => {
 });
 
 test.describe("Enhancement 3 — Products Hierarchy", () => {
+  test.skip(needsBackend, "requires live API backend — run against staging");
+
   test("product hierarchy toggle and expand/collapse", async ({ page }) => {
     await page.goto("/products");
     await expect(page.locator("h1")).toContainText("Product Analytics");
