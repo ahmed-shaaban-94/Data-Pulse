@@ -216,7 +216,7 @@ def health_check(
     # Determine overall status
     db_ok = checks["database"]["status"] == "ok"
     all_ok = all(
-        c["status"] in ("ok", "disabled", "stale", "unknown", "warning", "critical")
+        c["status"] in ("ok", "disabled", "stale", "unknown")
         for c in checks.values()
     )
 
