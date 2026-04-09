@@ -6,6 +6,8 @@ import shutil
 import uuid
 from pathlib import Path
 
+from fastapi import HTTPException
+
 from datapulse.logging import get_logger
 from datapulse.upload.models import ColumnInfo, PreviewResult, UploadedFile
 
@@ -43,7 +45,12 @@ class UploadService:
         """Read first N rows from an uploaded file and return preview."""
         import polars as pl
 
-        matching = list(TEMP_DIR.glob(f"{file_id}.*"))
+        try:
+            normalized_id = str(uuid.UUID(file_id))
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail="Invalid file ID format") from exc
+
+        matching = list(TEMP_DIR.glob(f"{normalized_id}.*"))
         if not matching:
             raise FileNotFoundError(f"File {file_id} not found")
 
@@ -90,7 +97,12 @@ class UploadService:
         self._raw_dir.mkdir(parents=True, exist_ok=True)
         moved = []
         for fid in file_ids:
-            matching = list(TEMP_DIR.glob(f"{fid}.*"))
+            try:
+                normalized_fid = str(uuid.UUID(fid))
+            except ValueError as exc:
+                raise HTTPException(status_code=400, detail="Invalid file ID format") from exc
+
+            matching = list(TEMP_DIR.glob(f"{normalized_fid}.*"))
             if not matching:
                 continue
             src = matching[0]

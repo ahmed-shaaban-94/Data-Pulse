@@ -1,6 +1,7 @@
 -- Migration: Seed initial tenant members
 -- Run order: after 028_create_resellers.sql
 -- Idempotent: ON CONFLICT DO UPDATE — safe to re-run
+-- Replace emails and user_ids below before running in a new production environment.
 
 -- admin@rahmaqanater.org  → owner  (full access + billing)
 -- dr.engy@saas.com        → admin  (all except billing:manage)

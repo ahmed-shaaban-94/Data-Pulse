@@ -78,7 +78,6 @@ def _patch_get_settings_globally():
         "datapulse.import_pipeline.reader.get_settings",
         "datapulse.bronze.loader.get_settings",
         "datapulse.api.deps.get_settings",
-        "datapulse.api.app.get_settings",
         "datapulse.api.auth.get_settings",
         "datapulse.embed.token.get_settings",
         "datapulse.api.routes.explore.get_settings",
@@ -87,18 +86,20 @@ def _patch_get_settings_globally():
     # Modules with heavy third-party deps that may not be importable in test env
     _optional_patch = [
         "datapulse.scheduler.get_settings",
+        "datapulse.api.app.get_settings",  # may fail if email-validator not installed
     ]
 
     import contextlib
 
-    patches = [patch(t, return_value=clean_settings) for t in _always_patch]
-    for t in _optional_patch:
-        with contextlib.suppress(AttributeError, ModuleNotFoundError):
-            patches.append(patch(t, return_value=clean_settings))
+    always_patches = [patch(t, return_value=clean_settings) for t in _always_patch]
+    optional_patches = [patch(t, return_value=clean_settings) for t in _optional_patch]
 
     with contextlib.ExitStack() as stack:
-        for p in patches:
+        for p in always_patches:
             stack.enter_context(p)
+        for p in optional_patches:
+            with contextlib.suppress(AttributeError, ModuleNotFoundError, ImportError):
+                stack.enter_context(p)
         yield
 
     get_settings.cache_clear()

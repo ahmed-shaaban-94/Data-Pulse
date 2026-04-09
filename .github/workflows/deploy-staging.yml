@@ -75,17 +75,21 @@ jobs:
 
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1
+        env:
+          API_KEY: ${{ secrets.API_KEY }}
+          PIPELINE_WEBHOOK_SECRET: ${{ secrets.PIPELINE_WEBHOOK_SECRET }}
+          NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
         with:
           host: ${{ secrets.STAGING_HOST }}
           username: ${{ secrets.STAGING_USER }}
           key: ${{ secrets.STAGING_SSH_KEY }}
+          envs: API_KEY,PIPELINE_WEBHOOK_SECRET,NEXTAUTH_SECRET
           script: |
             set -e
             cd ${{ secrets.STAGING_DEPLOY_PATH }}
             export IMAGE_TAG=staging
-            export API_KEY="${{ secrets.API_KEY }}"
-            export PIPELINE_WEBHOOK_SECRET="${{ secrets.PIPELINE_WEBHOOK_SECRET }}"
-            export NEXTAUTH_SECRET="${{ secrets.NEXTAUTH_SECRET }}"
+            # API_KEY, PIPELINE_WEBHOOK_SECRET, NEXTAUTH_SECRET are available as env vars
+            # (passed via envs: — not in shell history)
 
             # Save current image digests for rollback
             echo "=== Saving current state for rollback ==="
