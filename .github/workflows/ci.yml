@@ -146,6 +146,11 @@ jobs:
       - name: Build frontend
         working-directory: frontend
         run: npm run build
+        env:
+          # Point API proxy to localhost instead of the Docker service name
+          # "api" so that rewrite failures resolve instantly (ECONNREFUSED)
+          # rather than hanging on DNS (EAI_AGAIN).
+          INTERNAL_API_URL: "http://localhost:8000"
       - name: Prepare standalone server
         working-directory: frontend
         run: |
@@ -154,7 +159,7 @@ jobs:
       - name: Run E2E tests
         working-directory: frontend
         run: npx playwright test --reporter=html
-        timeout-minutes: 15
+        timeout-minutes: 20
         env:
           CI: "true"
           # Dummy NextAuth config — no real Auth0 in CI.
