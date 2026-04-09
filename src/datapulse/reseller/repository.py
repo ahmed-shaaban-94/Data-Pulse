@@ -153,9 +153,7 @@ class ResellerRepository:
     def tenant_belongs_to_reseller(self, tenant_id: int, reseller_id: int) -> bool:
         """Return True if the given tenant is associated with this reseller."""
         row = self._session.execute(
-            text(
-                "SELECT 1 FROM bronze.tenants WHERE tenant_id = :tid AND reseller_id = :rid"
-            ),
+            text("SELECT 1 FROM bronze.tenants WHERE tenant_id = :tid AND reseller_id = :rid"),
             {"tid": tenant_id, "rid": reseller_id},
         ).fetchone()
         return row is not None

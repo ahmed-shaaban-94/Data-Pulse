@@ -276,8 +276,7 @@ def _validate_callback_url(url: str | None, base_url: str) -> None:
     allowed_netloc = urlparse(base_url).netloc
     if parsed.netloc != allowed_netloc:
         raise ValueError(
-            f"Callback URL domain '{parsed.netloc}' is not allowed; "
-            f"must be '{allowed_netloc}'"
+            f"Callback URL domain '{parsed.netloc}' is not allowed; must be '{allowed_netloc}'"
         )
 
 
