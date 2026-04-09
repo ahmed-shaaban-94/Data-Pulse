@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { memo, useState, useMemo } from "react";
 import {
   BarChart,
   Bar,
@@ -30,7 +30,7 @@ export interface WaterfallChartProps {
   data?: WaterfallAnalysis;
 }
 
-export function WaterfallChart({ data }: WaterfallChartProps) {
+export const WaterfallChart = memo(function WaterfallChart({ data }: WaterfallChartProps) {
   const theme = useChartTheme();
   const [activeDim, setActiveDim] = useState<DimensionKey>("product");
 
@@ -68,17 +68,21 @@ export function WaterfallChart({ data }: WaterfallChartProps) {
       : availableTabs[0]?.key ?? "product";
 
   const filteredDrivers = driversByDim[effectiveDim] ?? [];
-  const chartData = filteredDrivers.slice(0, 10).map((d) => {
-    const rawName = d.entity_name;
-    return {
-      name: rawName.length > 22 ? rawName.slice(0, 20) + "..." : rawName,
-      fullName: rawName,
-      impact: d.impact,
-      impactPct: d.impact_pct,
-      dimension: d.dimension,
-      direction: d.direction,
-    };
-  });
+  const chartData = useMemo(
+    () =>
+      filteredDrivers.slice(0, 10).map((d) => {
+        const rawName = d.entity_name;
+        return {
+          name: rawName.length > 22 ? rawName.slice(0, 20) + "..." : rawName,
+          fullName: rawName,
+          impact: d.impact,
+          impactPct: d.impact_pct,
+          dimension: d.dimension,
+          direction: d.direction,
+        };
+      }),
+    [filteredDrivers],
+  );
 
   return (
     <div className="rounded-lg border border-border bg-card p-6">
@@ -174,4 +178,4 @@ export function WaterfallChart({ data }: WaterfallChartProps) {
       </ResponsiveContainer>
     </div>
   );
-}
+});
