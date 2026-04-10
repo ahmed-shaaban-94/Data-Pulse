@@ -20,7 +20,6 @@ import time
 from uuid import UUID
 
 import sqlalchemy.exc
-
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
@@ -205,7 +204,9 @@ async def run_pipeline(
         notify_pipeline_success(run_id_str, elapsed, total_rows)
         log.info("pipeline_complete", run_id=run_id_str, duration=elapsed, rows=total_rows)
 
-    except (sqlalchemy.exc.SQLAlchemyError, OSError, RuntimeError, subprocess.SubprocessError) as exc:
+    except (
+        sqlalchemy.exc.SQLAlchemyError, OSError, RuntimeError, subprocess.SubprocessError,
+    ) as exc:
         elapsed = round(time.perf_counter() - t0, 2)
         error_msg = str(exc)[:200]
         _update_status("failed", error_message=error_msg)

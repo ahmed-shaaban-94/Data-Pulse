@@ -8,10 +8,9 @@ from __future__ import annotations
 
 from uuid import UUID
 
+import sqlalchemy.exc
 from sqlalchemy import text
 from sqlalchemy.orm import Session
-
-import sqlalchemy.exc
 
 from datapulse.logging import get_logger
 

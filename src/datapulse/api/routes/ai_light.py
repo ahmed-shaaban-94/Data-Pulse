@@ -12,16 +12,15 @@ from __future__ import annotations
 from datetime import date
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
-
 import httpx
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
 from datapulse.ai_light.models import AISummary, AnomalyReport, ChangeNarrative
 from datapulse.ai_light.service import AILightService
 from datapulse.api.deps import get_ai_light_service
 from datapulse.api.limiter import limiter
-from datapulse.rbac.dependencies import require_permission
 from datapulse.logging import get_logger
+from datapulse.rbac.dependencies import require_permission
 
 router = APIRouter(
     prefix="/ai-light",

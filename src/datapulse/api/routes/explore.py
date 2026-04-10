@@ -10,16 +10,15 @@ from __future__ import annotations
 import time
 from typing import Annotated, Any
 
+import sqlalchemy.exc
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-import sqlalchemy.exc
-
 from datapulse.api.deps import get_tenant_session
 from datapulse.api.limiter import limiter
-from datapulse.rbac.dependencies import require_permission
 from datapulse.config import get_settings
+from datapulse.rbac.dependencies import require_permission
 from datapulse.explore.manifest_parser import get_catalog as _get_cached_catalog
 from datapulse.explore.manifest_parser import invalidate_catalog
 from datapulse.explore.models import (

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import re
 from datetime import UTC
 from unittest.mock import MagicMock
 from uuid import uuid4
@@ -193,8 +192,12 @@ class TestCheckCustomSQL:
         assert "SELECT" in result.message
 
     def test_handles_sql_error(self):
+        import sqlalchemy.exc
+
         session = MagicMock()
-        session.execute.side_effect = Exception("syntax error")
+        session.execute.side_effect = sqlalchemy.exc.OperationalError(
+            "statement", {}, Exception("syntax error")
+        )
         result = _check_custom_sql(
             session,
             "bronze",
@@ -209,8 +212,13 @@ class TestCheckCustomSQL:
 
 class TestRunConfigurableChecks:
     def test_uses_default_rules_when_none_provided(self):
+        from datetime import datetime, timedelta
+
         session = MagicMock()
-        session.execute.return_value.scalar_one.return_value = 1000
+        recent_date = datetime.now(UTC) - timedelta(hours=1)
+        # Bronze defaults: row_count (scalar_one=1000), null_rate (fetchone),
+        # freshness (scalar_one=recent_date)
+        session.execute.return_value.scalar_one.side_effect = [1000, recent_date]
         session.execute.return_value.fetchone.return_value = [0.0, 0.0, 0.0, 0.0]
 
         run_id = uuid4()
@@ -272,8 +280,12 @@ class TestRunConfigurableChecks:
         assert "Unknown check" in report.checks[0].message
 
     def test_handles_check_exception(self):
+        import sqlalchemy.exc
+
         session = MagicMock()
-        session.execute.side_effect = Exception("DB down")
+        session.execute.side_effect = sqlalchemy.exc.OperationalError(
+            "statement", {}, Exception("DB down")
+        )
 
         run_id = uuid4()
         rules = [
@@ -334,8 +346,12 @@ class TestDefaultRulesLoading:
 
     def test_run_uses_defaults_when_rules_none(self):
         """Verify that run_configurable_checks with rules=None loads defaults for the stage."""
+        from datetime import datetime, timedelta
+
         session = MagicMock()
-        session.execute.return_value.scalar_one.return_value = 1000
+        recent_date = datetime.now(UTC) - timedelta(hours=1)
+        # Bronze defaults: row_count (scalar_one), null_rate (fetchone), freshness (scalar_one)
+        session.execute.return_value.scalar_one.side_effect = [1000, recent_date]
         session.execute.return_value.fetchone.return_value = [0.0, 0.0, 0.0, 0.0]
 
         run_id = uuid4()
@@ -536,7 +552,11 @@ class TestSeverityLevels:
         run_id = uuid4()
         rules = [
             {"check_name": "row_count", "severity": "error", "config": {"min_rows": 1}},
-            {"check_name": "freshness", "severity": "warn", "config": {"max_age_hours": 24, "date_column": "date"}},
+            {
+                "check_name": "freshness",
+                "severity": "warn",
+                "config": {"max_age_hours": 24, "date_column": "date"},
+            },
         ]
         report = run_configurable_checks(session, run_id, "bronze", rules=rules)
 

@@ -11,7 +11,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from datapulse.tasks.async_executor import (
-    _QUERY_TIMEOUT,
+    _query_timeout,
     _serialise,
     get_job_result,
 )
@@ -115,7 +115,7 @@ def test_get_job_result_returns_complete_job():
 
 def test_get_job_result_detects_stale_running_job():
     """Marks a running job as failed if it exceeds the stale threshold."""
-    stale_time = time.time() - (_QUERY_TIMEOUT + 120)
+    stale_time = time.time() - (_query_timeout() + 120)
     job_data = {"status": "running", "submitted_at": stale_time}
     mock_client = MagicMock()
     mock_client.get.return_value = json.dumps(job_data)

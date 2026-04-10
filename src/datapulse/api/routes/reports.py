@@ -14,8 +14,8 @@ from sqlalchemy.orm import Session
 
 from datapulse.api.deps import get_tenant_session
 from datapulse.api.limiter import limiter
-from datapulse.rbac.dependencies import require_permission
 from datapulse.logging import get_logger
+from datapulse.rbac.dependencies import require_permission
 from datapulse.reports.models import RenderedReport, ReportTemplate
 from datapulse.reports.template_engine import get_template, get_templates, render_report
 

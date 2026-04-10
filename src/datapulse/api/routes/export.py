@@ -11,16 +11,15 @@ import io
 from datetime import date
 from typing import Annotated, Any
 
+import sqlalchemy.exc
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
-
-import sqlalchemy.exc
 
 from datapulse.analytics.service import AnalyticsService
 from datapulse.api.deps import get_analytics_service
 from datapulse.api.limiter import limiter
-from datapulse.rbac.dependencies import require_permission
 from datapulse.logging import get_logger
+from datapulse.rbac.dependencies import require_permission
 
 log = get_logger(__name__)
 

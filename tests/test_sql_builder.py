@@ -7,9 +7,9 @@ import pytest
 from datapulse.explore.models import (
     Dimension,
     DimensionType,
+    ExploreCatalog,
     ExploreFilter,
     ExploreModel,
-    ExploreCatalog,
     ExploreQuery,
     JoinPath,
     Metric,
@@ -37,14 +37,31 @@ def _make_catalog(
     """Build a minimal catalog for test cases."""
     if dims is None:
         dims = [
-            Dimension(name="date", label="Date", dimension_type=DimensionType.date, model=model_name),
-            Dimension(name="category", label="Category", dimension_type=DimensionType.string, model=model_name),
-            Dimension(name="region", label="Region", dimension_type=DimensionType.string, model=model_name),
+            Dimension(
+                name="date", label="Date",
+                dimension_type=DimensionType.date, model=model_name,
+            ),
+            Dimension(
+                name="category", label="Category",
+                dimension_type=DimensionType.string, model=model_name,
+            ),
+            Dimension(
+                name="region", label="Region",
+                dimension_type=DimensionType.string, model=model_name,
+            ),
         ]
     if metrics is None:
         metrics = [
-            Metric(name="total_sales", label="Total Sales", metric_type=MetricType.sum, column="net_sales", model=model_name),
-            Metric(name="avg_quantity", label="Avg Quantity", metric_type=MetricType.average, column="quantity", model=model_name),
+            Metric(
+                name="total_sales", label="Total Sales",
+                metric_type=MetricType.sum, column="net_sales",
+                model=model_name,
+            ),
+            Metric(
+                name="avg_quantity", label="Avg Quantity",
+                metric_type=MetricType.average, column="quantity",
+                model=model_name,
+            ),
         ]
 
     base_model = ExploreModel(
@@ -426,13 +443,20 @@ class TestJoinQueries:
             name="dim_customer",
             schema_name="public_marts",
             dimensions=[
-                Dimension(name="customer_name", label="Customer", dimension_type=DimensionType.string, model="dim_customer"),
+                Dimension(
+                    name="customer_name", label="Customer",
+                    dimension_type=DimensionType.string,
+                    model="dim_customer",
+                ),
             ],
             metrics=[],
             joins=[],
         )
         catalog = _make_catalog(
-            joins=[JoinPath(join_model="dim_customer", sql_on="${fct_sales.customer_id} = ${dim_customer.id}")],
+            joins=[JoinPath(
+                join_model="dim_customer",
+                sql_on="${fct_sales.customer_id} = ${dim_customer.id}",
+            )],
             extra_models=[dim_customer],
         )
         query = ExploreQuery(
@@ -469,7 +493,11 @@ class TestAggregationTypes:
     def test_aggregation_function(self, metric_type: MetricType, expected_sql: str):
         catalog = _make_catalog(
             metrics=[
-                Metric(name="test_metric", label="Test", metric_type=metric_type, column="net_sales", model="fct_sales"),
+                Metric(
+                    name="test_metric", label="Test",
+                    metric_type=metric_type, column="net_sales",
+                    model="fct_sales",
+                ),
             ],
         )
         query = ExploreQuery(
