@@ -187,7 +187,7 @@ class TestReadAndConcat:
         with (
             patch(
                 "datapulse.bronze.loader.read_single_file",
-                side_effect=Exception("read error"),
+                side_effect=OSError("read error"),
             ),
             pytest.raises(ValueError, match="All.*file"),
         ):
@@ -201,7 +201,7 @@ class TestReadAndConcat:
         with (
             patch(
                 "datapulse.bronze.loader.read_single_file",
-                side_effect=Exception("boom"),
+                side_effect=OSError("boom"),
             ),
             pytest.raises(ValueError, match="1"),
         ):

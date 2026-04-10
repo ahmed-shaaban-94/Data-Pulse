@@ -45,7 +45,7 @@ class TestGetRedisClient:
     @patch("datapulse.cache.get_settings")
     def test_returns_none_on_connection_error(self, mock_settings):
         mock_settings.return_value.redis_url = "redis://localhost:6379/0"
-        with patch("redis.from_url", side_effect=Exception("Connection refused")):
+        with patch("redis.from_url", side_effect=OSError("Connection refused")):
             result = get_redis_client()
             assert result is None
 
@@ -54,7 +54,7 @@ class TestGetRedisClient:
         import time
 
         mock_settings.return_value.redis_url = "redis://localhost:6379/0"
-        with patch("redis.from_url", side_effect=Exception("fail")):
+        with patch("redis.from_url", side_effect=OSError("fail")):
             get_redis_client()  # First attempt fails
 
         # Second attempt within retry interval should return None without trying
