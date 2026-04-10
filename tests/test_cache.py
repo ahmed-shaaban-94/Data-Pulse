@@ -92,7 +92,7 @@ class TestCacheGet:
 
     def test_returns_none_on_error(self):
         mock_client = MagicMock()
-        mock_client.get.side_effect = Exception("Redis error")
+        mock_client.get.side_effect = OSError("Redis error")
         with patch("datapulse.cache.get_redis_client", return_value=mock_client):
             assert cache_get("key") is None
 
@@ -123,7 +123,7 @@ class TestCacheSet:
 
     def test_silently_fails_on_error(self):
         mock_client = MagicMock()
-        mock_client.setex.side_effect = Exception("Redis error")
+        mock_client.setex.side_effect = OSError("Redis error")
         with patch("datapulse.cache.get_redis_client", return_value=mock_client):
             cache_set("key", "value", ttl=60)  # Should not raise
 
@@ -149,6 +149,6 @@ class TestCacheInvalidatePattern:
 
     def test_returns_zero_on_error(self):
         mock_client = MagicMock()
-        mock_client.scan_iter.side_effect = Exception("Redis error")
+        mock_client.scan_iter.side_effect = OSError("Redis error")
         with patch("datapulse.cache.get_redis_client", return_value=mock_client):
             assert cache_invalidate_pattern("*") == 0
