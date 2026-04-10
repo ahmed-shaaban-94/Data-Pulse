@@ -101,14 +101,16 @@ jobs:
         run: |
           for f in migrations/*.sql; do
             echo "Applying $f..."
-            psql -h localhost -U datapulse -d datapulse -f "$f" 2>&1 || true
+            psql -h localhost -U datapulse -d datapulse \
+              -c "SET app.db_reader_password = 'ci_reader_pass';" \
+              -f "$f" 2>&1 || true
           done
       - name: Run integration tests
         env:
           DATABASE_URL: postgresql://datapulse:datapulse@localhost:5432/datapulse
           REDIS_URL: redis://localhost:6379/0
           SENTRY_ENVIRONMENT: test
-        run: pytest -m integration --cov --cov-report=term-missing --cov-report=xml --cov-fail-under=50
+        run: pytest -m integration --cov=datapulse --cov-report=term-missing --cov-report=xml --cov-fail-under=95
       - name: Upload coverage report
         if: always()
         uses: actions/upload-artifact@v7
@@ -255,7 +257,7 @@ jobs:
         run: pip install "dbt-core>=1.8" "dbt-postgres>=1.8"
       - name: Install dbt packages
         working-directory: dbt
-        run: dbt deps || true
+        run: dbt deps
         env:
           DBT_HOST: localhost
           POSTGRES_PASSWORD: datapulse

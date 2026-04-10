@@ -14,9 +14,10 @@ import re
 from datetime import UTC, datetime
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 
 from datapulse.api.auth import get_current_user
+from datapulse.api.limiter import limiter
 from datapulse.logging import get_logger
 from datapulse.tasks.async_executor import get_job_result, submit_query
 from datapulse.tasks.models import QueryResponse, QueryResult, QueryStatus, QuerySubmit
@@ -71,7 +72,9 @@ def _validate_sql(sql: str) -> None:
 
 
 @router.post("", response_model=QueryResponse, status_code=202)
+@limiter.limit("5/minute")
 async def submit_query_endpoint(
+    request: Request,
     body: QuerySubmit,
     user: Annotated[dict[str, Any], Depends(get_current_user)],
 ) -> QueryResponse:

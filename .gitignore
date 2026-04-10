@@ -59,6 +59,7 @@ frontend/tsconfig.tsbuildinfo
 
 # Claude Code
 .claude/settings.local.json
+.claude/worktrees/
 
 # Waitlist data (frontend)
 frontend/waitlist.json

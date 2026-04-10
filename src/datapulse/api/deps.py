@@ -13,7 +13,9 @@ from sqlalchemy.orm import Session
 
 from datapulse.ai_light.service import AILightService
 from datapulse.analytics.advanced_repository import AdvancedRepository
+from datapulse.analytics.affinity_repository import AffinityRepository
 from datapulse.analytics.breakdown_repository import BreakdownRepository
+from datapulse.analytics.churn_repository import ChurnRepository
 from datapulse.analytics.comparison_repository import ComparisonRepository
 from datapulse.analytics.customer_health import CustomerHealthRepository
 from datapulse.analytics.detail_repository import DetailRepository
@@ -21,7 +23,11 @@ from datapulse.analytics.diagnostics import DiagnosticsRepository
 from datapulse.analytics.feature_store_repository import FeatureStoreRepository
 from datapulse.analytics.hierarchy_repository import HierarchyRepository
 from datapulse.analytics.repository import AnalyticsRepository
+from datapulse.analytics.search_service import SearchService
 from datapulse.analytics.service import AnalyticsService
+
+# Service imports for newly added factory functions
+from datapulse.annotations.service import AnnotationService
 from datapulse.api.auth import UserClaims, get_current_user, require_api_key
 from datapulse.billing.plans import PlanLimits, get_plan_limits
 from datapulse.billing.repository import BillingRepository
@@ -40,6 +46,7 @@ from datapulse.pipeline.quality_repository import QualityRepository
 from datapulse.pipeline.quality_service import QualityService
 from datapulse.pipeline.repository import PipelineRepository
 from datapulse.pipeline.service import PipelineService
+from datapulse.reports.schedule_service import ScheduleService
 
 logger = structlog.get_logger()
 
@@ -135,6 +142,8 @@ def get_analytics_service(
     diagnostics_repo = DiagnosticsRepository(session)
     customer_health_repo = CustomerHealthRepository(session)
     feature_store_repo = FeatureStoreRepository(session)
+    churn_repo = ChurnRepository(session)
+    affinity_repo = AffinityRepository(session)
     return AnalyticsService(
         repo,
         detail_repo,
@@ -145,6 +154,8 @@ def get_analytics_service(
         diagnostics_repo,
         customer_health_repo,
         feature_store_repo,
+        churn_repo=churn_repo,
+        affinity_repo=affinity_repo,
     )
 
 
@@ -216,3 +227,27 @@ def get_tenant_plan_limits(
 
 # Alias for backwards compatibility — analytics.py and ai_light.py import this name
 verify_api_key = require_api_key
+
+
+def get_annotation_service(
+    session: Annotated[Session, Depends(get_tenant_session)],
+) -> AnnotationService:
+    from datapulse.annotations.repository import AnnotationRepository
+
+    return AnnotationService(AnnotationRepository(session))
+
+
+def get_schedule_service(
+    session: Annotated[Session, Depends(get_tenant_session)],
+) -> ScheduleService:
+    from datapulse.reports.schedule_repository import ScheduleRepository
+
+    return ScheduleService(ScheduleRepository(session))
+
+
+def get_search_service(
+    session: Annotated[Session, Depends(get_tenant_session)],
+) -> SearchService:
+    from datapulse.analytics.search_repository import SearchRepository
+
+    return SearchService(SearchRepository(session))

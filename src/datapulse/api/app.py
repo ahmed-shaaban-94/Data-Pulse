@@ -122,7 +122,6 @@ def create_app() -> FastAPI:
             "Content-Type",
             "Authorization",
             "X-API-Key",
-            "X-Pipeline-Token",
         ],
     )
 
