@@ -178,9 +178,15 @@ def test_run_query_sync_stores_result_in_redis():
 
 def test_run_query_sync_handles_query_error():
     """Query failure stores error status in Redis."""
+    import sqlalchemy.exc
+
     mock_client = MagicMock()
     mock_session = MagicMock()
-    mock_session.execute.side_effect = [None, None, RuntimeError("column not found")]
+    mock_session.execute.side_effect = [
+        None,
+        None,
+        sqlalchemy.exc.OperationalError("SELECT bad", {}, Exception("column not found")),
+    ]
 
     with (
         patch("datapulse.tasks.async_executor._get_job_client", return_value=mock_client),
