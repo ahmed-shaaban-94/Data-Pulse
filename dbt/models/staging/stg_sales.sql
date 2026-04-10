@@ -1,6 +1,9 @@
 {{
     config(
-        materialized='table',
+        materialized='incremental',
+        incremental_strategy='delete+insert',
+        unique_key=['tenant_id', 'reference_no', 'date', 'material', 'customer', 'site'],
+        on_schema_change='sync_all_columns',
         schema='staging',
         post_hook=[
             "ALTER TABLE {{ this }} ENABLE ROW LEVEL SECURITY",
@@ -72,6 +75,9 @@ WITH source AS (
         insurance_tel,
         insurance_no
     FROM {{ ref('bronze_sales') }}
+    {% if is_incremental() %}
+    WHERE loaded_at > (SELECT MAX(loaded_at) - INTERVAL '3 days' FROM {{ this }})
+    {% endif %}
 ),
 
 deduplicated AS (

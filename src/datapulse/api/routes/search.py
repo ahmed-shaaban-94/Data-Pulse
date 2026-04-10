@@ -5,11 +5,10 @@ from __future__ import annotations
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query, Request
-from sqlalchemy.orm import Session
 
-from datapulse.analytics.search_repository import SearchRepository
+from datapulse.analytics.search_service import SearchService
 from datapulse.api.auth import get_current_user
-from datapulse.api.deps import get_tenant_session
+from datapulse.api.deps import get_search_service
 from datapulse.api.limiter import limiter
 
 router = APIRouter(
@@ -18,14 +17,7 @@ router = APIRouter(
     dependencies=[Depends(get_current_user)],
 )
 
-
-def get_search_repo(
-    session: Annotated[Session, Depends(get_tenant_session)],
-) -> SearchRepository:
-    return SearchRepository(session)
-
-
-RepoDep = Annotated[SearchRepository, Depends(get_search_repo)]
+ServiceDep = Annotated[SearchService, Depends(get_search_service)]
 
 
 _PAGES = [
@@ -58,7 +50,7 @@ def _search_pages(query: str) -> list[dict]:
 @limiter.limit("60/minute")
 def search(
     request: Request,
-    repo: RepoDep,
+    service: ServiceDep,
     q: str = Query("", min_length=0, max_length=200),
     limit: int = Query(10, ge=1, le=50),
 ):
@@ -66,6 +58,6 @@ def search(
     if not q.strip():
         return {"products": [], "customers": [], "staff": [], "pages": []}
 
-    results = repo.search(q.strip(), limit)
+    results = service.search(q.strip(), limit)
     results["pages"] = _search_pages(q.strip())
     return results

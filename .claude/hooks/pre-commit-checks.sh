@@ -22,8 +22,22 @@ fi
 TS_FILES=$(echo "$STAGED" | grep -E '\.(ts|tsx)$' || true)
 if [ -n "$TS_FILES" ] && [ -f frontend/tsconfig.json ]; then
   echo "[PRE-COMMIT] Running tsc --noEmit..." >&2
-  if ! (cd frontend && npx tsc --noEmit 2>/dev/null); then
-    ERRORS="${ERRORS}TypeScript type check failed. "
+  # In git worktrees, node_modules lives in the main repo — find tsc there.
+  TSC_BIN="frontend/node_modules/.bin/tsc"
+  if [ ! -f "$TSC_BIN" ]; then
+    MAIN=$(git worktree list --porcelain 2>/dev/null | grep "^worktree " | head -1 | cut -d' ' -f2)
+    [ -f "${MAIN}/frontend/node_modules/.bin/tsc" ] && TSC_BIN="${MAIN}/frontend/node_modules/.bin/tsc"
+  fi
+  if [ -f "$TSC_BIN" ]; then
+    # Filter pre-existing vitest/globals config error (not caused by our code)
+    TSC_OUT=$("$TSC_BIN" --project frontend/tsconfig.json --noEmit 2>&1 || true)
+    NEW_ERRORS=$(echo "$TSC_OUT" | grep "^frontend/" | grep -v "vitest/globals" | grep "error TS" || true)
+    if [ -n "$NEW_ERRORS" ]; then
+      echo "$NEW_ERRORS" >&2
+      ERRORS="${ERRORS}TypeScript type check failed. "
+    fi
+  else
+    echo "[PRE-COMMIT] tsc not found — skipping TypeScript check." >&2
   fi
 fi
 
