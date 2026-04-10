@@ -41,6 +41,38 @@ from datapulse.config import get_settings
 
 logger = structlog.get_logger()
 
+# ---------------------------------------------------------------------------
+# Prometheus cache metrics (optional — degrades gracefully if not installed)
+# ---------------------------------------------------------------------------
+try:
+    from prometheus_client import Counter
+
+    _cache_hits = Counter(
+        "cache_hits_total",
+        "Total number of Redis cache hits",
+        ["key_prefix"],
+    )
+    _cache_misses = Counter(
+        "cache_misses_total",
+        "Total number of Redis cache misses",
+        ["key_prefix"],
+    )
+    _PROMETHEUS_ENABLED = True
+except ImportError:  # pragma: no cover
+    _PROMETHEUS_ENABLED = False
+
+
+def _record_hit(key: str) -> None:
+    if _PROMETHEUS_ENABLED:
+        prefix = key.split(":")[0] if ":" in key else key
+        _cache_hits.labels(key_prefix=prefix).inc()
+
+
+def _record_miss(key: str) -> None:
+    if _PROMETHEUS_ENABLED:
+        prefix = key.split(":")[0] if ":" in key else key
+        _cache_misses.labels(key_prefix=prefix).inc()
+
 # Context variable holding the current tenant_id.  Set by ``get_tenant_session``
 # in ``datapulse.api.deps`` so that cache keys are automatically scoped per
 # tenant without requiring explicit passing through every service method.
@@ -105,16 +137,20 @@ def cache_get(key: str) -> Any | None:
     """Get a value from cache. Returns None on miss or error."""
     client = get_redis_client()
     if client is None:
+        _record_miss(key)
         return None
     try:
         raw = client.get(key)
         if raw is None:
             logger.debug("cache_miss", key=key)
+            _record_miss(key)
             return None
         logger.debug("cache_hit", key=key)
+        _record_hit(key)
         return json.loads(raw)
     except _REDIS_OP_ERRORS as exc:
         logger.error("cache_get_error", key=key, error=str(exc))
+        _record_miss(key)
         return None
 
 
