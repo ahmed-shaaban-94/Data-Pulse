@@ -101,7 +101,7 @@ jobs:
         run: |
           for f in migrations/*.sql; do
             echo "Applying $f..."
-            psql -h localhost -U datapulse -d datapulse -f "$f" 2>&1
+            (echo "SET app.db_reader_password = 'ci_reader_pass';" && cat "$f") | psql -h localhost -U datapulse -d datapulse 2>&1
           done
       - name: Run integration tests
         env:

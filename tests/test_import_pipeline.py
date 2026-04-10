@@ -16,6 +16,7 @@ from datapulse.import_pipeline.validator import ValidationError, validate_file
 # Helpers
 # ============================================================
 
+
 def _write_csv(tmp_path: Path, name: str, content: str) -> Path:
     p = tmp_path / name
     p.write_text(content, encoding="utf-8")
