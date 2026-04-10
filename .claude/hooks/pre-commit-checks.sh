@@ -18,15 +18,13 @@ if [ -n "$PY_FILES" ] && command -v ruff &>/dev/null; then
   fi
 fi
 
-# TypeScript frontend checks — only if staged .ts/.tsx files exist and node_modules is installed
+# TypeScript frontend checks — only if staged .ts/.tsx files exist
 TS_FILES=$(echo "$STAGED" | grep -E '\.(ts|tsx)$' || true)
-if [ -n "$TS_FILES" ] && [ -f frontend/tsconfig.json ] && [ -d frontend/node_modules ]; then
+if [ -n "$TS_FILES" ] && [ -f frontend/tsconfig.json ]; then
   echo "[PRE-COMMIT] Running tsc --noEmit..." >&2
-  if ! (cd frontend && node_modules/.bin/tsc --noEmit 2>/dev/null); then
+  if ! (cd frontend && npx tsc --noEmit 2>/dev/null); then
     ERRORS="${ERRORS}TypeScript type check failed. "
   fi
-elif [ -n "$TS_FILES" ] && [ ! -d frontend/node_modules ]; then
-  echo "[PRE-COMMIT] Skipping tsc — frontend/node_modules not installed (worktree?)" >&2
 fi
 
 if [ -n "$ERRORS" ]; then
