@@ -87,7 +87,8 @@ class BillingService:
                     limit=limits.data_sources,
                     plan=plan_name,
                 )
-            if additional_sources > 0 and current_sources + additional_sources > limits.data_sources:
+            projected = current_sources + additional_sources
+            if additional_sources > 0 and projected > limits.data_sources:
                 raise PlanLimitExceededError(
                     limit_type="data_sources",
                     current=current_sources,
