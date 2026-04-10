@@ -30,8 +30,9 @@ def _check_db() -> dict:
             conn.execute(text("SELECT 1"))
         latency = round((time.monotonic() - t0) * 1000)
         return {"status": "ok", "latency_ms": latency}
-    except Exception as exc:
-        return {"status": "error", "error": str(exc)[:100]}
+    except Exception:
+        logger.exception("Database health check failed")
+        return {"status": "error", "error": "internal error"}
 
 
 def _check_redis() -> dict:
@@ -46,8 +47,9 @@ def _check_redis() -> dict:
         client.ping()
         latency = round((time.monotonic() - t0) * 1000)
         return {"status": "ok", "latency_ms": latency}
-    except Exception as exc:
-        return {"status": "error", "error": str(exc)[:100]}
+    except Exception:
+        logger.exception("Redis health check failed")
+        return {"status": "error", "error": "internal error"}
 
 
 def _check_celery() -> dict:
@@ -60,8 +62,9 @@ def _check_celery() -> dict:
         if active is None:
             return {"status": "no-workers"}
         return {"status": "ok", "workers": len(active)}
-    except Exception as exc:
-        return {"status": "error", "error": str(exc)[:100]}
+    except Exception:
+        logger.exception("Celery health check failed")
+        return {"status": "error", "error": "internal error"}
 
 
 # ---------------------------------------------------------------------------
