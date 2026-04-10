@@ -1,8 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
-// eslint-disable-next-line
-const ReactGridLayout = require("react-grid-layout");
+import { Responsive, WidthProvider } from "react-grid-layout";
 import { Settings, Plus, Save, X } from "lucide-react";
 import {
   useDashboardLayout,
@@ -15,9 +14,7 @@ import { useToast } from "@/components/ui/toast";
 
 import "react-grid-layout/css/styles.css";
 
-const ResponsiveGridLayout = ReactGridLayout.WidthProvider(
-  ReactGridLayout.Responsive,
-);
+const ResponsiveGridLayout = WidthProvider(Responsive);
 
 interface GridLayoutItem {
   i: string;
