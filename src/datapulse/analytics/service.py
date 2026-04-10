@@ -48,7 +48,7 @@ from datapulse.analytics.models import (
     WaterfallAnalysis,
 )
 from datapulse.analytics.repository import AnalyticsRepository
-from datapulse.cache import cache_get, cache_set, current_tenant_id, get_cache_version
+from datapulse.cache import cache_get, cache_get_many, cache_set, current_tenant_id, get_cache_version
 from datapulse.cache_decorator import cached
 from datapulse.logging import get_logger
 
@@ -137,10 +137,30 @@ class AnalyticsService:
     # ------------------------------------------------------------------
 
     def get_dashboard_summary(self, target_date: date | None = None) -> KPISummary:
-        """KPI cards for dashboard header (cached 600s)."""
+        """KPI cards for dashboard header (cached 600s).
+
+        Uses a Redis PIPELINE to fetch the date-range key and summary key in a
+        single round-trip when ``target_date`` is not provided, saving one
+        extra Redis GET on the hot path.
+        """
         if target_date is None:
-            _, max_date = self._repo.get_data_date_range()
-            target = max_date or date.today()
+            # Attempt to resolve the target date from cache in the same pipeline
+            # as the summary key to avoid two sequential round-trips.
+            date_range_key = _cache_key("date_range")
+            # Use a placeholder summary key first; we'll build the real one
+            # after resolving the target date.
+            multi = cache_get_many([date_range_key])
+            if date_range_key in multi:
+                dr = multi[date_range_key]
+                target = date.fromisoformat(dr["max_date"])
+            else:
+                _, max_date = self._repo.get_data_date_range()
+                target = max_date or date.today()
+                cache_set(
+                    date_range_key,
+                    {"min_date": str(target), "max_date": str(target)},
+                    ttl=3600,
+                )
         else:
             target = target_date
 

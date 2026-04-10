@@ -167,6 +167,54 @@ def cache_set(key: str, value: Any, ttl: int | None = None) -> None:
         logger.error("cache_set_error", key=key, error=str(exc))
 
 
+def cache_get_many(keys: list[str]) -> dict[str, Any]:
+    """Fetch multiple cache keys in a single Redis PIPELINE round-trip.
+
+    Returns a dict mapping each key to its deserialized value.  Missing keys
+    and individual deserialization errors are silently omitted so callers can
+    treat this as a best-effort pre-warm.
+
+    Example::
+
+        results = cache_get_many([key_a, key_b, key_c])
+        val_a = results.get(key_a)   # None on miss
+    """
+    if not keys:
+        return {}
+
+    client = get_redis_client()
+    if client is None:
+        for key in keys:
+            _record_miss(key)
+        return {}
+
+    try:
+        pipe = client.pipeline(transaction=False)
+        for key in keys:
+            pipe.get(key)
+        raw_values: list[str | None] = pipe.execute()
+
+        result: dict[str, Any] = {}
+        for key, raw in zip(keys, raw_values):
+            if raw is None:
+                logger.debug("cache_miss", key=key)
+                _record_miss(key)
+            else:
+                try:
+                    result[key] = json.loads(raw)
+                    logger.debug("cache_hit", key=key)
+                    _record_hit(key)
+                except json.JSONDecodeError as exc:
+                    logger.error("cache_get_many_decode_error", key=key, error=str(exc))
+                    _record_miss(key)
+        return result
+    except _REDIS_OP_ERRORS as exc:
+        logger.error("cache_get_many_error", keys=keys, error=str(exc))
+        for key in keys:
+            _record_miss(key)
+        return {}
+
+
 def cache_invalidate_pattern(pattern: str) -> int:
     """Delete all keys matching a glob pattern. Returns count deleted.
 
