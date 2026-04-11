@@ -17,12 +17,77 @@ import pytest
 
 
 def pytest_configure(config):
-    """Set minimal env vars so modules with eager Settings() calls can import.
+    """Set minimal env vars and cache create_app for fast test startup.
 
     This runs before test collection, fixing collection errors in modules
     that call get_settings() at module level.
+
+    Also caches create_app() so Pydantic schema generation (~10-15s) only
+    happens once instead of 30+ times across test files. Without this,
+    unit tests exceed the 10-minute CI timeout.
     """
     os.environ.setdefault("DATABASE_URL", "postgresql://test:test@localhost/test")
+
+    # Cache create_app() — replaces the module attribute before any test file
+    # imports it, so both `from datapulse.api.app import create_app` and
+    # `datapulse.api.app.create_app()` resolve to the cached version.
+    #
+    # Without this, 30+ test files each call create_app(), triggering
+    # Pydantic schema generation (~10-15s each) and exceeding the
+    # 10-minute CI timeout.
+    #
+    # The lifespan is replaced with a no-op because session fixtures
+    # (_disable_scheduler) aren't active yet during the first call.
+    import datapulse.api.app as _app_module
+
+    _original = _app_module.create_app
+    _cached_app = None
+
+    def _cached_create_app():
+        nonlocal _cached_app
+        if _cached_app is None:
+            _cached_app = _original()
+            # Replace lifespan with no-op to avoid scheduler/event-loop
+            # conflicts in TestClient. Session fixtures patch the scheduler
+            # too late for the first cached call.
+            from contextlib import asynccontextmanager
+
+            @asynccontextmanager
+            async def _noop_lifespan(app):
+                yield
+
+            _cached_app.router.lifespan_context = _noop_lifespan
+        # Clear stale overrides from previous test
+        _cached_app.dependency_overrides.clear()
+
+        # Default RBAC overrides — some routes use require_permission/
+        # get_access_context which calls get_session_factory() directly
+        # (bypassing the mocked tenant session), hanging on DB connect.
+        # Provide a default admin context; tests that need specific RBAC
+        # behavior can override these.
+        from datapulse.rbac.dependencies import get_access_context
+        from datapulse.rbac.models import AccessContext
+
+        _cached_app.dependency_overrides[get_access_context] = lambda: AccessContext(
+            member_id=1,
+            tenant_id=1,
+            user_id="test-user",
+            role_key="owner",
+            permissions={
+                "analytics:read",
+                "analytics:custom_query",
+                "pipeline:read",
+                "pipeline:run",
+                "pipeline:trigger",
+                "admin:read",
+                "admin:write",
+            },
+            sector_ids=[],
+            is_admin=True,
+        )
+        return _cached_app
+
+    _app_module.create_app = _cached_create_app
 
 
 from datapulse.api.limiter import limiter  # noqa: E402
@@ -35,23 +100,6 @@ def _disable_rate_limiting():
     limiter.enabled = False
     yield
     limiter.enabled = True
-
-
-@pytest.fixture(autouse=True, scope="session")
-def _disable_scheduler():
-    """Prevent APScheduler from starting during tests.
-
-    The AsyncIOScheduler started via create_app() lifespan causes
-    TestClient to deadlock. Patching start_scheduler/stop_scheduler
-    functions directly prevents the lifespan from ever interacting
-    with the real scheduler. The import inside create_app() resolves
-    at call time, so patching the source module is sufficient.
-    """
-    with (
-        patch("datapulse.scheduler.start_scheduler"),
-        patch("datapulse.scheduler.stop_scheduler"),
-    ):
-        yield
 
 
 @pytest.fixture(autouse=True, scope="session")
