@@ -120,7 +120,7 @@ async def stripe_webhook(
         )
         session.commit()
         return {"status": result.status, "event_type": result.event_type}
-    except (ValueError, OSError) as e:
+    except Exception as e:
         session.rollback()
         logger.error("webhook_error", error=str(e))
         raise HTTPException(status_code=400, detail="Webhook processing failed") from e

@@ -10,7 +10,6 @@ from __future__ import annotations
 from typing import Annotated, Any
 
 import jwt
-import sqlalchemy.exc
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 from sqlalchemy import text
@@ -145,7 +144,7 @@ def embed_query(
         )
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
-    except (sqlalchemy.exc.SQLAlchemyError, OSError) as exc:
+    except Exception as exc:
         if session is not None:
             session.rollback()
         log.error("embed_query_failed", error=str(exc))
