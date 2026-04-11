@@ -36,9 +36,9 @@ def _check_db() -> dict:
             conn.execute(text("SELECT 1"))
         latency = round((time.monotonic() - t0) * 1000)
         return {"status": "ok", "latency_ms": latency}
-    except (sqlalchemy.exc.SQLAlchemyError, OSError) as exc:
-        logger.error("health_db_error", error=str(exc))
-        return {"status": "error", "error": str(exc)[:100]}
+    except (sqlalchemy.exc.SQLAlchemyError, OSError):
+        logger.exception("Database health check failed")
+        return {"status": "error", "error": "internal_error"}
 
 
 def _check_redis() -> dict:
@@ -53,9 +53,9 @@ def _check_redis() -> dict:
         client.ping()
         latency = round((time.monotonic() - t0) * 1000)
         return {"status": "ok", "latency_ms": latency}
-    except (redis.RedisError, OSError) as exc:
-        logger.error("health_redis_error", error=str(exc))
-        return {"status": "error", "error": str(exc)[:100]}
+    except (redis.RedisError, OSError):
+        logger.exception("Redis health check failed")
+        return {"status": "error", "error": "internal_error"}
 
 
 def _check_query_executor() -> dict:
@@ -70,9 +70,9 @@ def _check_query_executor() -> dict:
         client.ping()
         latency = round((time.monotonic() - t0) * 1000)
         return {"status": "ok", "latency_ms": latency}
-    except (redis.RedisError, OSError) as exc:
-        logger.error("health_query_executor_error", error=str(exc))
-        return {"status": "error", "error": str(exc)[:100]}
+    except (redis.RedisError, OSError):
+        logger.exception("Query executor health check failed")
+        return {"status": "error", "error": "internal_error"}
 
 
 def _check_pool() -> dict:
@@ -111,9 +111,9 @@ def _check_pool() -> dict:
             "overflow": overflow,
             "saturation_pct": round(saturation * 100, 1),
         }
-    except (sqlalchemy.exc.SQLAlchemyError, AttributeError, OSError) as exc:
-        logger.error("health_pool_error", error=str(exc))
-        return {"status": "error", "error": str(exc)[:100]}
+    except (sqlalchemy.exc.SQLAlchemyError, AttributeError, OSError):
+        logger.exception("Connection pool health check failed")
+        return {"status": "error", "error": "internal_error"}
 
 
 def _check_schema_version() -> dict:
@@ -125,9 +125,9 @@ def _check_schema_version() -> dict:
             return {"status": "unknown", "version": None}
         version = row[0]
         return {"status": "ok", "version": version}
-    except (sqlalchemy.exc.SQLAlchemyError, OSError) as exc:
-        logger.error("health_schema_version_error", error=str(exc))
-        return {"status": "error", "error": str(exc)[:100]}
+    except (sqlalchemy.exc.SQLAlchemyError, OSError):
+        logger.exception("Schema version health check failed")
+        return {"status": "error", "error": "internal_error"}
 
 
 def _check_dbt_freshness() -> dict:
@@ -153,9 +153,9 @@ def _check_dbt_freshness() -> dict:
             "last_updated_at": last_updated.isoformat(),
             "age_hours": round(age_hours, 1),
         }
-    except (sqlalchemy.exc.SQLAlchemyError, OSError) as exc:
-        logger.error("health_dbt_freshness_error", error=str(exc))
-        return {"status": "error", "error": str(exc)[:100]}
+    except (sqlalchemy.exc.SQLAlchemyError, OSError):
+        logger.exception("dbt freshness health check failed")
+        return {"status": "error", "error": "internal_error"}
 
 
 def _check_data_freshness() -> dict:
@@ -181,9 +181,9 @@ def _check_data_freshness() -> dict:
             "last_loaded_at": last_loaded.isoformat(),
             "age_hours": round(age_hours, 1),
         }
-    except (sqlalchemy.exc.SQLAlchemyError, OSError) as exc:
-        logger.error("health_data_freshness_error", error=str(exc))
-        return {"status": "error", "error": str(exc)[:100]}
+    except (sqlalchemy.exc.SQLAlchemyError, OSError):
+        logger.exception("Data freshness health check failed")
+        return {"status": "error", "error": "internal_error"}
 
 
 # ---------------------------------------------------------------------------

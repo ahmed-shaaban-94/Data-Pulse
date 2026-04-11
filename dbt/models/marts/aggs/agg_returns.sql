@@ -1,6 +1,9 @@
 {{
     config(
-        materialized='table',
+        materialized='incremental',
+        incremental_strategy='delete+insert',
+        unique_key=['tenant_id', 'product_key', 'customer_key', 'year', 'month', 'billing_way'],
+        on_schema_change='sync_all_columns',
         schema='marts',
         post_hook=[
             "ALTER TABLE {{ this }} ENABLE ROW LEVEL SECURITY",
@@ -37,6 +40,12 @@ WITH returns_monthly AS (
     FROM {{ ref('fct_sales') }} f
     INNER JOIN {{ ref('dim_date') }} d ON f.date_key = d.date_key
     WHERE f.is_return = TRUE
+    {% if is_incremental() %}
+    AND (d.year * 100 + d.month) >= (
+        SELECT MAX(year * 100 + month) - 1
+        FROM {{ this }}
+    )
+    {% endif %}
     GROUP BY f.tenant_id, f.product_key, f.customer_key, d.year, d.month, f.billing_way
 )
 

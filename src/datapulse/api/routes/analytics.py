@@ -12,10 +12,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request, Response
 from pydantic import BaseModel, Field
-from sqlalchemy.orm import Session
 
-from datapulse.analytics.affinity_repository import AffinityRepository
-from datapulse.analytics.churn_repository import ChurnRepository
 from datapulse.analytics.models import (
     ABCAnalysis,
     AffinityPair,
@@ -54,7 +51,7 @@ from datapulse.analytics.models import (
 from datapulse.analytics.service import AnalyticsService
 from datapulse.api.auth import get_current_user
 from datapulse.api.cache_helpers import set_cache_headers
-from datapulse.api.deps import get_analytics_service, get_tenant_session
+from datapulse.api.deps import get_analytics_service
 from datapulse.api.limiter import limiter
 
 router = APIRouter(
@@ -388,14 +385,13 @@ def get_product_detail(
 def get_churn_predictions(
     request: Request,
     response: Response,
-    session: Annotated[Session, Depends(get_tenant_session)],
+    service: ServiceDep,
     risk_level: str | None = Query(None),
     limit: Annotated[int, Query(ge=1, le=200)] = 50,
 ) -> list:
     """Customer churn predictions sorted by probability."""
     set_cache_headers(response, 300)
-    repo = ChurnRepository(session)
-    rows = repo.get_churn_predictions(risk_level=risk_level, limit=limit)
+    rows = service.get_churn_predictions(risk_level=risk_level, limit=limit)
     return [ChurnPrediction(**r) for r in rows]
 
 
@@ -567,14 +563,13 @@ def get_staff_quota(
 def get_product_affinity(
     request: Request,
     response: Response,
-    session: Annotated[Session, Depends(get_tenant_session)],
+    service: ServiceDep,
     product_key: int,
     limit: Annotated[int, Query(ge=1, le=50)] = 10,
 ) -> list:
     """Top co-purchased products for a given product."""
     set_cache_headers(response, 600)
-    repo = AffinityRepository(session)
-    rows = repo.get_affinity_for_product(product_key, limit=limit)
+    rows = service.get_affinity_for_product(product_key, limit=limit)
     return [AffinityPair(**r) for r in rows]
 
 

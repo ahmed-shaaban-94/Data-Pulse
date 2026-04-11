@@ -1,0 +1,12 @@
+# Gitleaks configuration
+# https://github.com/gitleaks/gitleaks#configuration
+
+title = "DataPulse Gitleaks Config"
+
+[allowlist]
+  # Stale worktree directories were removed in this PR but still exist
+  # in git history. These contained duplicate copies of the codebase
+  # with test/example tokens — not real secrets.
+  paths = [
+    '''\.claude/worktrees/''',
+  ]

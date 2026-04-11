@@ -8,7 +8,7 @@ from fastapi.testclient import TestClient
 
 from datapulse.api.app import create_app
 from datapulse.api.auth import get_current_user
-from datapulse.api.routes.annotations import get_annotation_repo
+from datapulse.api.deps import get_annotation_service
 
 
 def _make_row(**overrides):
@@ -43,7 +43,7 @@ def mock_repo():
 def client(mock_user, mock_repo):
     app = create_app()
     app.dependency_overrides[get_current_user] = lambda: mock_user
-    app.dependency_overrides[get_annotation_repo] = lambda: mock_repo
+    app.dependency_overrides[get_annotation_service] = lambda: mock_repo
     yield TestClient(app)
     app.dependency_overrides.clear()
 

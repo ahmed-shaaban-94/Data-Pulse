@@ -8,7 +8,9 @@ from datetime import date, timedelta
 from typing import Any
 
 from datapulse.analytics.advanced_repository import AdvancedRepository
+from datapulse.analytics.affinity_repository import AffinityRepository
 from datapulse.analytics.breakdown_repository import BreakdownRepository
+from datapulse.analytics.churn_repository import ChurnRepository
 from datapulse.analytics.comparison_repository import ComparisonRepository
 from datapulse.analytics.customer_health import CustomerHealthRepository
 from datapulse.analytics.detail_repository import DetailRepository
@@ -95,6 +97,8 @@ class AnalyticsService:
         diagnostics_repo: DiagnosticsRepository | None = None,
         customer_health_repo: CustomerHealthRepository | None = None,
         feature_store_repo: FeatureStoreRepository | None = None,
+        churn_repo: ChurnRepository | None = None,
+        affinity_repo: AffinityRepository | None = None,
     ) -> None:
         self._repo = repo
         self._detail_repo = detail_repo
@@ -105,6 +109,8 @@ class AnalyticsService:
         self._diagnostics_repo = diagnostics_repo
         self._customer_health_repo = customer_health_repo
         self._feature_store_repo = feature_store_repo
+        self._churn_repo = churn_repo
+        self._affinity_repo = affinity_repo
 
     def get_date_range(self) -> DataDateRange:
         """Return the min/max dates of available data (cached 3600s)."""
@@ -625,3 +631,23 @@ class AnalyticsService:
             raise RuntimeError("FeatureStoreRepository not configured")
         data = self._feature_store_repo.get_lifecycle_distribution()
         return LifecycleDistribution(**data)
+
+    def get_churn_predictions(
+        self,
+        risk_level: str | None = None,
+        limit: int = 50,
+    ) -> list[dict]:
+        """Customer churn predictions sorted by probability (cached 300s)."""
+        if self._churn_repo is None:
+            raise RuntimeError("ChurnRepository not configured")
+        return self._churn_repo.get_churn_predictions(risk_level=risk_level, limit=limit)
+
+    def get_affinity_for_product(
+        self,
+        product_key: int,
+        limit: int = 10,
+    ) -> list[dict]:
+        """Top co-purchased products for a given product (cached 600s)."""
+        if self._affinity_repo is None:
+            raise RuntimeError("AffinityRepository not configured")
+        return self._affinity_repo.get_affinity_for_product(product_key=product_key, limit=limit)

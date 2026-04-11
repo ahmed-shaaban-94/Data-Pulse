@@ -596,6 +596,10 @@ models:
           - not_null
       - name: daily_net_amount
         description: "Deprecated alias for daily_gross_amount (backward compat)"
+        tests:
+          - not_null:
+              config:
+                severity: warn
       - name: daily_transactions
         description: "Total number of transactions for the day"
         tests:
@@ -614,6 +618,10 @@ models:
           - not_null
       - name: mtd_net_amount
         description: "Deprecated alias for mtd_gross_amount (backward compat)"
+        tests:
+          - not_null:
+              config:
+                severity: warn
       - name: mtd_transactions
         description: "Month-to-date cumulative transaction count"
         tests:
@@ -624,6 +632,10 @@ models:
           - not_null
       - name: ytd_net_amount
         description: "Deprecated alias for ytd_gross_amount (backward compat)"
+        tests:
+          - not_null:
+              config:
+                severity: warn
       - name: ytd_transactions
         description: "Year-to-date cumulative transaction count"
         tests:
