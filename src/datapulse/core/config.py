@@ -164,10 +164,8 @@ class Settings(BaseSettings):
             return self
 
         missing: list[str] = []
-        if not self.api_key:
-            missing.append("API_KEY")
-        if not self.auth0_domain:
-            missing.append("AUTH0_DOMAIN")
+        if not self.api_key and not self.auth0_domain:
+            missing.append("API_KEY or AUTH0_DOMAIN")
         if not self.db_reader_password:
             missing.append("DB_READER_PASSWORD")
         if (

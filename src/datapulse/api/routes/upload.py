@@ -47,10 +47,18 @@ async def upload_files(
     for f in files:
         if not f.filename:
             continue
-        content = await f.read()
         max_size = 100 * 1024 * 1024  # 100MB
-        if len(content) > max_size:
+        # Check declared size first (cheap), then stream-read with limit
+        if f.size and f.size > max_size:
             raise HTTPException(413, f"File {f.filename} exceeds 100MB limit")
+        chunks: list[bytes] = []
+        total = 0
+        while chunk := await f.read(1024 * 1024):  # 1MB chunks
+            total += len(chunk)
+            if total > max_size:
+                raise HTTPException(413, f"File {f.filename} exceeds 100MB limit")
+            chunks.append(chunk)
+        content = b"".join(chunks)
         try:
             result = service.save_temp_file(f.filename, content)
             results.append(result)
