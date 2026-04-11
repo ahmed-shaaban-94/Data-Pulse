@@ -34,7 +34,9 @@ def get_billing_status(
 
 
 @router.post("/checkout", response_model=CheckoutResponse)
+@limiter.limit("5/minute")
 def create_checkout(
+    request: Request,
     body: CheckoutRequest,
     user: CurrentUser,
     service: Annotated[BillingService, Depends(get_billing_service)],
@@ -60,7 +62,9 @@ def create_checkout(
 
 
 @router.post("/portal", response_model=PortalResponse)
+@limiter.limit("5/minute")
 def create_portal(
+    request: Request,
     user: CurrentUser,
     service: Annotated[BillingService, Depends(get_billing_service)],
 ) -> PortalResponse:

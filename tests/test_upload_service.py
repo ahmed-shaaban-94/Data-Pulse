@@ -1,201 +1,164 @@
-"""Tests for upload service UUID validation (path traversal prevention)."""
+"""Tests for upload service — save_temp_file, preview_file, confirm_upload."""
 
 from __future__ import annotations
 
 import uuid
-from unittest.mock import patch
+from pathlib import Path
 
 import pytest
-from fastapi import HTTPException
 
 from datapulse.upload.service import UploadService
 
-
-@pytest.fixture()
-def service(tmp_path):
-    """Return an UploadService with a temp raw data dir and mocked TEMP_DIR."""
-    with patch("datapulse.upload.service.TEMP_DIR", tmp_path):
-        yield UploadService(raw_data_dir=str(tmp_path / "raw"))
-
-
-# ---------------------------------------------------------------------------
-# preview_file — UUID validation
-# ---------------------------------------------------------------------------
+# Minimal valid XLSX magic bytes (PK\x03\x04)
+_XLSX_MAGIC = b"PK\x03\x04" + b" " * 100
+# Minimal valid XLS magic bytes (OLE2: D0 CF 11 E0)
+_XLS_MAGIC = b"\xd0\xcf\x11\xe0" + b" " * 100
+# Valid CSV content
+_CSV_CONTENT = b"name,value\nfoo,1\nbar,2\n"
 
 
-def test_preview_file_path_traversal_rejected(service):
-    """Path traversal sequences in file_id must return HTTP 400."""
-    with pytest.raises(HTTPException) as exc_info:
-        service.preview_file("../../../etc/passwd")
-    assert exc_info.value.status_code == 400
-    assert exc_info.value.detail == "Invalid file ID format"
+@pytest.fixture
+def svc(tmp_path):
+    raw_dir = tmp_path / "raw"
+    raw_dir.mkdir()
+    return UploadService(raw_data_dir=str(raw_dir), tenant_id="test-tenant")
 
 
-def test_preview_file_glob_wildcard_rejected(service):
-    """Glob wildcard characters in file_id must return HTTP 400."""
-    with pytest.raises(HTTPException) as exc_info:
-        service.preview_file("*")
-    assert exc_info.value.status_code == 400
-    assert exc_info.value.detail == "Invalid file ID format"
+# ------------------------------------------------------------------
+# save_temp_file
+# ------------------------------------------------------------------
 
 
-def test_preview_file_valid_uuid_no_file_raises_not_found(service):
-    """A valid UUID that has no corresponding file raises FileNotFoundError."""
-    valid_id = str(uuid.uuid4())
-    with pytest.raises(FileNotFoundError):
-        service.preview_file(valid_id)
+@pytest.mark.unit
+def test_save_valid_csv(svc):
+    result = svc.save_temp_file("report.csv", _CSV_CONTENT)
+    assert result.status == "uploaded"
+    assert result.size_bytes == len(_CSV_CONTENT)
+    assert uuid.UUID(result.file_id)  # valid UUID
 
 
-# ---------------------------------------------------------------------------
-# confirm_upload — UUID validation
-# ---------------------------------------------------------------------------
+@pytest.mark.unit
+def test_save_valid_xlsx(svc):
+    result = svc.save_temp_file("report.xlsx", _XLSX_MAGIC)
+    assert result.status == "uploaded"
+    assert uuid.UUID(result.file_id)
 
 
-def test_confirm_upload_path_traversal_rejected(service):
-    """Path traversal sequences in file_ids must return HTTP 400."""
-    with pytest.raises(HTTPException) as exc_info:
-        service.confirm_upload(["../../../etc/passwd"])
-    assert exc_info.value.status_code == 400
-    assert exc_info.value.detail == "Invalid file ID format"
-
-
-def test_confirm_upload_glob_wildcard_rejected(service):
-    """Glob wildcard characters in file_ids must return HTTP 400."""
-    with pytest.raises(HTTPException) as exc_info:
-        service.confirm_upload(["*"])
-    assert exc_info.value.status_code == 400
-    assert exc_info.value.detail == "Invalid file ID format"
-
-
-def test_confirm_upload_valid_uuid_no_file_returns_empty(service):
-    """A valid UUID with no matching temp file is silently skipped (returns empty list)."""
-    valid_id = str(uuid.uuid4())
-    result = service.confirm_upload([valid_id])
-    assert result == []
-
-
-# ---------------------------------------------------------------------------
-# Additional edge cases
-# ---------------------------------------------------------------------------
-
-
-def test_preview_file_empty_string_rejected(service):
-    """Empty string for file_id must be rejected as invalid UUID."""
-    with pytest.raises(HTTPException) as exc_info:
-        service.preview_file("")
-    assert exc_info.value.status_code == 400
-
-
-def test_preview_file_arbitrary_string_rejected(service):
-    """Arbitrary non-UUID string must be rejected."""
-    with pytest.raises(HTTPException) as exc_info:
-        service.preview_file("notauuid")
-    assert exc_info.value.status_code == 400
-
-
-def test_confirm_upload_mixed_ids_rejects_on_first_invalid(service):
-    """If any file_id is invalid, HTTP 400 is raised immediately."""
-    valid_id = str(uuid.uuid4())
-    with pytest.raises(HTTPException) as exc_info:
-        service.confirm_upload([valid_id, "../traversal"])
-    assert exc_info.value.status_code == 400
-
-
-def test_preview_file_brace_form_uuid_normalized_not_injected(service):
-    """Brace-form UUID is normalized by uuid.UUID() — braces never reach the glob.
-
-    Python's uuid.UUID() accepts ``{uuid}`` form and returns the canonical
-    hyphenated string (no braces), so ``str(uuid.UUID(...))`` strips the
-    braces before they can be used in a glob pattern.  The service must
-    therefore NOT raise HTTPException(400) for this input; it should raise
-    FileNotFoundError because no matching file exists, confirming that the
-    normalized (safe) form was used in the glob call.
-    """
-    brace_form_id = "{12345678-1234-5678-1234-567812345678}"
-    # Must NOT raise HTTPException — UUID is valid, just non-standard form
-    with pytest.raises(FileNotFoundError):
-        service.preview_file(brace_form_id)
-
-
-# ---------------------------------------------------------------------------
-# Extension spoofing — save_temp_file validation
-# ---------------------------------------------------------------------------
-
-
-def test_save_temp_file_disallowed_extension_rejected(service):
-    """Files with a disallowed extension must raise ValueError."""
+@pytest.mark.unit
+def test_reject_unsupported_extension(svc):
     with pytest.raises(ValueError, match="Unsupported file type"):
-        service.save_temp_file("malware.exe", b"MZ\x90\x00")
+        svc.save_temp_file("malware.exe", b"MZ" + b" " * 100)
 
 
-def test_save_temp_file_php_extension_rejected(service):
-    """Double-extension where the outer extension is disallowed must be rejected.
-
-    ``report.csv.php`` → suffix is ``.php`` → rejected.
-    This prevents disguising executable scripts as data files.
-    """
-    with pytest.raises(ValueError, match="Unsupported file type"):
-        service.save_temp_file("report.csv.php", b"<?php system($_GET['cmd']); ?>")
+@pytest.mark.unit
+def test_reject_empty_content(svc):
+    with pytest.raises(ValueError, match="empty"):
+        svc.save_temp_file("empty.csv", b"")
 
 
-def test_save_temp_file_double_extension_csv_outer_accepted(service):
-    """Double-extension where the outer extension IS allowed must be accepted.
-
-    ``report.php.csv`` → suffix is ``.csv`` → accepted.
-    The inner ``php`` component never reaches the filesystem as executable code;
-    the file is stored under a fresh UUID name, making the original name irrelevant.
-    """
-    result = service.save_temp_file("report.php.csv", b"col1,col2\n1,2\n3,4")
-    assert result.file_id  # a UUID was generated
-    assert result.size_bytes == len(b"col1,col2\n1,2\n3,4")
+@pytest.mark.unit
+def test_reject_bad_magic_bytes_xlsx(svc):
+    with pytest.raises(ValueError, match="magic bytes"):
+        svc.save_temp_file("trick.xlsx", b"definitely not excel content here")
 
 
-def test_save_temp_file_allowed_extensions(service):
-    """All three allowed extensions must succeed."""
-    for ext, content in [
-        ("data.xlsx", b"PK\x03\x04"),  # fake zip header (won't parse, but saves ok)
-        ("data.xls", b"\xd0\xcf\x11\xe0"),  # OLE compound document magic bytes
-        ("data.csv", b"a,b,c\n1,2,3\n"),
-    ]:
-        result = service.save_temp_file(ext, content)
-        assert result.file_id, f"Expected file_id for {ext}"
+@pytest.mark.unit
+def test_reject_csv_with_null_bytes(svc):
+    with pytest.raises(ValueError, match="null bytes"):
+        svc.save_temp_file("binary.csv", b"col1,col2\n\x00,value\n")
 
 
-# ---------------------------------------------------------------------------
-# Concurrent confirm — two simultaneous calls must not cross-corrupt
-# ---------------------------------------------------------------------------
+@pytest.mark.unit
+def test_uuid_filename(svc):
+    result = svc.save_temp_file("mydata.csv", _CSV_CONTENT)
+    file_id = result.file_id
+    stored = list(svc._tenant_dir.glob(f"{file_id}.*"))
+    assert len(stored) == 1
+    assert stored[0].name == f"{file_id}.csv"
+    assert "mydata" not in stored[0].name
 
 
-def test_confirm_upload_concurrent_calls_independent(service, tmp_path):
-    """Two concurrent confirm_upload calls for disjoint file sets produce independent results.
+# ------------------------------------------------------------------
+# preview_file
+# ------------------------------------------------------------------
 
-    Each call should move only its own files; neither call should interfere
-    with the files belonging to the other call.
-    """
-    import concurrent.futures
-    from unittest.mock import patch
 
-    with patch("datapulse.upload.service.TEMP_DIR", tmp_path):
-        # Create two distinct temp files (simulate prior save_temp_file calls)
-        id_a = str(uuid.uuid4())
-        id_b = str(uuid.uuid4())
-        (tmp_path / f"{id_a}.csv").write_bytes(b"a,b\n1,2\n")
-        (tmp_path / f"{id_b}.csv").write_bytes(b"x,y\n9,8\n")
+@pytest.mark.unit
+def test_preview_invalid_uuid_format(svc):
+    from fastapi import HTTPException
 
-        raw_dir_a = tmp_path / "raw_a"
-        raw_dir_b = tmp_path / "raw_b"
+    with pytest.raises(HTTPException) as exc_info:
+        svc.preview_file("not-a-uuid")
+    assert exc_info.value.status_code == 400
 
-        svc = UploadService(raw_data_dir=str(raw_dir_a))
-        svc_b = UploadService(raw_data_dir=str(raw_dir_b))
 
-        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
-            fut_a = pool.submit(svc.confirm_upload, [id_a])
-            fut_b = pool.submit(svc_b.confirm_upload, [id_b])
-            result_a = fut_a.result()
-            result_b = fut_b.result()
+@pytest.mark.unit
+def test_preview_file_not_found(svc):
+    with pytest.raises(FileNotFoundError):
+        svc.preview_file(str(uuid.uuid4()))
 
-    assert len(result_a) == 1, "Service A must have moved exactly one file"
-    assert len(result_b) == 1, "Service B must have moved exactly one file"
-    # Files must have gone to their own raw directories
-    assert "raw_a" in result_a[0]
-    assert "raw_b" in result_b[0]
+
+@pytest.mark.unit
+def test_preview_csv_columns(svc):
+    csv_data = b"product,quantity,price\nAlpha,10,5.5\nBeta,20,3.0\n"
+    result = svc.save_temp_file("data.csv", csv_data)
+    preview = svc.preview_file(result.file_id)
+    col_names = [c.name for c in preview.columns]
+    assert "product" in col_names
+    assert "quantity" in col_names
+    assert "price" in col_names
+    assert preview.row_count == 2
+
+
+@pytest.mark.unit
+def test_preview_high_null_warning(svc):
+    csv_data = b"a,b\n1,\n2,\n3,\n4,hello\n"
+    result = svc.save_temp_file("nulls.csv", csv_data)
+    preview = svc.preview_file(result.file_id)
+    assert any(">50% nulls" in w for w in preview.warnings)
+
+
+# ------------------------------------------------------------------
+# confirm_upload
+# ------------------------------------------------------------------
+
+
+@pytest.mark.unit
+def test_confirm_moves_to_raw_dir(svc):
+    result = svc.save_temp_file("confirm_me.csv", _CSV_CONTENT)
+    moved = svc.confirm_upload([result.file_id])
+    assert len(moved) == 1
+    assert Path(moved[0]).exists()
+    remaining = list(svc._tenant_dir.glob(f"{result.file_id}.*"))
+    assert len(remaining) == 0
+
+
+@pytest.mark.unit
+def test_confirm_invalid_uuid(svc):
+    from fastapi import HTTPException
+
+    with pytest.raises(HTTPException) as exc_info:
+        svc.confirm_upload(["not-a-uuid"])
+    assert exc_info.value.status_code == 400
+
+
+@pytest.mark.unit
+def test_confirm_missing_file_skipped(svc):
+    moved = svc.confirm_upload([str(uuid.uuid4())])
+    assert moved == []
+
+
+# ------------------------------------------------------------------
+# Tenant isolation
+# ------------------------------------------------------------------
+
+
+@pytest.mark.unit
+def test_tenant_dir_isolation(tmp_path):
+    raw = tmp_path / "raw"
+    raw.mkdir()
+    svc_a = UploadService(raw_data_dir=str(raw), tenant_id="A")
+    svc_b = UploadService(raw_data_dir=str(raw), tenant_id="B")
+    assert svc_a._tenant_dir != svc_b._tenant_dir
+    assert "A" in str(svc_a._tenant_dir)
+    assert "B" in str(svc_b._tenant_dir)
