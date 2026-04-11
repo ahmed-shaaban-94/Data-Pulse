@@ -26,6 +26,7 @@ log = get_logger(__name__)
 ALLOWED_COLUMNS: frozenset[str] = frozenset(COLUMN_MAP.values()) | {
     "source_file",
     "source_quarter",
+    "tenant_id",
 }
 
 
@@ -150,17 +151,22 @@ def save_parquet(df: pl.DataFrame, output_path: Path) -> Path:
     return output_path
 
 
-def load_to_postgres(df: pl.DataFrame, engine: Engine, batch_size: int) -> int:
+def load_to_postgres(df: pl.DataFrame, engine: Engine, batch_size: int, tenant_id: int = 1) -> int:
     """Load DataFrame into bronze.sales table using batched inserts via PyArrow.
 
     Args:
         df: DataFrame with columns already renamed to DB names.
         engine: Shared SQLAlchemy engine (created and disposed by caller).
         batch_size: Number of rows per insert batch.
+        tenant_id: Tenant to assign the data to (default 1 for backward compat).
 
     Returns:
         Total number of rows inserted.
     """
+    # Add tenant_id column if not already present
+    if "tenant_id" not in df.columns:
+        df = df.with_columns(pl.lit(tenant_id).alias("tenant_id"))
+
     # Exclude auto-generated columns
     db_columns = [col for col in df.columns if col not in ("id", "loaded_at")]
     df_to_load = df.select(db_columns)
@@ -272,6 +278,7 @@ def run(
     batch_size: int | None = None,
     skip_db: bool = False,
     files_per_chunk: int = 4,
+    tenant_id: int = 1,
 ) -> pl.DataFrame:
     """Full bronze pipeline: Excel -> concat -> Parquet -> PostgreSQL.
 
@@ -328,7 +335,7 @@ def run(
             all_frames.append(chunk_df)
 
             if engine is not None:
-                total_loaded += load_to_postgres(chunk_df, engine, bs)
+                total_loaded += load_to_postgres(chunk_df, engine, bs, tenant_id)
 
         # 3. Combine all chunks for Parquet and return value
         df = pl.concat(all_frames, how="diagonal_relaxed") if len(all_frames) > 1 else all_frames[0]

@@ -111,6 +111,15 @@ def embed_query(
     except jwt.InvalidTokenError as exc:
         raise HTTPException(status_code=401, detail="Invalid or expired embed token") from exc
 
+    # Enforce resource scope: token is minted for a specific resource_type + resource_id.
+    # If resource_id is set, the query model must match it (prevents token reuse across widgets).
+    token_resource_id = payload.get("resource_id", "")
+    if token_resource_id and body.model != token_resource_id:
+        raise HTTPException(
+            status_code=403,
+            detail="Token is not authorized for this resource",
+        )
+
     session = None
     try:
         session = _get_embed_session(payload)
