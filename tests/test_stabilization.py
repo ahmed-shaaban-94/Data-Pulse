@@ -38,6 +38,7 @@ async def test_upload_rejects_oversized_file_mid_stream():
 
     mock_file = MagicMock()
     mock_file.filename = "big.csv"
+    mock_file.size = None  # no declared size — triggers stream-based check only
     mock_file.read = _mock_read
 
     mock_request = MagicMock()
@@ -72,6 +73,7 @@ async def test_upload_accepts_small_file():
 
     mock_file = MagicMock()
     mock_file.filename = "small.csv"
+    mock_file.size = None  # no declared size — triggers stream-based check only
     mock_file.read = _mock_read
 
     mock_request = MagicMock()

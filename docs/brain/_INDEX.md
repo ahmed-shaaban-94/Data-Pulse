@@ -1,6 +1,6 @@
 ---
 generated: true
-last_updated: 2026-04-11T16:51
+last_updated: 2026-04-11T17:03
 ---
 # DataPulse Second Brain — Context Index
 
@@ -9,35 +9,30 @@ last_updated: 2026-04-11T16:51
 
 ## Recent Sessions (last 5)
 
-### [[sessions/2026-04-11-16-51|2026-04-11T16:51]]
+### [[sessions/2026-04-11-17-03|2026-04-11T17:03]]
+- **Branch**: `claude/charming-wilbur`
+- **Layers**: [api,bronze,frontend,test]
+- **Modules**: [ai_light,api,bronze,core,explore,frontend,migrations,pipeline]
+
+### [[sessions/2026-04-11-16-59|2026-04-11T16:59]]
 - **Branch**: `claude/charming-wilbur`
 - **Layers**: [api,bronze,frontend,test]
 - **Modules**: [ai_light,api,bronze,core,frontend,migrations,pipeline]
 
-### [[sessions/2026-04-11-15-46|2026-04-11T15:46]]
-- **Branch**: `claude/vibrant-thompson`
+### [[sessions/2026-04-11-16-58|2026-04-11T16:58]]
+- **Branch**: `claude/charming-wilbur`
 - **Layers**: [api,bronze,frontend,test]
-- **Modules**: [api,bronze,core,explore,frontend,migrations]
+- **Modules**: [ai_light,api,bronze,core,frontend,migrations,pipeline]
 
-### [[sessions/2026-04-11-14-35|2026-04-11T14:35]]
-- **Branch**: `claude/thirsty-rhodes`
-- **Layers**: [api,bronze,frontend,gold,test]
-- **Modules**: [ai_light,api,bronze,explore,forecasting,frontend,graph,import_pipeline,migrations,pipeline,rbac,tasks,watcher]
+### [[sessions/2026-04-11-16-56|2026-04-11T16:56]]
+- **Branch**: `claude/charming-wilbur`
+- **Layers**: [api,bronze,frontend,test]
+- **Modules**: [ai_light,api,bronze,core,frontend,migrations,pipeline]
 
-### [[sessions/2026-04-11-11-16|2026-04-11T11:16]]
-- **Branch**: `claude/intelligent-panini`
-- **Layers**: [api,bronze,test]
-- **Modules**: [api,migrations]
-
-### [[sessions/2026-04-11-11-10|2026-04-11T11:10]]
-- **Branch**: `claude/intelligent-panini`
-- **Layers**: [api,bronze,test]
-- **Modules**: [api,migrations]
-
-### [[sessions/2026-04-11-11-07|2026-04-11T11:07]]
-- **Branch**: `claude/intelligent-panini`
-- **Layers**: [api,bronze,test]
-- **Modules**: [api,migrations]
+### [[sessions/2026-04-11-16-51|2026-04-11T16:51]]
+- **Branch**: `claude/charming-wilbur`
+- **Layers**: [api,bronze,frontend,test]
+- **Modules**: [ai_light,api,bronze,core,frontend,migrations,pipeline]
 
 ## Vault Structure
 
