@@ -59,20 +59,19 @@ logger = structlog.get_logger()
 
 
 def create_app() -> FastAPI:
-    import asyncio
     from contextlib import asynccontextmanager
 
     from datapulse.scheduler import start_scheduler, stop_scheduler
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
-        # Run scheduler startup in a thread with a timeout so a hanging
-        # DB connection (e.g. after container recreation) never blocks
-        # the app from serving health checks and traffic.
+        # AsyncIOScheduler.start() must run on the main thread where the
+        # asyncio event loop lives — calling it via asyncio.to_thread()
+        # causes get_event_loop() to fail in Python 3.12 worker threads,
+        # hanging all uvicorn workers at "Waiting for application startup".
+        # DB connect_timeout=10s already prevents indefinite hangs.
         try:
-            await asyncio.wait_for(asyncio.to_thread(start_scheduler), timeout=15)
-        except TimeoutError:
-            logger.error("scheduler_start_timeout", detail="start_scheduler took >15s — skipped")
+            start_scheduler()
         except Exception:
             logger.error("scheduler_start_failed", exc_info=True)
         yield
