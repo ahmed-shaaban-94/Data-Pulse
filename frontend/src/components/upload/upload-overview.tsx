@@ -196,7 +196,7 @@ export function UploadOverview() {
 
           {confirmed && !progress && (
             <div className="rounded-lg bg-green-500/10 border border-green-500/20 p-3 text-sm text-green-500">
-              Files confirmed and ready for processing. Click "Run Pipeline" to start.
+              Files confirmed and ready for processing. Click &ldquo;Run Pipeline&rdquo; to start.
             </div>
           )}
         </div>

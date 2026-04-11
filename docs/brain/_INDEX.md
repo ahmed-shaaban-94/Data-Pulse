@@ -1,6 +1,6 @@
 ---
 generated: true
-last_updated: 2026-04-11T16:24
+last_updated: 2026-04-11T16:44
 ---
 # DataPulse Second Brain — Context Index
 
@@ -8,6 +8,16 @@ last_updated: 2026-04-11T16:24
 > Claude reads this at the start of every session for recent context.
 
 ## Recent Sessions (last 5)
+
+### [[sessions/2026-04-11-16-44|2026-04-11T16:44]]
+- **Branch**: `claude/interesting-colden`
+- **Layers**: [api,bronze,frontend,test]
+- **Modules**: [api,bronze,core,explore,frontend,migrations]
+
+### [[sessions/2026-04-11-16-40|2026-04-11T16:40]]
+- **Branch**: `claude/interesting-colden`
+- **Layers**: [api,bronze,frontend,test]
+- **Modules**: [api,bronze,frontend,migrations]
 
 ### [[sessions/2026-04-11-16-24|2026-04-11T16:24]]
 - **Branch**: `claude/interesting-colden`
@@ -23,21 +33,6 @@ last_updated: 2026-04-11T16:24
 - **Branch**: `claude/thirsty-rhodes`
 - **Layers**: [api,bronze,frontend,gold,test]
 - **Modules**: [ai_light,api,bronze,explore,forecasting,frontend,graph,import_pipeline,migrations,pipeline,rbac,tasks,watcher]
-
-### [[sessions/2026-04-11-11-16|2026-04-11T11:16]]
-- **Branch**: `claude/intelligent-panini`
-- **Layers**: [api,bronze,test]
-- **Modules**: [api,migrations]
-
-### [[sessions/2026-04-11-11-10|2026-04-11T11:10]]
-- **Branch**: `claude/intelligent-panini`
-- **Layers**: [api,bronze,test]
-- **Modules**: [api,migrations]
-
-### [[sessions/2026-04-11-11-07|2026-04-11T11:07]]
-- **Branch**: `claude/intelligent-panini`
-- **Layers**: [api,bronze,test]
-- **Modules**: [api,migrations]
 
 ## Vault Structure
 
