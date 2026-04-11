@@ -1,6 +1,6 @@
 ---
 generated: true
-last_updated: 2026-04-11T16:44
+last_updated: 2026-04-11T16:51
 ---
 # DataPulse Second Brain — Context Index
 
@@ -8,6 +8,11 @@ last_updated: 2026-04-11T16:44
 > Claude reads this at the start of every session for recent context.
 
 ## Recent Sessions (last 5)
+
+### [[sessions/2026-04-11-16-51|2026-04-11T16:51]]
+- **Branch**: `claude/interesting-colden`
+- **Layers**: [api,bronze,frontend,test]
+- **Modules**: [api,bronze,core,explore,frontend,migrations]
 
 ### [[sessions/2026-04-11-16-44|2026-04-11T16:44]]
 - **Branch**: `claude/interesting-colden`
@@ -28,11 +33,6 @@ last_updated: 2026-04-11T16:44
 - **Branch**: `claude/vibrant-thompson`
 - **Layers**: [api,bronze,frontend,test]
 - **Modules**: [api,bronze,core,explore,frontend,migrations]
-
-### [[sessions/2026-04-11-14-35|2026-04-11T14:35]]
-- **Branch**: `claude/thirsty-rhodes`
-- **Layers**: [api,bronze,frontend,gold,test]
-- **Modules**: [ai_light,api,bronze,explore,forecasting,frontend,graph,import_pipeline,migrations,pipeline,rbac,tasks,watcher]
 
 ## Vault Structure
 
