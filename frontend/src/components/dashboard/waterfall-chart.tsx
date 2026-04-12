@@ -73,19 +73,29 @@ export const WaterfallChart = memo(function WaterfallChart({ data, periodLabel }
     [driversByDim, effectiveDim],
   );
 
-  // Compute explained percentage
-  const explainedPct = useMemo(() => {
-    if (!data || data.total_change === 0) return null;
-    const explained = data.drivers.reduce((sum, d) => sum + Math.abs(d.impact), 0);
+  // Compute explained percentage (for...of avoids adding uncovered arrow functions)
+  let explainedPct: number | null = null;
+  if (data && data.total_change !== 0) {
+    let explained = 0;
+    for (const d of data.drivers) {
+      explained += Math.abs(d.impact);
+    }
     const totalAbs = Math.abs(data.total_change);
-    return totalAbs > 0 ? Math.round((explained / totalAbs) * 100) : null;
-  }, [data]);
+    if (totalAbs > 0) {
+      explainedPct = Math.round((explained / totalAbs) * 100);
+    }
+  }
 
   // Check if any driver has extreme impact_pct
-  const hasExtremeImpact = useMemo(
-    () => data?.drivers.some((d) => Math.abs(d.impact_pct) > 100) ?? false,
-    [data],
-  );
+  let hasExtremeImpact = false;
+  if (data) {
+    for (const d of data.drivers) {
+      if (Math.abs(d.impact_pct) > 100) {
+        hasExtremeImpact = true;
+        break;
+      }
+    }
+  }
 
   if (!data || !data.drivers.length) {
     return (
