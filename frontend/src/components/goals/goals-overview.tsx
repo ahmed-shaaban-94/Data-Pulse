@@ -220,10 +220,12 @@ export function GoalsOverview() {
   const [formMonth, setFormMonth] = useState("");
   const [formValue, setFormValue] = useState("");
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const handleAddTarget = async () => {
     if (!formMonth || !formValue) return;
     setSaving(true);
+    setSaveError(null);
     try {
       await postAPI("/api/v1/targets/", {
         target_type: "revenue",
@@ -236,7 +238,7 @@ export function GoalsOverview() {
       setShowForm(false);
       mutate();
     } catch (e) {
-      console.error("Failed to save target", e);
+      setSaveError("Failed to save target. Please try again.");
     } finally {
       setSaving(false);
     }
@@ -309,6 +311,9 @@ export function GoalsOverview() {
             </button>
             <button onClick={() => setShowForm(false)} className="rounded-lg px-4 py-2 text-sm text-text-secondary hover:bg-divider">Cancel</button>
           </div>
+          {saveError && (
+            <p className="mt-2 text-xs text-red-500">{saveError}</p>
+          )}
         </div>
       )}
 
