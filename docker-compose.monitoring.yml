@@ -71,7 +71,9 @@ services:
       - "127.0.0.1:3001:3000"
     environment:
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-datapulse}
-      GF_SERVER_ROOT_URL: http://localhost:3001
+      # Serve from /grafana/ subpath behind nginx reverse proxy
+      GF_SERVER_ROOT_URL: https://smartdatapulse.tech/grafana/
+      GF_SERVER_SERVE_FROM_SUB_PATH: "true"
       GF_USERS_ALLOW_SIGN_UP: "false"
       # Provisioned datasources/dashboards are read-only in the UI by default;
       # allowUiUpdates: true in dashboards.yml lets you tweak without file changes.
@@ -94,6 +96,7 @@ services:
       - prometheus
     networks:
       - datapulse-backend
+      - datapulse-frontend
 
   # Lightweight uptime watchdog — checks /health/live every 30s,
   # alerts to Slack after 4 consecutive failures (2 min), sends
@@ -199,3 +202,6 @@ networks:
   datapulse-backend:
     external: true
     name: datapulse-backend
+  datapulse-frontend:
+    external: true
+    name: datapulse-frontend
