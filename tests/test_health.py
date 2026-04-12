@@ -19,7 +19,7 @@ from datapulse.api.routes.health import (
 
 
 class TestCheckDb:
-    @patch("datapulse.api.routes.health.get_engine")
+    @patch("datapulse.checks.get_engine")
     def test_ok(self, mock_engine):
         mock_conn = MagicMock()
         mock_engine.return_value.connect.return_value.__enter__ = lambda s: mock_conn
@@ -28,7 +28,7 @@ class TestCheckDb:
         assert result["status"] == "ok"
         assert "latency_ms" in result
 
-    @patch("datapulse.api.routes.health.get_engine")
+    @patch("datapulse.checks.get_engine")
     def test_error(self, mock_engine):
         mock_engine.return_value.connect.side_effect = sqlalchemy.exc.OperationalError(
             "SELECT 1", {}, Exception("refused")

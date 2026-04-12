@@ -16,44 +16,14 @@ from sqlalchemy import text
 
 from datapulse.api.auth import get_optional_user
 from datapulse.api.deps import get_engine
+from datapulse.checks import check_db, check_redis
 
 router = APIRouter(tags=["health"])
 logger = structlog.get_logger()
 
-
-# ---------------------------------------------------------------------------
-# Component checks
-# ---------------------------------------------------------------------------
-
-
-def _check_db() -> dict:
-    """Ping PostgreSQL and return status + latency."""
-    try:
-        t0 = time.monotonic()
-        with get_engine().connect() as conn:
-            conn.execute(text("SELECT 1"))
-        latency = round((time.monotonic() - t0) * 1000)
-        return {"status": "ok", "latency_ms": latency}
-    except Exception:
-        logger.exception("Database health check failed")
-        return {"status": "error", "error": "internal_error"}
-
-
-def _check_redis() -> dict:
-    """Ping Redis and return status + latency."""
-    try:
-        from datapulse.cache import get_redis_client
-
-        client = get_redis_client()
-        if client is None:
-            return {"status": "disabled"}
-        t0 = time.monotonic()
-        client.ping()
-        latency = round((time.monotonic() - t0) * 1000)
-        return {"status": "ok", "latency_ms": latency}
-    except Exception:
-        logger.exception("Redis health check failed")
-        return {"status": "error", "error": "internal_error"}
+# Backward-compat aliases — remove once no other module uses the underscore names.
+_check_db = check_db
+_check_redis = check_redis
 
 
 def _check_query_executor() -> dict:
