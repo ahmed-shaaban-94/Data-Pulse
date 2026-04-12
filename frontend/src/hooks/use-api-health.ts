@@ -38,14 +38,37 @@ export function useApiHealth(onRecover?: () => void) {
     }
   }, [stopPolling, onRecover]);
 
-  /** Call this when any SWR hook encounters a network/5xx error. */
+  /**
+   * Call this when any SWR hook encounters a network/5xx error.
+   *
+   * Verifies the API is actually down before showing the banner —
+   * prevents false positives from single-endpoint failures or transient
+   * timeouts while the API is otherwise healthy.
+   */
   const reportError = useCallback(() => {
-    if (intervalRef.current) return; // already polling
-    downSinceRef.current = new Date();
-    setIsApiDown(true);
-    setIsRecovering(false);
-    // Poll /health/ready every 10s
-    intervalRef.current = setInterval(poll, 10_000);
+    if (intervalRef.current) return; // already verifying / polling
+
+    // Immediately probe /health/ready — show banner ONLY if it also fails.
+    // This avoids false positives from one endpoint blipping while the API is fine.
+    fetch("/health/ready", { signal: AbortSignal.timeout(5000) })
+      .then((res) => {
+        if (res.ok) {
+          // API is healthy — the SWR error was a false alarm, do nothing.
+          return;
+        }
+        // Health check returned non-200 — API is genuinely degraded.
+        downSinceRef.current = new Date();
+        setIsApiDown(true);
+        setIsRecovering(false);
+        intervalRef.current = setInterval(poll, 10_000);
+      })
+      .catch(() => {
+        // Couldn't reach health endpoint at all — API is genuinely down.
+        downSinceRef.current = new Date();
+        setIsApiDown(true);
+        setIsRecovering(false);
+        intervalRef.current = setInterval(poll, 10_000);
+      });
   }, [poll]);
 
   // Cleanup on unmount
