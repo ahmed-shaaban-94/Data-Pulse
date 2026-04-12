@@ -226,3 +226,40 @@ def readiness() -> JSONResponse:
         status_code=200 if ready else 503,
         content={"ready": ready, "database": db},
     )
+
+
+@router.get("/health/auth-check")
+def auth_check() -> JSONResponse:
+    """Auth pipeline probe — validates that tenant context can be established.
+
+    Checks that ``default_tenant_id`` is configured and that the DB accepts
+    ``SET LOCAL app.tenant_id``.  If this fails, all JWT-authenticated requests
+    will be rejected with 401 even though the API container looks healthy.
+    """
+    from datapulse.config import get_settings
+
+    settings = get_settings()
+    if not settings.default_tenant_id:
+        return JSONResponse(
+            status_code=503,
+            content={"status": "error", "error": "no_default_tenant_id"},
+        )
+    try:
+        with get_engine().connect() as conn:
+            conn.execute(
+                text("SET LOCAL app.tenant_id = :tid"),
+                {"tid": str(settings.default_tenant_id)},
+            )
+        return JSONResponse(
+            status_code=200,
+            content={
+                "status": "ok",
+                "default_tenant_id": str(settings.default_tenant_id),
+            },
+        )
+    except Exception:
+        logger.exception("Auth pipeline health check failed")
+        return JSONResponse(
+            status_code=503,
+            content={"status": "error", "error": "tenant_session_failed"},
+        )
