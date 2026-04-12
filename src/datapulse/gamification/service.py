@@ -78,9 +78,7 @@ class GamificationService:
         """Return badges earned by a staff member."""
         return self._repo.get_staff_badges(staff_key)
 
-    def award_badge(
-        self, staff_key: int, badge_key: str, context: dict | None = None
-    ) -> bool:
+    def award_badge(self, staff_key: int, badge_key: str, context: dict | None = None) -> bool:
         """Manually award a badge. Returns True if newly awarded."""
         awarded = self._repo.award_badge(staff_key, badge_key, context)
         if awarded:
