@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from decimal import Decimal
-from unittest.mock import MagicMock, create_autospec
+from unittest.mock import create_autospec
 
 import pytest
 

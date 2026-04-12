@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock, create_autospec
+from unittest.mock import create_autospec
 
 import pytest
 
-from datapulse.audit.models import AuditLogEntry, AuditLogPage
+from datapulse.audit.models import AuditLogPage
 from datapulse.audit.repository import AuditRepository
 from datapulse.audit.service import AuditService
 
