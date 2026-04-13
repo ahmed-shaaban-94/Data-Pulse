@@ -14,6 +14,8 @@ export interface WidgetDef {
   defaultH: number;
   minW: number;
   minH: number;
+  /** Per-breakpoint minW overrides. Falls back to Math.min(minW, maxCols) when absent. */
+  breakpointMinW?: Partial<Record<"lg" | "md" | "sm" | "xs", number>>;
 }
 
 export const WIDGET_CATALOG: WidgetDef[] = [
@@ -28,6 +30,7 @@ export const WIDGET_CATALOG: WidgetDef[] = [
     defaultH: 2,
     minW: 2,
     minH: 2,
+    breakpointMinW: { xs: 1 },
   },
   {
     key: "trend-kpis",
@@ -39,6 +42,7 @@ export const WIDGET_CATALOG: WidgetDef[] = [
     defaultH: 2,
     minW: 2,
     minH: 2,
+    breakpointMinW: { xs: 1 },
   },
   // Chart widgets
   {
@@ -51,6 +55,7 @@ export const WIDGET_CATALOG: WidgetDef[] = [
     defaultH: 4,
     minW: 2,
     minH: 2,
+    breakpointMinW: { xs: 1 },
   },
   {
     key: "monthly-trend",
@@ -62,6 +67,7 @@ export const WIDGET_CATALOG: WidgetDef[] = [
     defaultH: 4,
     minW: 2,
     minH: 2,
+    breakpointMinW: { xs: 1 },
   },
   {
     key: "billing-breakdown",
@@ -95,6 +101,7 @@ export const WIDGET_CATALOG: WidgetDef[] = [
     defaultH: 3,
     minW: 3,
     minH: 2,
+    breakpointMinW: { sm: 2, xs: 1 },
   },
   {
     key: "waterfall",
@@ -106,6 +113,7 @@ export const WIDGET_CATALOG: WidgetDef[] = [
     defaultH: 3,
     minW: 2,
     minH: 2,
+    breakpointMinW: { xs: 1 },
   },
   // Table widgets
   {
@@ -118,6 +126,7 @@ export const WIDGET_CATALOG: WidgetDef[] = [
     defaultH: 4,
     minW: 2,
     minH: 3,
+    breakpointMinW: { xs: 1 },
   },
   {
     key: "top-customers",
@@ -129,6 +138,7 @@ export const WIDGET_CATALOG: WidgetDef[] = [
     defaultH: 4,
     minW: 2,
     minH: 3,
+    breakpointMinW: { xs: 1 },
   },
   {
     key: "top-staff",
@@ -140,6 +150,7 @@ export const WIDGET_CATALOG: WidgetDef[] = [
     defaultH: 4,
     minW: 2,
     minH: 3,
+    breakpointMinW: { xs: 1 },
   },
   // Insight widgets
   {
@@ -152,6 +163,7 @@ export const WIDGET_CATALOG: WidgetDef[] = [
     defaultH: 3,
     minW: 2,
     minH: 2,
+    breakpointMinW: { xs: 1 },
   },
   {
     key: "target-progress",
@@ -174,6 +186,7 @@ export const WIDGET_CATALOG: WidgetDef[] = [
     defaultH: 3,
     minW: 2,
     minH: 2,
+    breakpointMinW: { xs: 1 },
   },
   {
     key: "narrative",
@@ -185,6 +198,7 @@ export const WIDGET_CATALOG: WidgetDef[] = [
     defaultH: 2,
     minW: 2,
     minH: 2,
+    breakpointMinW: { xs: 1 },
   },
 ];
 
