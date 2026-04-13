@@ -11,6 +11,7 @@ import {
   Lock,
   Unlock,
   Trash2,
+  Monitor,
 } from "lucide-react";
 import { useDashboardLayout, type LayoutItem } from "@/hooks/use-dashboard-layout";
 import { WidgetRenderer } from "@/components/dashboard-builder/widget-renderer";
@@ -25,6 +26,31 @@ import { DashboardContent } from "../dashboard/dashboard-content";
 import "react-grid-layout/css/styles.css";
 
 // react-grid-layout v2 uses useContainerWidth instead of WidthProvider
+
+const COLS = { lg: 4, md: 3, sm: 2, xs: 1 } as const;
+const BREAKPOINTS = { lg: 1024, md: 768, sm: 480, xs: 0 } as const;
+
+/**
+ * Derives per-breakpoint layouts from the canonical lg layout.
+ * Clamps each widget's width and x-position to the target breakpoint's column count,
+ * respecting per-breakpoint minW overrides defined in the widget catalog.
+ */
+function deriveResponsiveLayouts(lg: LayoutItem[], catalog: WidgetDef[]) {
+  const layouts: Record<keyof typeof COLS, LayoutItem[]> = {
+    lg, md: [], sm: [], xs: [],
+  };
+  (["md", "sm", "xs"] as const).forEach((bp) => {
+    const maxCols = COLS[bp];
+    layouts[bp] = lg.map((item) => {
+      const def = catalog.find((w) => w.key === item.i);
+      const bpMinW = def?.breakpointMinW?.[bp] ?? Math.min(item.minW ?? 1, maxCols);
+      const w = Math.min(Math.max(item.w, bpMinW), maxCols);
+      const x = Math.min(item.x, Math.max(0, maxCols - w));
+      return { ...item, x, w, minW: bpMinW };
+    });
+  });
+  return layouts;
+}
 
 function WidgetPickerPanel({
   open,
@@ -119,6 +145,7 @@ export default function MyDashboardPage() {
   const [locked, setLocked] = useState(false);
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
+  const [bannerDismissed, setBannerDismissed] = useState(false);
 
   useEffect(() => {
     if (!isLoading && !initialized) {
@@ -128,6 +155,8 @@ export default function MyDashboardPage() {
   }, [isLoading, initialized, savedLayout]);
 
   const activeWidgets = new Set(layout.map((item) => item.i));
+  // Lock editing to desktop (≥1024px) to prevent cross-breakpoint save corruption
+  const editable = !locked && (width ?? 0) >= BREAKPOINTS.lg;
 
   function handleLayoutChange(newLayout: LayoutItem[]) {
     // react-grid-layout fires this on every render; only mark dirty if positions changed
@@ -244,6 +273,24 @@ export default function MyDashboardPage() {
         </div>
       </div>
 
+      {/* Mobile edit banner — shown only on narrow viewports when widgets are present */}
+      {!bannerDismissed && layout.length > 0 && (width ?? 0) < BREAKPOINTS.lg && (
+        <div
+          role="alert"
+          className="flex items-center gap-2 rounded-lg border border-chart-amber/30 bg-chart-amber/10 px-4 py-2.5 text-xs text-chart-amber"
+        >
+          <Monitor className="h-4 w-4 shrink-0" />
+          <span className="flex-1">Switch to desktop to edit your dashboard layout.</span>
+          <button
+            onClick={() => setBannerDismissed(true)}
+            className="ml-2 rounded p-0.5 hover:bg-chart-amber/20"
+            aria-label="Dismiss"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      )}
+
       <DashboardContent>
         {layout.length === 0 ? (
           <div className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-border py-24">
@@ -261,13 +308,16 @@ export default function MyDashboardPage() {
             innerRef={containerRef as React.RefObject<HTMLDivElement>}
             width={width || 1024}
             className="layout"
-            layouts={{ lg: layout }}
-            breakpoints={{ lg: 1024, md: 768, sm: 480, xs: 0 }}
-            cols={{ lg: 4, md: 3, sm: 2, xs: 1 }}
+            layouts={deriveResponsiveLayouts(layout, WIDGET_CATALOG)}
+            breakpoints={BREAKPOINTS}
+            cols={COLS}
             rowHeight={100}
-            dragConfig={{ enabled: !locked, handle: ".drag-handle" }}
-            resizeConfig={{ enabled: !locked }}
-            onLayoutChange={(newLayout) => handleLayoutChange([...newLayout] as LayoutItem[])}
+            dragConfig={{ enabled: editable, handle: ".drag-handle" }}
+            resizeConfig={{ enabled: editable }}
+            onLayoutChange={(newLayout, _allLayouts) => {
+              // Only persist lg-breakpoint edits to prevent cross-breakpoint save corruption
+              if (editable) handleLayoutChange([...newLayout] as LayoutItem[]);
+            }}
             margin={[12, 12] as [number, number]}
           >
             {layout.map((item) => (
@@ -277,7 +327,7 @@ export default function MyDashboardPage() {
               >
                 {/* Widget header with drag handle */}
                 <div className="flex items-center gap-1 border-b border-border/50 bg-card px-3 py-1.5">
-                  {!locked && (
+                  {editable && (
                     <div className="drag-handle cursor-grab text-text-secondary/50 hover:text-text-secondary">
                       <GripVertical className="h-4 w-4" />
                     </div>
@@ -285,7 +335,7 @@ export default function MyDashboardPage() {
                   <span className="flex-1 text-xs font-medium text-text-secondary">
                     {WIDGET_CATALOG.find((w) => w.key === item.i)?.label ?? item.i}
                   </span>
-                  {!locked && (
+                  {editable && (
                     <button
                       onClick={() => removeWidget(item.i)}
                       className="rounded p-0.5 text-text-secondary/50 opacity-0 transition-opacity hover:bg-growth-red/10 hover:text-growth-red group-hover:opacity-100"
