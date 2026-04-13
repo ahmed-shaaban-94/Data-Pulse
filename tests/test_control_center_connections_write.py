@@ -125,21 +125,21 @@ class TestUpdateConnection:
     def test_returns_updated_connection(self, service, mock_repos):
         updated = _connection_row(7, status="active")
         mock_repos["connections"].update.return_value = updated
-        result = service.update_connection(7, name="New Name", status="active")
+        result = service.update_connection(7, tenant_id=1, name="New Name", status="active")
         assert isinstance(result, SourceConnection)
         assert result.status == "active"
         mock_repos["connections"].update.assert_called_once_with(
-            7, name="New Name", status="active", config_json=None
+            7, name="New Name", status="active", config_json=None, credentials_ref=None
         )
 
     def test_returns_none_when_not_found(self, service, mock_repos):
         mock_repos["connections"].update.return_value = None
-        result = service.update_connection(999, name="Ghost")
+        result = service.update_connection(999, tenant_id=1, name="Ghost")
         assert result is None
 
     def test_partial_update_only_name(self, service, mock_repos):
         mock_repos["connections"].update.return_value = _connection_row(3)
-        service.update_connection(3, name="Renamed")
+        service.update_connection(3, tenant_id=1, name="Renamed")
         call_kwargs = mock_repos["connections"].update.call_args.kwargs
         assert call_kwargs["name"] == "Renamed"
         assert call_kwargs["status"] is None
@@ -148,7 +148,7 @@ class TestUpdateConnection:
     def test_config_update_passes_dict(self, service, mock_repos):
         new_config = {"file_id": "xyz", "filename": "new.csv"}
         mock_repos["connections"].update.return_value = _connection_row(5)
-        service.update_connection(5, config=new_config)
+        service.update_connection(5, tenant_id=1, config=new_config)
         call_kwargs = mock_repos["connections"].update.call_args.kwargs
         assert call_kwargs["config_json"] == new_config
 
@@ -239,7 +239,7 @@ class TestPreviewConnection:
 
     def test_raises_for_unsupported_source_type(self, service, mock_repos):
         row = _connection_row(1)
-        row["source_type"] = "postgres"
+        row["source_type"] = "mssql"  # no connector registered
         mock_repos["connections"].get.return_value = row
         with pytest.raises(ValueError, match="preview_not_supported_for"):
             service.preview_connection(connection_id=1, tenant_id=1)

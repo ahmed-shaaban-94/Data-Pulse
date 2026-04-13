@@ -56,8 +56,13 @@ log = get_logger(__name__)
 # Lazy-imported to avoid pulling in file I/O dependencies at import time.
 
 
-def _get_connector(source_type: str):  # type: ignore[return]
-    """Return the connector instance for a given source_type, or None."""
+def _get_connector(source_type: str, *, session=None, connection_id: int = 0, tenant_id: int = 0):  # type: ignore[return]
+    """Return the connector instance for a given source_type, or None.
+
+    For credential-aware connectors (postgres, mssql …) the session,
+    connection_id, and tenant_id are forwarded so the connector can load
+    the password at runtime from source_credentials.
+    """
     if source_type == "file_upload":
         from datapulse.control_center.connectors.file_upload import (
             FileUploadConnector,  # noqa: PLC0415
@@ -150,19 +155,41 @@ class ControlCenterService:
         self,
         connection_id: int,
         *,
+        tenant_id: int,
         name: str | None = None,
         status: str | None = None,
         config: dict | None = None,
+        credential: str | None = None,
     ) -> SourceConnection | None:
         """Update specified fields on an existing connection.
 
+        When ``credential`` is provided (non-empty), it is encrypted and
+        persisted in source_credentials, and credentials_ref is updated to
+        str(cred_id).  The plain value is never stored in config_json or
+        returned in the response.
+
         Returns None when the connection is not found (or not accessible via RLS).
         """
+        credentials_ref: str | None = None
+
+        if credential:
+            from datapulse.control_center.credentials import store_credential  # noqa: PLC0415
+
+            cred_id = store_credential(
+                self._session,
+                connection_id=connection_id,
+                tenant_id=tenant_id,
+                cred_type="password",
+                plain_value=credential,
+            )
+            credentials_ref = str(cred_id)
+
         row = self._connections.update(
             connection_id,
             name=name,
             status=status,
             config_json=config,
+            credentials_ref=credentials_ref,
         )
         return SourceConnection(**row) if row else None
 
@@ -189,7 +216,12 @@ class ControlCenterService:
         if conn is None:
             return ConnectionTestResult(ok=False, error="connection_not_found")
 
-        connector = _get_connector(conn.source_type)
+        connector = _get_connector(
+            conn.source_type,
+            session=self._session,
+            connection_id=conn.id,
+            tenant_id=tenant_id,
+        )
         if connector is None:
             return ConnectionTestResult(
                 ok=False,

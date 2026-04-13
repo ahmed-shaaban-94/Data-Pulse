@@ -249,11 +249,21 @@ class UpdateConnectionRequest(BaseModel):
     """Payload for PATCH /control-center/connections/{id}.
 
     All fields are optional — only provided fields are updated.
+
+    ``credential`` is write-only plain text — it is encrypted at rest and
+    NEVER returned by any GET endpoint.  The value is not validated here;
+    the service layer calls credentials.store_credential() and sets
+    credentials_ref = str(cred_id) on the connection row.
     """
 
     name: str | None = Field(None, min_length=1, max_length=200)
     status: SourceStatus | None = None
     config: dict[str, Any] | None = None
+    credential: str | None = Field(
+        None,
+        description="Write-only plain-text password. Encrypted at rest. Never returned by GET.",
+        exclude=True,  # Never serialised into API responses
+    )
 
 
 # ── Connector result models ───────────────────────────────────

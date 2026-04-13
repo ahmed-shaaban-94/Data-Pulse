@@ -121,6 +121,7 @@ class SourceConnectionRepository:
         name: str | None = None,
         status: str | None = None,
         config_json: dict | None = None,
+        credentials_ref: str | None = None,
     ) -> dict | None:
         """Update specified fields. Returns the updated row or None if not found."""
         sets: list[str] = []
@@ -134,6 +135,9 @@ class SourceConnectionRepository:
         if config_json is not None:
             sets.append("config_json = :config_json::jsonb")
             params["config_json"] = json.dumps(config_json)
+        if credentials_ref is not None:
+            sets.append("credentials_ref = :credentials_ref")
+            params["credentials_ref"] = credentials_ref
         if not sets:
             # Nothing to update — return current state
             return self.get(connection_id)

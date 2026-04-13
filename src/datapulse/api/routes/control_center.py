@@ -200,16 +200,24 @@ def update_connection(
     service: ServiceDep,
     connection_id: Annotated[int, Path(ge=1)],
     body: UpdateConnectionRequest,
+    user: UserDep,
 ) -> SourceConnection:
     """Update one or more fields on an existing source connection.
 
     Only the fields present in the request body are updated (partial update).
+
+    The optional ``credential`` field (write-only) is encrypted at rest via
+    pgcrypto and NEVER returned in the response.  Requires
+    CONTROL_CENTER_CREDS_KEY to be set in the environment.
     """
+    tenant_id = int(user.get("tenant_id", 1))
     conn = service.update_connection(
         connection_id,
+        tenant_id=tenant_id,
         name=body.name,
         status=body.status,
         config=body.config,
+        credential=body.credential,
     )
     if conn is None:
         raise HTTPException(status_code=404, detail="connection_not_found")

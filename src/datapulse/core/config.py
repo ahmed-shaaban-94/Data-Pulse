@@ -142,6 +142,11 @@ class Settings(BaseSettings):
     stripe_price_pro_monthly: str = ""  # price_xxx from Stripe Dashboard
     billing_base_url: str = "https://smartdatapulse.tech"
 
+    # Control Center — credential encryption key (pgcrypto pgp_sym_encrypt)
+    # Generate with: openssl rand -base64 48
+    # Must be set when using Postgres/SQL Server connectors with stored passwords.
+    control_center_creds_key: str = ""
+
     @model_validator(mode="after")
     def _require_auth_in_production(self) -> "Settings":
         """Fail fast at startup if auth is unconfigured in non-dev environments."""
