@@ -9,8 +9,6 @@ from __future__ import annotations
 from datetime import date
 from typing import Any
 
-from langchain_core.tools import tool
-
 from datapulse.analytics.models import AnalyticsFilter, DateRange
 from datapulse.analytics.repository import AnalyticsRepository
 from datapulse.logging import get_logger
@@ -23,6 +21,7 @@ def build_tool_registry(repo: AnalyticsRepository) -> list[Any]:
 
     Tools are closure-bound to *repo* so they use the per-request RLS session.
     """
+    from langchain_core.tools import tool  # lazy import — langchain_core is optional
 
     @tool
     def get_kpi_summary(target_date: str) -> dict[str, Any]:

@@ -16,6 +16,8 @@ import pytest
 from datapulse.ai_light.models import AISummary
 from datapulse.ai_light.service import AILightService
 
+pytestmark = pytest.mark.unit
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -45,9 +47,13 @@ def _make_kpi_mock() -> MagicMock:
     kpi.daily_transactions = 120
     kpi.daily_customers = 95
     kpi.model_dump.return_value = {
-        "today_gross": 150000.0, "mtd_gross": 3000000.0, "ytd_gross": 12000000.0,
-        "mom_growth_pct": 5.2, "yoy_growth_pct": 11.0,
-        "daily_transactions": 120, "daily_customers": 95,
+        "today_gross": 150000.0,
+        "mtd_gross": 3000000.0,
+        "ytd_gross": 12000000.0,
+        "mom_growth_pct": 5.2,
+        "yoy_growth_pct": 11.0,
+        "daily_transactions": 120,
+        "daily_customers": 95,
     }
     return kpi
 
@@ -74,14 +80,16 @@ LEGACY_LLM_RESPONSE = (
     "• 95 active customers"
 )
 
-GRAPH_LLM_JSON = json.dumps({
-    "narrative": "Sales were strong this week with healthy MoM growth.",
-    "highlights": [
-        "Revenue up 5% month-over-month",
-        "Drug A leads product mix",
-        "95 active customers",
-    ],
-})
+GRAPH_LLM_JSON = json.dumps(
+    {
+        "narrative": "Sales were strong this week with healthy MoM growth.",
+        "highlights": [
+            "Revenue up 5% month-over-month",
+            "Drug A leads product mix",
+            "95 active customers",
+        ],
+    }
+)
 
 
 # ---------------------------------------------------------------------------
@@ -116,6 +124,7 @@ class TestResponseShape:
         pytest.importorskip("langgraph", reason="langgraph not installed")
 
         import datapulse.ai_light.graph.builder as _builder
+
         _builder._compiled_graph = None
 
         settings = _make_settings(use_langgraph=True)
@@ -125,7 +134,11 @@ class TestResponseShape:
         ranking = _make_ranking_mock()
         trend = MagicMock()
         trend.model_dump.return_value = {
-            "points": [], "total": 0, "average": 0, "minimum": 0, "maximum": 0
+            "points": [],
+            "total": 0,
+            "average": 0,
+            "minimum": 0,
+            "maximum": 0,
         }
 
         fake_llm = MagicMock()
@@ -223,8 +236,10 @@ class TestFeatureFlagWiring:
         settings = _make_settings(use_langgraph=True)
         session = _make_session()
 
-        with patch("datapulse.ai_light.graph_service.AnalyticsRepository"), \
-             patch("datapulse.ai_light.graph_service.AILightService"):
+        with (
+            patch("datapulse.ai_light.graph_service.AnalyticsRepository"),
+            patch("datapulse.ai_light.graph_service.AILightService"),
+        ):
             svc = AILightGraphService(settings=settings, session=session)
             assert isinstance(svc, AILightGraphService)
             # is_available mirrors openrouter_api_key presence

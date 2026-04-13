@@ -9,6 +9,8 @@ import pytest
 
 from datapulse.analytics.models import AnalyticsFilter, RankingResult, TrendResult
 
+pytestmark = pytest.mark.unit
+
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
@@ -65,6 +67,7 @@ def mock_repo():
 
 @pytest.fixture()
 def tools(mock_repo):
+    pytest.importorskip("langchain_core", reason="langchain_core not installed; skip tool tests")
     from datapulse.ai_light.graph.tools import build_tool_registry
 
     return build_tool_registry(mock_repo)

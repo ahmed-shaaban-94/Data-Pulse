@@ -8,7 +8,11 @@ from __future__ import annotations
 import json
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 from datapulse.ai_light.graph.state import AILightState
+
+pytestmark = pytest.mark.unit
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -44,8 +48,10 @@ class TestCacheCheckNode:
         from datapulse.ai_light.graph.nodes import cache_check
 
         state = _base_state()
-        with patch("datapulse.ai_light.graph.nodes.cache_get", return_value=None), \
-             patch("datapulse.ai_light.graph.nodes.get_cache_version", return_value="v1"):
+        with (
+            patch("datapulse.ai_light.graph.nodes.cache_get", return_value=None),
+            patch("datapulse.ai_light.graph.nodes.get_cache_version", return_value="v1"),
+        ):
             result = cache_check(state)
 
         assert result["cache_hit"] is False
@@ -58,8 +64,10 @@ class TestCacheCheckNode:
         cached = {"narrative": "Cached text", "highlights": ["h1"], "degraded": False}
         state = _base_state()
 
-        with patch("datapulse.ai_light.graph.nodes.cache_get", return_value=cached), \
-             patch("datapulse.ai_light.graph.nodes.get_cache_version", return_value="v1"):
+        with (
+            patch("datapulse.ai_light.graph.nodes.cache_get", return_value=cached),
+            patch("datapulse.ai_light.graph.nodes.get_cache_version", return_value="v1"),
+        ):
             result = cache_check(state)
 
         assert result["cache_hit"] is True
@@ -71,8 +79,10 @@ class TestCacheCheckNode:
         from datapulse.ai_light.graph.nodes import cache_check
 
         state = _base_state()
-        with patch("datapulse.ai_light.graph.nodes.cache_get", return_value=None), \
-             patch("datapulse.ai_light.graph.nodes.get_cache_version", return_value="v0"):
+        with (
+            patch("datapulse.ai_light.graph.nodes.cache_get", return_value=None),
+            patch("datapulse.ai_light.graph.nodes.get_cache_version", return_value="v0"),
+        ):
             result = cache_check(state)
 
         entry = result["step_trace"][0]
@@ -180,18 +190,26 @@ class TestAnalyzeNode:
         payload = {"narrative": "Sales were strong.", "highlights": ["H1", "H2"]}
         llm = self._make_llm(json.dumps(payload))
         kpi = {
-            "today_gross": 100000, "mtd_gross": 2000000, "ytd_gross": 10000000,
-            "mom_growth_pct": 5.0, "yoy_growth_pct": 12.0,
-            "daily_transactions": 120, "daily_customers": 95,
+            "today_gross": 100000,
+            "mtd_gross": 2000000,
+            "ytd_gross": 10000000,
+            "mom_growth_pct": 5.0,
+            "yoy_growth_pct": 12.0,
+            "daily_transactions": 120,
+            "daily_customers": 95,
         }
         state = _base_state(
             kpi_data=kpi,
-            top_products={"items": [
-                {"rank": 1, "name": "Drug A", "value": 50000, "pct_of_total": 40},
-            ]},
-            top_customers={"items": [
-                {"rank": 1, "name": "Hospital B", "value": 30000, "pct_of_total": 25},
-            ]},
+            top_products={
+                "items": [
+                    {"rank": 1, "name": "Drug A", "value": 50000, "pct_of_total": 40},
+                ]
+            },
+            top_customers={
+                "items": [
+                    {"rank": 1, "name": "Hospital B", "value": 30000, "pct_of_total": 25},
+                ]
+            },
         )
 
         result = analyze(state, llm)
@@ -231,10 +249,12 @@ class TestAnalyzeNode:
         llm = self._make_llm(json.dumps(payload))
         state = _base_state(
             kpi_data={},
-            top_products={"items": [
-                {"rank": 1, "name": "A", "value": 100, "pct_of_total": 50},
-                {"rank": 2, "name": "B", "value": 200, "pct_of_total": 50},
-            ]},
+            top_products={
+                "items": [
+                    {"rank": 1, "name": "A", "value": 100, "pct_of_total": 50},
+                    {"rank": 2, "name": "B", "value": 200, "pct_of_total": 50},
+                ]
+            },
             top_customers={"items": []},
         )
         result = analyze(state, llm)
@@ -320,9 +340,7 @@ class TestFallbackNode:
         from datapulse.ai_light.graph.nodes import fallback
 
         state = _base_state(
-            kpi_data={
-                "today_gross": 150000, "mtd_gross": 3000000, "ytd_gross": 12000000
-            },
+            kpi_data={"today_gross": 150000, "mtd_gross": 3000000, "ytd_gross": 12000000},
         )
         result = fallback(state)
 
@@ -354,8 +372,10 @@ class TestCacheWriteNode:
             highlights=["H1"],
             degraded=False,
         )
-        with patch("datapulse.ai_light.graph.nodes.cache_set") as mock_set, \
-             patch("datapulse.ai_light.graph.nodes.get_cache_version", return_value="v1"):
+        with (
+            patch("datapulse.ai_light.graph.nodes.cache_set") as mock_set,
+            patch("datapulse.ai_light.graph.nodes.get_cache_version", return_value="v1"),
+        ):
             result = cache_write(state)
             mock_set.assert_called_once()
 
@@ -370,8 +390,10 @@ class TestCacheWriteNode:
         def fake_set(key, value, ttl=None):
             captured["ttl"] = ttl
 
-        with patch("datapulse.ai_light.graph.nodes.cache_set", side_effect=fake_set), \
-             patch("datapulse.ai_light.graph.nodes.get_cache_version", return_value="v0"):
+        with (
+            patch("datapulse.ai_light.graph.nodes.cache_set", side_effect=fake_set),
+            patch("datapulse.ai_light.graph.nodes.get_cache_version", return_value="v0"),
+        ):
             cache_write(state)
 
         assert captured["ttl"] == 300  # _TTL_SUMMARY

@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
+import pytest
+
 from datapulse.ai_light.graph.state import AILightState, _append_reducer
+
+pytestmark = pytest.mark.unit
 
 
 class TestAppendReducer:

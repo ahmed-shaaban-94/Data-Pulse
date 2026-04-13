@@ -210,11 +210,9 @@ def analyze(state: AILightState, llm: ChatOpenAI) -> dict[str, Any]:
     errors: list[str] = list(state.get("errors") or [])
 
     try:
-        from langchain_core.messages import HumanMessage, SystemMessage
-
         messages = [
-            SystemMessage(content=SYSTEM_PROMPT_V2),
-            HumanMessage(content=prompt_text),
+            {"role": "system", "content": SYSTEM_PROMPT_V2},
+            {"role": "user", "content": prompt_text},
         ]
         response = llm.invoke(messages)
         llm_raw = str(response.content)
@@ -329,9 +327,7 @@ def fallback(state: AILightState) -> dict[str, Any]:
             f"YTD: {float(kpi.get('ytd_gross', 0)):,.0f} EGP."
         )
     if stat.get("top_product_avg"):
-        parts.append(
-            f"Average revenue across top products: {stat['top_product_avg']:,.0f} EGP."
-        )
+        parts.append(f"Average revenue across top products: {stat['top_product_avg']:,.0f} EGP.")
 
     narrative = " ".join(parts) or "Insufficient data to generate summary."
     highlights = ["AI narrative unavailable — statistical summary shown."]

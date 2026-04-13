@@ -47,7 +47,8 @@ class AILightGraphService:
         target = target_date or date.today()
 
         params_hash = hashlib.md5(  # noqa: S324 — non-cryptographic use
-            json.dumps({"target_date": target.isoformat()}, sort_keys=True).encode()
+            json.dumps({"target_date": target.isoformat()}, sort_keys=True).encode(),
+            usedforsecurity=False,
         ).hexdigest()
 
         tenant_id = str(getattr(self._session, "_tenant_id", "1"))
@@ -113,9 +114,7 @@ class AILightGraphService:
         previous_date: date | None = None,
     ) -> ChangeNarrative:
         """Delegate to legacy service (Phase B adds LangGraph path)."""
-        return self._legacy.explain_changes(
-            current_date=current_date, previous_date=previous_date
-        )
+        return self._legacy.explain_changes(current_date=current_date, previous_date=previous_date)
 
     # ------------------------------------------------------------------
     # Private helpers
