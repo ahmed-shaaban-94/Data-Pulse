@@ -22,10 +22,12 @@ from datapulse.ai_light.graph.state import AILightState
 # ---------------------------------------------------------------------------
 
 
-VALID_SUMMARY_JSON = json.dumps({
-    "narrative": "Sales performance was robust with strong YoY growth.",
-    "highlights": ["YoY +12%", "Top product drove 40% of revenue", "95 daily customers"],
-})
+VALID_SUMMARY_JSON = json.dumps(
+    {
+        "narrative": "Sales performance was robust with strong YoY growth.",
+        "highlights": ["YoY +12%", "Top product drove 40% of revenue", "95 daily customers"],
+    }
+)
 
 
 def _make_fake_llm(content: str = VALID_SUMMARY_JSON) -> MagicMock:
@@ -42,13 +44,21 @@ def _make_fake_llm(content: str = VALID_SUMMARY_JSON) -> MagicMock:
 def _make_fake_repo() -> MagicMock:
     kpi = MagicMock()
     kpi.model_dump.return_value = {
-        "today_gross": 150000.0, "mtd_gross": 3000000.0, "ytd_gross": 12000000.0,
-        "mom_growth_pct": 5.2, "yoy_growth_pct": 11.0,
-        "daily_transactions": 120, "daily_customers": 95,
+        "today_gross": 150000.0,
+        "mtd_gross": 3000000.0,
+        "ytd_gross": 12000000.0,
+        "mom_growth_pct": 5.2,
+        "yoy_growth_pct": 11.0,
+        "daily_transactions": 120,
+        "daily_customers": 95,
     }
     trend = MagicMock()
     trend.model_dump.return_value = {
-        "points": [], "total": 0, "average": 0, "minimum": 0, "maximum": 0
+        "points": [],
+        "total": 0,
+        "average": 0,
+        "minimum": 0,
+        "maximum": 0,
     }
     ranking = MagicMock()
     ranking.model_dump.return_value = {
@@ -75,6 +85,7 @@ def _run_graph(
     from datapulse.ai_light.graph.builder import build_graph, set_runtime_context
     from datapulse.ai_light.graph.tools import build_tool_registry
     from datapulse.config import Settings
+
     _builder._compiled_graph = None
 
     repo = _make_fake_repo()
@@ -103,11 +114,12 @@ def _run_graph(
 
     thread_config = {"configurable": {"thread_id": "1:summary:integration-test-run"}}
 
-    with patch("datapulse.ai_light.graph.nodes.cache_get", return_value=cache_value), \
-         patch("datapulse.ai_light.graph.nodes.cache_set"), \
-         patch("datapulse.ai_light.graph.nodes.get_cache_version", return_value="v0"), \
-         patch("datapulse.ai_light.graph.cost.write_invocation_row"):
-
+    with (
+        patch("datapulse.ai_light.graph.nodes.cache_get", return_value=cache_value),
+        patch("datapulse.ai_light.graph.nodes.cache_set"),
+        patch("datapulse.ai_light.graph.nodes.get_cache_version", return_value="v0"),
+        patch("datapulse.ai_light.graph.cost.write_invocation_row"),
+    ):
         set_runtime_context(llm=llm, tools=tools, session=session)
         graph = build_graph(settings)
         final_state = graph.invoke(initial_state, config=thread_config)
@@ -199,11 +211,12 @@ class TestCircuitBreaker:
         }
         thread_config = {"configurable": {"thread_id": "1:summary:cb-test-run"}}
 
-        with patch("datapulse.ai_light.graph.nodes.cache_get", return_value=None), \
-             patch("datapulse.ai_light.graph.nodes.cache_set"), \
-             patch("datapulse.ai_light.graph.nodes.get_cache_version", return_value="v0"), \
-             patch("datapulse.ai_light.graph.cost.write_invocation_row"):
-
+        with (
+            patch("datapulse.ai_light.graph.nodes.cache_get", return_value=None),
+            patch("datapulse.ai_light.graph.nodes.cache_set"),
+            patch("datapulse.ai_light.graph.nodes.get_cache_version", return_value="v0"),
+            patch("datapulse.ai_light.graph.cost.write_invocation_row"),
+        ):
             set_runtime_context(llm=llm, tools=tools, session=session)
             graph = build_graph(settings)
             final_state = graph.invoke(initial_state, config=thread_config)
