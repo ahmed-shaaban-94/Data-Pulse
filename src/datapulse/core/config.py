@@ -122,8 +122,8 @@ class Settings(BaseSettings):
     ai_light_checkpoint_backend: str = "memory"
     # Tool-capable model, e.g. "openai/gpt-4o-mini" or "anthropic/claude-3.5-haiku".
     openrouter_agent_model: str = ""
-    langsmith_api_key: str = ""    # Optional LangSmith observability
-    langsmith_project: str = ""    # LangSmith project name
+    langsmith_api_key: str = ""  # Optional LangSmith observability
+    langsmith_project: str = ""  # LangSmith project name
 
     # Brain (session memory) — embedding model for semantic search
     brain_embed_model: str = "openai/text-embedding-3-small"

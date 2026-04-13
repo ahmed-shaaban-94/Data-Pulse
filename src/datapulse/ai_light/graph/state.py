@@ -33,6 +33,7 @@ if TYPE_CHECKING:
 # Step-trace append reducer
 # ---------------------------------------------------------------------------
 
+
 def _append_reducer(left: list[Any], right: Any) -> list[Any]:
     """Append *right* (a single record or list) to *left*."""
     if isinstance(right, list):

@@ -16,8 +16,8 @@ log = get_logger(__name__)
 OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions"
 
 # Circuit-breaker thresholds
-_CB_THRESHOLD = 3       # consecutive failures before opening
-_CB_OPEN_SECONDS = 60   # seconds the circuit stays open before half-open
+_CB_THRESHOLD = 3  # consecutive failures before opening
+_CB_OPEN_SECONDS = 60  # seconds the circuit stays open before half-open
 
 
 class OpenRouterClient:
@@ -67,9 +67,7 @@ class OpenRouterClient:
 
         if self._cb_is_open():
             remaining = self._cb_open_until - time.time()
-            raise RuntimeError(
-                f"OpenRouter circuit breaker open — retry after {remaining:.0f}s"
-            )
+            raise RuntimeError(f"OpenRouter circuit breaker open — retry after {remaining:.0f}s")
 
         headers = {
             "Authorization": f"Bearer {self._api_key}",
