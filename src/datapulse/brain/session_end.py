@@ -18,14 +18,24 @@ from pathlib import Path
 # ── Layer / module detection ────────────────────────────────────────
 
 LAYER_RULES: list[tuple[str, list[str]]] = [
-    ("bronze", [
-        "migrations/", "src/datapulse/bronze/", "src/datapulse/import_pipeline/",
-    ]),
+    (
+        "bronze",
+        [
+            "migrations/",
+            "src/datapulse/bronze/",
+            "src/datapulse/import_pipeline/",
+        ],
+    ),
     ("silver", ["dbt/models/staging/", "dbt/models/bronze/"]),
-    ("gold", [
-        "dbt/models/marts/", "src/datapulse/analytics/",
-        "src/datapulse/forecasting/", "src/datapulse/targets/",
-    ]),
+    (
+        "gold",
+        [
+            "dbt/models/marts/",
+            "src/datapulse/analytics/",
+            "src/datapulse/forecasting/",
+            "src/datapulse/targets/",
+        ],
+    ),
     ("api", ["src/datapulse/api/"]),
     ("frontend", ["frontend/"]),
     ("test", ["tests/", "frontend/e2e/"]),
@@ -113,20 +123,24 @@ def gather_git_data(project_dir: str) -> dict:
             if len(parts) < 4:
                 # Fallback: treat as sha + message only
                 sha = parts[0] if parts else ""
-                commits.append({
-                    "sha": sha,
-                    "author": "",
-                    "committed_at": "",
-                    "message": parts[-1] if len(parts) > 1 else "",
-                })
+                commits.append(
+                    {
+                        "sha": sha,
+                        "author": "",
+                        "committed_at": "",
+                        "message": parts[-1] if len(parts) > 1 else "",
+                    }
+                )
                 continue
             sha, author, committed_at, message = parts
-            commits.append({
-                "sha": sha,
-                "author": author,
-                "committed_at": committed_at,
-                "message": message,
-            })
+            commits.append(
+                {
+                    "sha": sha,
+                    "author": author,
+                    "committed_at": committed_at,
+                    "message": message,
+                }
+            )
             commit_files = _run(
                 ["git", "diff-tree", "--no-commit-id", "--name-only", "-r", sha],
                 cwd=project_dir,
@@ -172,9 +186,7 @@ def build_body_md(
 
     # Layers section
     if layers:
-        layers_section = "\n".join(
-            LAYER_DESCRIPTIONS.get(ly, f"- [[{ly}]]") for ly in layers
-        )
+        layers_section = "\n".join(LAYER_DESCRIPTIONS.get(ly, f"- [[{ly}]]") for ly in layers)
     else:
         layers_section = "_No recognized layers._"
 
@@ -308,18 +320,27 @@ def write_index_from_files(brain_dir: Path) -> None:
                 frontmatter[key.strip()] = val.strip()
         layers_raw = frontmatter.get("layers", "[]").strip("[]")
         modules_raw = frontmatter.get("modules", "[]").strip("[]")
-        sessions.append({
-            "timestamp": frontmatter.get("date", "unknown"),
-            "branch": frontmatter.get("branch", "unknown"),
-            "layers": [x.strip() for x in layers_raw.split(",") if x.strip()],
-            "modules": [x.strip() for x in modules_raw.split(",") if x.strip()],
-        })
+        sessions.append(
+            {
+                "timestamp": frontmatter.get("date", "unknown"),
+                "branch": frontmatter.get("branch", "unknown"),
+                "layers": [x.strip() for x in layers_raw.split(",") if x.strip()],
+                "modules": [x.strip() for x in modules_raw.split(",") if x.strip()],
+            }
+        )
 
     (brain_dir / "_INDEX.md").write_text(build_index_md(sessions), encoding="utf-8")
 
 
-def append_csv(brain_dir: Path, *, timestamp: str, branch: str, user_name: str,
-               layers: list[str], modules: list[str]) -> None:
+def append_csv(
+    brain_dir: Path,
+    *,
+    timestamp: str,
+    branch: str,
+    user_name: str,
+    layers: list[str],
+    modules: list[str],
+) -> None:
     """Append a row to session-log.csv for backward compatibility."""
     csv_path = brain_dir / "session-log.csv"
     write_header = not csv_path.exists()
@@ -351,6 +372,7 @@ def main() -> None:
     # Load .env for DATABASE_URL and OPENROUTER_API_KEY
     try:
         from dotenv import load_dotenv
+
         load_dotenv(project_path / ".env")
     except ImportError:
         pass
@@ -395,6 +417,7 @@ def main() -> None:
         # Generate embedding (non-blocking, nullable)
         try:
             from datapulse.brain.embeddings import get_embedding
+
             vec = get_embedding(body_md)
             if vec is not None:
                 update_embedding("sessions", session_id, vec)
@@ -405,7 +428,8 @@ def main() -> None:
         recent = get_recent_sessions(count=5)
         brain_dir.mkdir(parents=True, exist_ok=True)
         (brain_dir / "_INDEX.md").write_text(
-            build_index_md(recent), encoding="utf-8",
+            build_index_md(recent),
+            encoding="utf-8",
         )
         db_ok = True
 
@@ -437,8 +461,16 @@ def main() -> None:
         )
 
     # Auto-stage brain files
-    _run(["git", "add", "docs/brain/sessions/", "docs/brain/_INDEX.md",
-          "docs/brain/session-log.csv"], cwd=project_dir)
+    _run(
+        [
+            "git",
+            "add",
+            "docs/brain/sessions/",
+            "docs/brain/_INDEX.md",
+            "docs/brain/session-log.csv",
+        ],
+        cwd=project_dir,
+    )
 
 
 if __name__ == "__main__":

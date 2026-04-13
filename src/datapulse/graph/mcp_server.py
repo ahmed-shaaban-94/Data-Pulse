@@ -254,10 +254,12 @@ def _ensure_indexed() -> None:
 
 def _brain_error(msg: str) -> str:
     """Return a standard brain error JSON."""
-    return json.dumps({
-        "error": msg,
-        "hint": "Ensure DATABASE_URL is set and PostgreSQL is running",
-    })
+    return json.dumps(
+        {
+            "error": msg,
+            "hint": "Ensure DATABASE_URL is set and PostgreSQL is running",
+        }
+    )
 
 
 def _serialize(obj: Any) -> Any:

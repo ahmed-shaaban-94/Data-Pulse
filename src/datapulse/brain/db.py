@@ -68,17 +68,20 @@ def insert_session(
         RETURNING id
     """
     with get_connection() as conn, conn.cursor() as cur:
-        cur.execute(sql, (
-            tenant_id,
-            timestamp,
-            branch,
-            user_name,
-            layers,
-            modules,
-            files_changed,
-            json.dumps(commits),
-            body_md,
-        ))
+        cur.execute(
+            sql,
+            (
+                tenant_id,
+                timestamp,
+                branch,
+                user_name,
+                layers,
+                modules,
+                files_changed,
+                json.dumps(commits),
+                body_md,
+            ),
+        )
         row_id: int = cur.fetchone()[0]
         conn.commit()
     return row_id
@@ -217,7 +220,10 @@ def search_hybrid(
     """Combined FTS + semantic. Falls back to FTS-only if no embedding."""
     if query_embedding is None:
         return search_fts(
-            query, layers=layers, modules=modules, limit=limit,
+            query,
+            layers=layers,
+            modules=modules,
+            limit=limit,
         )
 
     conditions = [
@@ -255,7 +261,12 @@ def search_hybrid(
         LIMIT %s
     """
     params_full = [
-        query, vec_str, query, vec_str, *params, limit,
+        query,
+        vec_str,
+        query,
+        vec_str,
+        *params,
+        limit,
     ]
 
     with get_connection() as conn, _dict_cursor(conn) as cur:
@@ -264,7 +275,9 @@ def search_hybrid(
 
 
 def search_all(
-    query: str, *, limit: int = 20,
+    query: str,
+    *,
+    limit: int = 20,
 ) -> list[dict[str, Any]]:
     """Cross-table FTS search (sessions + decisions + incidents)."""
     sql = """
@@ -317,9 +330,16 @@ def insert_decision(
         RETURNING id
     """
     with get_connection() as conn, conn.cursor() as cur:
-        cur.execute(sql, (
-            tenant_id, session_id, title, body_md, tags or [],
-        ))
+        cur.execute(
+            sql,
+            (
+                tenant_id,
+                session_id,
+                title,
+                body_md,
+                tags or [],
+            ),
+        )
         row_id: int = cur.fetchone()[0]
         conn.commit()
     return row_id
@@ -342,10 +362,17 @@ def insert_incident(
         RETURNING id
     """
     with get_connection() as conn, conn.cursor() as cur:
-        cur.execute(sql, (
-            tenant_id, session_id, title,
-            severity, body_md, tags or [],
-        ))
+        cur.execute(
+            sql,
+            (
+                tenant_id,
+                session_id,
+                title,
+                severity,
+                body_md,
+                tags or [],
+            ),
+        )
         row_id: int = cur.fetchone()[0]
         conn.commit()
     return row_id
@@ -355,15 +382,14 @@ def insert_incident(
 
 
 def update_embedding(
-    table: str, row_id: int, embedding: list[float],
+    table: str,
+    row_id: int,
+    embedding: list[float],
 ) -> None:
     """Set the embedding column for a given row."""
     if table not in ("sessions", "decisions", "incidents"):
         raise ValueError(f"Invalid table: {table}")
-    sql = (
-        f"UPDATE brain.{table} "
-        "SET embedding = %s::vector WHERE id = %s"
-    )
+    sql = f"UPDATE brain.{table} SET embedding = %s::vector WHERE id = %s"
     with get_connection() as conn, conn.cursor() as cur:
         cur.execute(sql, (str(embedding), row_id))
         conn.commit()

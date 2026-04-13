@@ -36,7 +36,7 @@ def parse_session_file(path: Path) -> dict | None:
 
     # Extract body (everything after second ---)
     body_start = text.find("---", text.find("---") + 3)
-    body_md = text[body_start + 3:].strip() if body_start > 0 else ""
+    body_md = text[body_start + 3 :].strip() if body_start > 0 else ""
 
     return {
         "timestamp": frontmatter["date"],
@@ -120,6 +120,7 @@ if __name__ == "__main__":
     # Load .env
     try:
         from dotenv import load_dotenv
+
         load_dotenv(project_path / ".env")
     except ImportError:
         pass
