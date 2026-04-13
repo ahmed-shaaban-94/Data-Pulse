@@ -522,7 +522,12 @@ def _register_sync_schedules() -> int:
         log.warning("sync_schedule_registration_skipped", reason="control_center not installed")
         return 0
 
-    session = get_session_factory()()
+    try:
+        session = get_session_factory()()
+    except Exception:  # noqa: BLE001
+        log.warning("sync_schedule_db_unavailable", exc_info=True)
+        return 0
+
     try:
         repo = SyncScheduleRepository(session)
         schedules = repo.list_all_active()

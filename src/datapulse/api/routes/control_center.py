@@ -179,7 +179,7 @@ def create_connection(
     ``filename`` (original file name including extension).
     """
     tenant_id = int(user.get("tenant_id", 1))
-    created_by: str = user.get("sub", user.get("user_id", "anonymous"))
+    created_by: str = str(user.get("sub") or user.get("user_id") or "anonymous")
     return service.create_connection(
         tenant_id=tenant_id,
         name=body.name,
@@ -520,7 +520,7 @@ def create_mapping(
 ) -> MappingTemplate:
     """Create a new column-mapping template."""
     tenant_id = int(user.get("tenant_id", 1))
-    created_by: str = user.get("sub", user.get("user_id", "anonymous"))
+    created_by: str = str(user.get("sub") or user.get("user_id") or "anonymous")
     return service.create_mapping(
         tenant_id=tenant_id,
         source_type=body.source_type,
@@ -616,7 +616,7 @@ def create_draft(
 ) -> PipelineDraft:
     """Create a new pipeline draft (entity bundle to be published)."""
     tenant_id = int(user.get("tenant_id", 1))
-    created_by: str = user.get("sub", user.get("user_id", "anonymous"))
+    created_by: str = str(user.get("sub") or user.get("user_id") or "anonymous")
     return service.create_draft(
         tenant_id=tenant_id,
         entity_type=body.entity_type,
@@ -714,7 +714,7 @@ def publish_draft(
     4. Invalidates the tenant's analytics cache.
     """
     tenant_id = int(user.get("tenant_id", 1))
-    published_by: str = user.get("sub", user.get("user_id", "anonymous"))
+    published_by: str = str(user.get("sub") or user.get("user_id") or "anonymous")
     try:
         return service.publish_draft(
             draft_id,
@@ -751,7 +751,7 @@ def rollback_release(
     to the rolled-back release.
     """
     tenant_id = int(user.get("tenant_id", 1))
-    published_by: str = user.get("sub", user.get("user_id", "anonymous"))
+    published_by: str = str(user.get("sub") or user.get("user_id") or "anonymous")
     try:
         return service.rollback_release(release_id, tenant_id=tenant_id, published_by=published_by)
     except ValueError as exc:
@@ -783,7 +783,7 @@ def trigger_sync(
     tracked via ``GET /connections/{id}/sync-history``.
     """
     tenant_id = int(user.get("tenant_id", 1))
-    created_by: str = user.get("sub", user.get("user_id", "anonymous"))
+    created_by: str = str(user.get("sub") or user.get("user_id") or "anonymous")
     try:
         return service.trigger_sync(
             connection_id,
@@ -823,7 +823,7 @@ def create_schedule(
     you can restart the scheduler or call the internal reload endpoint.
     """
     tenant_id = int(user.get("tenant_id", 1))
-    created_by: str = user.get("sub", user.get("user_id", "anonymous"))
+    created_by: str = str(user.get("sub") or user.get("user_id") or "anonymous")
     try:
         return service.create_schedule(
             connection_id=connection_id,
