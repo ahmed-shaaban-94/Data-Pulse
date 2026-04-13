@@ -350,8 +350,8 @@ class ControlCenterService:
 
         Used by ``POST /mappings/validate`` for live feedback in the UI.
         """
-        from datapulse.control_center import canonical as can_helpers  # noqa: PLC0415
         import datapulse.control_center.validation as val_engine  # noqa: PLC0415
+        from datapulse.control_center import canonical as can_helpers  # noqa: PLC0415
 
         canonical = can_helpers.get_canonical_domain(self._session, target_domain)
         if canonical is None:
@@ -413,8 +413,8 @@ class ControlCenterService:
 
         Returns the updated draft. Raises ``ValueError`` when not found.
         """
-        from datapulse.control_center import canonical as can_helpers  # noqa: PLC0415
         import datapulse.control_center.validation as val_engine  # noqa: PLC0415
+        from datapulse.control_center import canonical as can_helpers  # noqa: PLC0415
 
         draft_row = self._drafts.get(draft_id)
         if draft_row is None:
