@@ -1,44 +1,26 @@
-"""V2 prompt templates for LangGraph AI-Light nodes.
+"""V2 prompt templates for the AI Light LangGraph nodes.
 
-Extends the V1 prompts in ai_light/prompts.py with structured JSON output
-requirements and prompt versioning for A/B capability.
+PROMPT_VERSION is embedded in cache keys so that updating a prompt
+automatically invalidates cached responses.
 """
 
 from __future__ import annotations
 
-import re as _re
+PROMPT_VERSION = "2.0"
 
-PROMPT_VERSION = "v2.0"
-
-# Reuse sanitize from parent module — kept here to avoid circular imports.
-_CONTROL_CHARS_RE = _re.compile(r"[\x00-\x1f\x7f-\x9f]")
-_INJECTION_DELIMITERS_RE = _re.compile(r"[<>\[\]{}|\\`]")
-_INJECTION_PREFIXES_RE = _re.compile(
-    r"(?i)(ignore\s+(previous|above)|system\s*:|<\s*/?\s*system|you\s+are\s+now)"
-)
-
-
-def _sanitize_for_prompt(text: str, max_len: int = 100) -> str:
-    """Strip control chars, prompt injection markers, and truncate user-controlled text."""
-    cleaned = _CONTROL_CHARS_RE.sub(" ", text)
-    cleaned = _INJECTION_DELIMITERS_RE.sub("", cleaned)
-    cleaned = _INJECTION_PREFIXES_RE.sub("", cleaned)
-    return cleaned.strip()[:max_len]
-
-
-SYSTEM_PROMPT_V2 = (
+SYSTEM_PROMPT = (
     "You are a business analytics assistant for DataPulse, a pharma/sales analytics platform. "
-    "Analyze sales data and provide concise, actionable insights in English. "
-    "Keep responses data-driven. Currency is EGP (Egyptian Pounds). "
-    "When asked for JSON, return ONLY the JSON object — no markdown, no extra text."
+    "You analyze sales data and provide concise, actionable insights in English. "
+    "Keep responses short and data-driven. Use bullet points for highlights. "
+    "Currency is EGP (Egyptian Pounds). All numbers should be formatted clearly. "
+    "Always return valid JSON — no markdown code fences, no extra text."
 )
 
-SUMMARY_PROMPT = """\
-Analyze the following sales data and return a JSON object with exactly two keys:
-- "narrative": a concise executive summary paragraph (3-5 sentences, no markdown headers)
-- "highlights": an array of 3-5 short bullet-point strings
+SUMMARY_PROMPT_V2 = """\
+Analyze the following sales data and write a brief executive summary.
+Return valid JSON with schema: {{"narrative": "...", "highlights": ["...", ...]}}
 
-**KPI Snapshot (prompt_version={prompt_version}):**
+**KPI Snapshot:**
 - Today's Gross Sales: {today_gross} EGP
 - Month-to-Date: {mtd_gross} EGP
 - Year-to-Date: {ytd_gross} EGP
@@ -53,5 +35,45 @@ Analyze the following sales data and return a JSON object with exactly two keys:
 **Top 5 Customers by Revenue:**
 {top_customers}
 
-Return ONLY the JSON object. Example:
-{{"narrative": "...", "highlights": ["...", "..."]}}"""
+Return only valid JSON."""
+
+ANOMALY_PROMPT_V2 = """\
+Analyze the following daily sales time series and identify anomalies \
+(unusual spikes, drops, or pattern breaks).
+Return valid JSON with schema:
+{{"anomalies": [{{"date": "YYYY-MM-DD", "description": "...", "severity": "low|medium|high"}}],\
+ "narrative": "overall summary"}}
+
+**Daily Sales Data:**
+{daily_data}
+
+**Statistics:**
+- Average: {avg} EGP
+- Std Dev: {std_dev} EGP
+- Min: {min_val} EGP
+- Max: {max_val} EGP
+
+**Active Monitoring Alerts:**
+{active_alerts}
+
+Return only valid JSON. Use empty list [] if no anomalies found."""
+
+CHANGES_PROMPT_V2 = """\
+Compare these two periods and explain the key business performance changes.
+Return valid JSON with schema: {{"narrative": "...", "key_changes": ["...", ...]}}
+
+**Current Period ({current_period}):**
+- Net Sales: {current_net} EGP
+- Transactions: {current_txns}
+- Customers: {current_customers}
+
+**Previous Period ({previous_period}):**
+- Net Sales: {previous_net} EGP
+- Transactions: {previous_txns}
+- Customers: {previous_customers}
+
+**Top Gainers (products):** {top_gainers}
+**Top Losers (products):** {top_losers}
+**Top Staff by Sales:** {top_staff}
+
+Return only valid JSON."""

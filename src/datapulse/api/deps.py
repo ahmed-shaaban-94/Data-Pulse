@@ -190,16 +190,24 @@ def get_forecasting_service(
 def get_ai_light_service(
     session: Annotated[Session, Depends(get_tenant_session)],
 ) -> AILightService:
-    """Factory for AI-Light service.
+    """Factory for AI-Light service — returns graph-backed or legacy implementation.
 
-    Returns AILightGraphService when AI_LIGHT_USE_LANGGRAPH=true,
-    otherwise falls back to the legacy AILightService.
+    When ``AI_LIGHT_USE_LANGGRAPH=true``, returns ``AILightGraphService``
+    which routes requests through the LangGraph orchestration layer.
+    Falls back to the original ``AILightService`` if langgraph is not
+    installed or the flag is off.
     """
     settings = get_settings()
     if settings.ai_light_use_langgraph:
-        from datapulse.ai_light.graph_service import AILightGraphService  # lazy import
+        try:
+            from datapulse.ai_light.graph_service import AILightGraphService
 
-        return AILightGraphService(settings=settings, session=session)  # type: ignore[return-value]
+            return AILightGraphService(settings=settings, session=session)  # type: ignore[return-value]
+        except ImportError:
+            logger.warning(
+                "langgraph_not_installed",
+                detail="Falling back to AILightService — install datapulse[ai]",
+            )
     return AILightService(settings=settings, session=session)
 
 
