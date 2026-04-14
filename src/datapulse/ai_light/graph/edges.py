@@ -1,48 +1,44 @@
-"""Conditional edge functions for the AI-Light LangGraph."""
+"""Conditional edge functions for the AI Light LangGraph."""
 
 from __future__ import annotations
 
-from datapulse.ai_light.graph.state import AILightState
+from typing import TYPE_CHECKING, Literal
+
+if TYPE_CHECKING:
+    from datapulse.ai_light.graph.state import AILightState
 
 _MAX_RETRIES = 2
-_CIRCUIT_BREAKER_THRESHOLD = 3
 
 
-def route_by_type(state: AILightState) -> str:
-    """Route from *route* node to the appropriate plan node based on insight_type."""
-    insight_type = state.get("insight_type", "summary")
-    if insight_type == "summary":
-        return "plan_summary"
-    # Future: anomalies, changes, deep_dive
+def route_by_type(
+    state: AILightState,
+) -> Literal["plan_summary", "plan_anomalies", "plan_changes"]:
+    """Route after cache_check → plan_* based on insight_type."""
+    insight = state.get("insight_type", "summary")
+    if insight == "anomalies":
+        return "plan_anomalies"
+    if insight == "changes":
+        return "plan_changes"
     return "plan_summary"
 
 
-def validate_or_retry(state: AILightState) -> str:
-    """After validate: retry analyze if retries remain, else synthesize or fallback."""
-    retries = state.get("validation_retries", 0)
+def validate_or_retry(
+    state: AILightState,
+) -> Literal["synthesize", "analyze", "fallback"]:
+    """Route after validate node.
+
+    - No errors → synthesize
+    - errors AND retries < MAX_RETRIES → analyze (retry)
+    - errors AND retries >= MAX_RETRIES → fallback
+    """
+    retries = state.get("validation_retries") or 0
+    errors = state.get("errors") or []
     parsed = state.get("llm_parsed_output")
 
-    if parsed is not None:
-        # Try to validate
-        try:
-            from datapulse.ai_light.graph.schemas import SummaryOutput
+    # Validation succeeded when parsed output is present and no recent error
+    if parsed is not None and not any("validation:" in e or "json_parse:" in e for e in errors):
+        return "synthesize"
 
-            insight_type = state.get("insight_type", "summary")
-            if insight_type == "summary":
-                SummaryOutput(**parsed)
-                return "synthesize"
-        except Exception:
-            pass
-
-    # Validation failed
     if retries < _MAX_RETRIES:
         return "analyze"
     return "fallback"
-
-
-def circuit_breaker_check(state: AILightState) -> str:
-    """Check circuit breaker before fetch_data; open circuit goes to fallback."""
-    failures = state.get("circuit_breaker_failures", 0)
-    if failures >= _CIRCUIT_BREAKER_THRESHOLD:
-        return "fallback"
-    return "fetch_data"

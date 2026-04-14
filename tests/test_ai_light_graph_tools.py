@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import date
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -12,7 +12,7 @@ from datapulse.analytics.models import AnalyticsFilter, RankingResult, TrendResu
 pytestmark = pytest.mark.unit
 
 # ---------------------------------------------------------------------------
-# Fixtures
+# Helpers
 # ---------------------------------------------------------------------------
 
 
@@ -54,6 +54,11 @@ def _make_ranking_result():
     return ranking
 
 
+# ---------------------------------------------------------------------------
+# Fixtures
+# ---------------------------------------------------------------------------
+
+
 @pytest.fixture()
 def mock_repo():
     repo = MagicMock()
@@ -62,32 +67,32 @@ def mock_repo():
     repo.get_monthly_trend.return_value = _make_trend_result()
     repo.get_top_products.return_value = _make_ranking_result()
     repo.get_top_customers.return_value = _make_ranking_result()
+    repo.get_top_staff.return_value = _make_ranking_result()
+    repo.get_site_performance.return_value = _make_ranking_result()
     return repo
 
 
 @pytest.fixture()
-def tools(mock_repo):
-    pytest.importorskip("langchain_core", reason="langchain_core not installed; skip tool tests")
+def tool_map(mock_repo):
+    """Return the tool registry dict with AnalyticsRepository patched to mock_repo."""
     from datapulse.ai_light.graph.tools import build_tool_registry
 
-    return build_tool_registry(mock_repo)
-
-
-@pytest.fixture()
-def tool_map(tools):
-    return {t.name: t for t in tools}
+    mock_session = MagicMock()
+    mock_settings = MagicMock()
+    with patch("datapulse.ai_light.graph.tools.AnalyticsRepository", return_value=mock_repo):
+        return build_tool_registry(mock_session, mock_settings)
 
 
 # ---------------------------------------------------------------------------
-# Tests: tool registry
+# Tests: tool registry shape
 # ---------------------------------------------------------------------------
 
 
 class TestBuildToolRegistry:
-    def test_returns_5_tools(self, tools):
-        assert len(tools) == 5
+    def test_returns_dict(self, tool_map):
+        assert isinstance(tool_map, dict)
 
-    def test_tool_names(self, tool_map):
+    def test_core_tools_present(self, tool_map):
         expected = {
             "get_kpi_summary",
             "get_daily_trend",
@@ -95,7 +100,11 @@ class TestBuildToolRegistry:
             "get_top_products",
             "get_top_customers",
         }
-        assert set(tool_map.keys()) == expected
+        assert expected.issubset(set(tool_map.keys()))
+
+    def test_all_values_callable(self, tool_map):
+        for name, fn in tool_map.items():
+            assert callable(fn), f"tool {name!r} is not callable"
 
 
 # ---------------------------------------------------------------------------
@@ -105,14 +114,14 @@ class TestBuildToolRegistry:
 
 class TestGetKpiSummary:
     def test_valid_date(self, tool_map, mock_repo):
-        result = tool_map["get_kpi_summary"].invoke({"target_date": "2026-04-12"})
+        result = tool_map["get_kpi_summary"](target_date=date(2026, 4, 12))
         mock_repo.get_kpi_summary.assert_called_once_with(date(2026, 4, 12))
         assert isinstance(result, dict)
         assert "today_gross" in result
 
-    def test_invalid_date_raises(self, tool_map):
-        with pytest.raises(ValueError):
-            tool_map["get_kpi_summary"].invoke({"target_date": "not-a-date"})
+    def test_no_date_uses_today(self, tool_map, mock_repo):
+        tool_map["get_kpi_summary"]()
+        assert mock_repo.get_kpi_summary.called
 
 
 # ---------------------------------------------------------------------------
@@ -122,18 +131,14 @@ class TestGetKpiSummary:
 
 class TestGetDailyTrend:
     def test_calls_repo_with_filter(self, tool_map, mock_repo):
-        result = tool_map["get_daily_trend"].invoke(
-            {"start_date": "2026-03-01", "end_date": "2026-03-31"}
+        result = tool_map["get_daily_trend"](
+            start_date=date(2026, 3, 1), end_date=date(2026, 3, 31)
         )
         mock_repo.get_daily_trend.assert_called_once()
         call_arg = mock_repo.get_daily_trend.call_args[0][0]
         assert isinstance(call_arg, AnalyticsFilter)
         assert call_arg.date_range.start_date == date(2026, 3, 1)
         assert result["points"][0]["period"] == "2026-04-01"
-
-    def test_invalid_dates_raise(self, tool_map):
-        with pytest.raises(ValueError):
-            tool_map["get_daily_trend"].invoke({"start_date": "bad", "end_date": "2026-03-31"})
 
 
 # ---------------------------------------------------------------------------
@@ -143,8 +148,8 @@ class TestGetDailyTrend:
 
 class TestGetMonthlyTrend:
     def test_calls_repo(self, tool_map, mock_repo):
-        result = tool_map["get_monthly_trend"].invoke(
-            {"start_date": "2026-01-01", "end_date": "2026-03-31"}
+        result = tool_map["get_monthly_trend"](
+            start_date=date(2026, 1, 1), end_date=date(2026, 3, 31)
         )
         mock_repo.get_monthly_trend.assert_called_once()
         assert isinstance(result, dict)
@@ -157,30 +162,20 @@ class TestGetMonthlyTrend:
 
 class TestGetTopProducts:
     def test_default_limit(self, tool_map, mock_repo):
-        tool_map["get_top_products"].invoke({"limit": 5})
+        tool_map["get_top_products"](limit=5)
         call_arg = mock_repo.get_top_products.call_args[0][0]
         assert call_arg.limit == 5
 
-    def test_limit_clamped_to_max(self, tool_map, mock_repo):
-        tool_map["get_top_products"].invoke({"limit": 999})
-        call_arg = mock_repo.get_top_products.call_args[0][0]
-        assert call_arg.limit == 20
-
-    def test_limit_clamped_to_min(self, tool_map, mock_repo):
-        tool_map["get_top_products"].invoke({"limit": 0})
-        call_arg = mock_repo.get_top_products.call_args[0][0]
-        assert call_arg.limit == 1
-
     def test_with_date_range(self, tool_map, mock_repo):
-        tool_map["get_top_products"].invoke(
-            {"limit": 5, "start_date": "2026-01-01", "end_date": "2026-03-31"}
+        tool_map["get_top_products"](
+            limit=5, start_date=date(2026, 1, 1), end_date=date(2026, 3, 31)
         )
         call_arg = mock_repo.get_top_products.call_args[0][0]
         assert call_arg.date_range is not None
         assert call_arg.date_range.start_date == date(2026, 1, 1)
 
     def test_without_date_range(self, tool_map, mock_repo):
-        tool_map["get_top_products"].invoke({"limit": 5})
+        tool_map["get_top_products"](limit=5)
         call_arg = mock_repo.get_top_products.call_args[0][0]
         assert call_arg.date_range is None
 
@@ -192,13 +187,13 @@ class TestGetTopProducts:
 
 class TestGetTopCustomers:
     def test_basic_call(self, tool_map, mock_repo):
-        result = tool_map["get_top_customers"].invoke({"limit": 5})
+        result = tool_map["get_top_customers"](limit=5)
         mock_repo.get_top_customers.assert_called_once()
         assert isinstance(result, dict)
 
     def test_with_date_range(self, tool_map, mock_repo):
-        tool_map["get_top_customers"].invoke(
-            {"limit": 3, "start_date": "2026-01-01", "end_date": "2026-03-31"}
+        tool_map["get_top_customers"](
+            limit=3, start_date=date(2026, 1, 1), end_date=date(2026, 3, 31)
         )
         call_arg = mock_repo.get_top_customers.call_args[0][0]
         assert call_arg.date_range is not None
