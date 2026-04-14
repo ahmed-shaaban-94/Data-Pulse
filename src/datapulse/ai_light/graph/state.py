@@ -1,50 +1,98 @@
-"""LangGraph state schema for AI-Light.
+"""Shared state TypedDict for the AI-Light LangGraph.
 
-Defines ``AILightState`` — the single TypedDict that flows through every node in
-the graph.  Fields are grouped by lifecycle stage:
-
-* **Identity** — tenant / user / run identifiers (set once at graph entry).
-* **Request**  — insight type, date range, params hash, feature flag.
-* **Fetched data** — raw DB / service results (populated by ``fetch_data`` node).
-* **Analysis** — statistical summaries and raw LLM output.
-* **Outputs**  — final response fields returned to the API caller.
-* **Cost / observability** — token counts, cost estimate, step trace.
-* **Control**  — retry counters, circuit-breaker failures, cache hit flag.
-
-``step_trace`` uses a custom *append* reducer so each node can push a record
-without overwriting the full list.  All other keys use LangGraph's default
-``last-write-wins`` reducer.
-
-Implementation note (Phase A-1): this file is a scaffold — ``AILightState`` is
-declared but the graph is not yet wired.  The LangGraph import is deferred so
-the ``[ai]`` extras are not required at import time.
+Design notes:
+- No add_messages reducer — this is not a chatbot.
+- step_trace uses a custom append reducer to accumulate node-execution records
+  without overwriting previous steps.
+- All keys are optional (total=False) so nodes can write partial updates cleanly.
 """
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
-if TYPE_CHECKING:
-    # LangGraph is an optional dependency — only imported for type-checking.
-    pass
+from langgraph.graph.message import add_messages  # noqa: F401 (re-used pattern reference)
 
 
-# ---------------------------------------------------------------------------
-# Step-trace append reducer
-# ---------------------------------------------------------------------------
+def _append(existing: list | None, new: list) -> list:
+    """Reducer: append new items to an existing list; never replace."""
+    base = existing or []
+    return base + new
 
 
-def _append_reducer(left: list[Any], right: Any) -> list[Any]:
-    """Append *right* (a single record or list) to *left*."""
-    if isinstance(right, list):
-        return left + right
-    return left + [right]
+class AILightState(dict):
+    """LangGraph state for the AI-Light insight graph.
 
+    Implemented as a plain dict subclass so LangGraph's TypedDict-based
+    reducers work correctly.  Keys are documented below:
 
-# ---------------------------------------------------------------------------
-# AILightState
-# ---------------------------------------------------------------------------
+    Identity & routing
+    ------------------
+    tenant_id       str  — from JWT claims
+    user_claims     dict — full JWT payload
+    run_id          str  — UUID4 as string; generated at request time
 
-# NOTE: Full TypedDict definition lands in Phase A (summary path implementation).
-# Declared here as a plain dict alias so imports work before langgraph is installed.
-AILightState = dict  # type: ignore[assignment]
+    Request
+    -------
+    insight_type    str  — "summary" | "anomalies" | "changes" | "deep_dive"
+    target_date     str | None
+    start_date      str | None
+    end_date        str | None
+    params_hash     str  — MD5 of sorted JSON input params
+    require_review  bool — True → interrupt_before=["synthesize"]
+
+    Fetched data (filled by fetch_data / tool calls)
+    -------------------------------------------------
+    kpi_data             dict | None
+    daily_trend          dict | None
+    monthly_trend        dict | None
+    top_products         dict | None
+    top_customers        dict | None
+    anomaly_alerts       list | None
+    forecast_summary     dict | None
+    target_vs_actual     dict | None
+
+    Analysis
+    --------
+    statistical_analysis dict | None
+    llm_raw_output       str  | None
+    llm_parsed_output    dict | None
+
+    Outputs (written by synthesize or fallback)
+    -------------------------------------------
+    narrative        str | None
+    highlights       list[str] | None
+    anomalies_list   list | None
+    deltas           list | None
+    degraded         bool
+
+    Cost & observability
+    --------------------
+    token_usage   dict  — {input, output, total}
+    cost_cents    float
+    model_used    str
+    step_trace    list  — append-only; each entry: {node, ts, status, ...}
+    errors        list[str]
+
+    Control
+    -------
+    validation_retries        int
+    circuit_breaker_failures  int
+    cache_hit                 bool
+    """
+
+    # Registry of keys that use an append reducer instead of replace.
+    _APPEND_KEYS: frozenset[str] = frozenset({"step_trace", "errors"})
+
+    def update(self, other: dict[str, Any] | None = None, **kwargs: Any) -> None:  # type: ignore[override]
+        """Override update to apply append-reducers for accumulator keys."""
+        combined: dict[str, Any] = {}
+        if other:
+            combined.update(other)
+        combined.update(kwargs)
+        for key, value in combined.items():
+            if key in self._APPEND_KEYS and isinstance(value, list):
+                existing = self.get(key, [])
+                super().__setitem__(key, existing + value)
+            else:
+                super().__setitem__(key, value)

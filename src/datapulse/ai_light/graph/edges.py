@@ -1,50 +1,59 @@
-"""LangGraph conditional edge functions for AI-Light.
+"""Conditional edge functions for the AI-Light LangGraph.
 
-Conditional edges read ``AILightState`` and return the *name* of the next node
-(a string).  LangGraph's ``add_conditional_edges`` maps that string to the
-actual node function.
-
-Edge functions
---------------
-``route_by_type``         — After ``route`` node: dispatches to type-specific plan node.
-``validate_or_retry``     — After ``validate`` node: retries ``analyze`` (max 2) or proceeds.
-``circuit_breaker_check`` — After ``fetch_data``: short-circuits to ``fallback`` if CB open.
-``cache_or_continue``     — After ``cache_check``: exits graph on cache hit, continues on miss.
-
-Implementation note (Phase A-1): stubs only.  Phase A will implement
-``route_by_type``, ``validate_or_retry``, and ``cache_or_continue`` for the
-summary path.
+Each function receives the current state and returns a node name string.
+LangGraph calls these after each node to determine the next step.
 """
 
 from __future__ import annotations
 
-from typing import Any
+_MAX_VALIDATE_RETRIES = 2
 
 
-def route_by_type(state: dict[str, Any]) -> str:
-    """Map ``insight_type`` to the corresponding plan node name.
-
-    Returns one of: ``"plan_summary"``, ``"plan_anomalies"``,
-    ``"plan_changes"``, ``"plan_deep_dive"``.
-    """
-    raise NotImplementedError("route_by_type — Phase A")
-
-
-def validate_or_retry(state: dict[str, Any]) -> str:
-    """Return ``"analyze"`` for a retry or ``"synthesize"`` / ``"fallback"`` on terminal state.
-
-    Retry logic: if ``validation_retries < 2`` and the last validation failed,
-    route back to ``"analyze"`` with an amended prompt.  After 2 retries route
-    to ``"fallback"``.  On success route to ``"synthesize"``.
-    """
-    raise NotImplementedError("validate_or_retry — Phase A")
+def route_by_type(state: dict) -> str:
+    """Route from the dummy `route` node to the appropriate plan_* node."""
+    insight_type = state.get("insight_type", "summary")
+    routes = {
+        "summary": "plan_summary",
+        "anomalies": "plan_anomalies",
+        "changes": "plan_changes",
+        "deep_dive": "plan_deep_dive",
+    }
+    return routes.get(insight_type, "plan_summary")
 
 
-def circuit_breaker_check(state: dict[str, Any]) -> str:
-    """Return ``"analyze"`` normally or ``"fallback"`` when the circuit breaker is open."""
-    raise NotImplementedError("circuit_breaker_check — Phase A")
+def cache_or_continue(state: dict) -> str:
+    """After cache_check: END (cache hit) or continue to route."""
+    return "__end__" if state.get("cache_hit") else "route"
 
 
-def cache_or_continue(state: dict[str, Any]) -> str:
-    """Return ``"__end__"`` on a cache hit or ``"route"`` on a miss."""
-    raise NotImplementedError("cache_or_continue — Phase A")
+def validate_or_retry(state: dict) -> str:
+    """After validate: retry analyze, fall back, or proceed to synthesize."""
+    retries = state.get("validation_retries", 0)
+    parsed = state.get("llm_parsed_output")
+
+    if parsed is not None and retries <= _MAX_VALIDATE_RETRIES:
+        # Check if the last validate step reported an error
+        trace = state.get("step_trace", [])
+        last_validate = next(
+            (s for s in reversed(trace) if s.get("node") == "validate"),
+            None,
+        )
+        if last_validate and last_validate.get("status") == "ok":
+            return "synthesize"
+        if retries >= _MAX_VALIDATE_RETRIES:
+            return "fallback"
+        return "analyze"
+
+    if retries >= _MAX_VALIDATE_RETRIES:
+        return "fallback"
+    if parsed is None:
+        return "fallback" if retries >= _MAX_VALIDATE_RETRIES else "analyze"
+    return "synthesize"
+
+
+def circuit_breaker_check(state: dict) -> str:
+    """After fetch_data: check if circuit is open (too many consecutive failures)."""
+    failures = state.get("circuit_breaker_failures", 0)
+    if failures >= 3:
+        return "fallback"
+    return "analyze"

@@ -1,4 +1,11 @@
-"""Pydantic models for AI-Light insights."""
+"""Pydantic models for AI-Light insights.
+
+Phase D additions:
+- DeepDiveRequest: adds require_review flag and stream flag
+- AIInsightMeta: run-level observability (run_id, model, tokens, cost, duration)
+- DeepDiveResponse: composite deep-dive result (narrative + highlights + anomalies + deltas)
+- DeepDiveDraft: 202 Accepted response when require_review=True (HITL paused run)
+"""
 
 from __future__ import annotations
 
@@ -74,3 +81,88 @@ class ChangeNarrative(BaseModel):
     deltas: list[ChangeDelta]
     current_period: str
     previous_period: str
+
+
+# ---------------------------------------------------------------------------
+# Phase D models
+# ---------------------------------------------------------------------------
+
+
+class DeepDiveRequest(BaseModel):
+    """Request body for the composite /deep-dive endpoint."""
+
+    model_config = ConfigDict(frozen=True)
+
+    insight_type: str = Field(default="deep_dive", description="Always 'deep_dive'")
+    start_date: date | None = None
+    end_date: date | None = None
+    require_review: bool = Field(
+        default=False,
+        description=(
+            "When True the graph pauses before synthesize and returns 202 Accepted "
+            "with a run_id.  The caller must then GET /review/{run_id} to inspect the "
+            "draft and POST /review/{run_id}/approve to resume."
+        ),
+    )
+    stream: bool = Field(
+        default=False,
+        description=(
+            "When True returns an SSE stream of node-level events instead of a JSON response."
+        ),
+    )
+
+
+class AIInsightMeta(BaseModel):
+    """Run-level observability attached to deep-dive responses."""
+
+    model_config = ConfigDict(frozen=True)
+
+    run_id: str
+    model: str
+    tokens: int
+    cost_cents: float
+    degraded: bool
+    duration_ms: int
+
+
+class DeepDiveResponse(BaseModel):
+    """Full composite deep-dive result."""
+
+    model_config = ConfigDict(frozen=True)
+
+    narrative: str
+    highlights: list[str]
+    anomalies_list: list[dict]
+    deltas: list[dict]
+    degraded: bool
+    meta: AIInsightMeta
+
+
+class DeepDiveDraft(BaseModel):
+    """202 Accepted response when require_review=True.
+
+    Contains enough information for an analyst to review the draft before
+    approving.  The run_id is required for the /review and /approve endpoints.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    run_id: str
+    tenant_id: str
+    narrative_draft: str
+    highlights_draft: list[str]
+    data_snapshot: dict
+    step_trace: list[dict]
+
+
+class ApproveRequest(BaseModel):
+    """Body for POST /review/{run_id}/approve.
+
+    edits overrides specific keys in the draft (e.g. narrative, highlights).
+    Leave empty to approve as-is.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    narrative: str | None = None
+    highlights: list[str] | None = None

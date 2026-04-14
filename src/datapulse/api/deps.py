@@ -190,8 +190,18 @@ def get_forecasting_service(
 def get_ai_light_service(
     session: Annotated[Session, Depends(get_tenant_session)],
 ) -> AILightService:
-    """Factory for AI-Light service with analytics repo + OpenRouter client."""
+    """Factory for AI-Light service.
+
+    When AI_LIGHT_USE_LANGGRAPH=true returns AILightGraphService (LangGraph-backed).
+    Falls back to the legacy AILightService otherwise.  Both implement the same
+    interface so routes are unaffected.
+    """
     settings = get_settings()
+    if settings.ai_light_use_langgraph:
+        # Lazy import to keep langgraph out of the import path when disabled
+        from datapulse.ai_light.graph_service import AILightGraphService  # noqa: PLC0415
+
+        return AILightGraphService(settings=settings, session=session)  # type: ignore[return-value]
     return AILightService(settings=settings, session=session)
 
 

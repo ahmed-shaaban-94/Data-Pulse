@@ -1,99 +1,105 @@
-"""Token-to-cost mapping, daily cap checker, and invocation persistence for AI-Light.
+"""Token → cost mapping and invocation tracking for AI-Light graph.
 
-Responsibilities
-----------------
-``TOKEN_COST_MAP``         — Per-model cost in USD per 1 000 tokens (input / output).
-``estimate_cost_cents``    — Convert token counts to fractional cents using the map.
-``check_daily_cap``        — Return True if the tenant (or global) daily token budget
-                             is already exhausted; the ``cost_track`` node calls this
-                             before writing and the graph short-circuits to ``fallback``.
-``write_invocation_row``   — Insert one row into ``public.ai_invocations`` as a
-                             fire-and-forget side effect of the ``cost_track`` node.
-
-Implementation note (Phase A-1): ``TOKEN_COST_MAP`` is pre-populated with a
-representative subset of OpenRouter models.  ``estimate_cost_cents``,
-``check_daily_cap``, and ``write_invocation_row`` are stubs — implemented in
-Phase A when the ``cost_track`` node is wired.
+Cost values are approximate (in USD cents per 1k tokens) and updated manually.
+Rounds up to nearest 0.0001 cent for precision without float weirdness.
 """
 
 from __future__ import annotations
 
-from typing import Any
+from decimal import ROUND_UP, Decimal
 
-# ---------------------------------------------------------------------------
-# Per-model cost map (USD per 1 000 tokens, input / output)
-# Source: OpenRouter pricing as of 2026-04.  Update as models change.
-# ---------------------------------------------------------------------------
+from sqlalchemy import text
+from sqlalchemy.orm import Session
 
-TOKEN_COST_MAP: dict[str, dict[str, float]] = {
-    # OpenAI-compatible via OpenRouter
-    "openai/gpt-4o-mini": {"input": 0.000150, "output": 0.000600},
-    "openai/gpt-4o": {"input": 0.002500, "output": 0.010000},
-    # Anthropic via OpenRouter
-    "anthropic/claude-3.5-haiku": {"input": 0.000250, "output": 0.001250},
-    "anthropic/claude-3.5-sonnet": {"input": 0.003000, "output": 0.015000},
-    # Free / default tier (cost is effectively $0 but we still track tokens)
-    "openrouter/free": {"input": 0.0, "output": 0.0},
+from datapulse.logging import get_logger
+
+log = get_logger(__name__)
+
+# Cost in USD cents per 1,000 tokens (input / output)
+# Source: openrouter.ai pricing as of 2026-04
+_COST_TABLE: dict[str, tuple[float, float]] = {
+    "openai/gpt-4o-mini": (0.015, 0.060),       # 0.015 / 0.060 per 1k
+    "openai/gpt-4o": (0.25, 0.75),
+    "anthropic/claude-3.5-haiku": (0.025, 0.125),
+    "anthropic/claude-3.5-sonnet": (0.15, 0.75),
+    "openrouter/free": (0.0, 0.0),
 }
-
-# Fallback pricing for unknown models — conservative estimate.
-_UNKNOWN_MODEL_COST: dict[str, float] = {"input": 0.001000, "output": 0.005000}
+_DEFAULT_COST = (0.05, 0.15)  # conservative fallback for unknown models
 
 
-def estimate_cost_cents(model: str, input_tokens: int, output_tokens: int) -> float:
-    """Return the estimated cost in fractional cents for a single LLM call.
-
-    Parameters
-    ----------
-    model:
-        OpenRouter model identifier (e.g. ``"openai/gpt-4o-mini"``).
-    input_tokens:
-        Number of prompt tokens consumed.
-    output_tokens:
-        Number of completion tokens generated.
-
-    Returns
-    -------
-    float
-        Cost in cents (USD × 100).  Returns 0.0 for models with zero-cost pricing.
-    """
-    raise NotImplementedError("estimate_cost_cents — Phase A")
+def estimate_cost_cents(model: str, input_tokens: int, output_tokens: int) -> Decimal:
+    """Return cost estimate in USD cents (Decimal for DB storage)."""
+    in_rate, out_rate = _COST_TABLE.get(model, _DEFAULT_COST)
+    raw = (input_tokens * in_rate + output_tokens * out_rate) / 1000
+    return Decimal(str(raw)).quantize(Decimal("0.0001"), rounding=ROUND_UP)
 
 
-def check_daily_cap(session: Any, settings: Any, tenant_id: int) -> bool:  # noqa: ARG001
-    """Return True if the daily token budget is exhausted for *tenant_id*.
-
-    Queries ``public.ai_invocations`` for the sum of
-    ``input_tokens + output_tokens`` since midnight UTC.  Compares against
-    ``settings.ai_light_max_tokens_per_day``.
-
-    Implementation note: Phase A implements this.  Returns False (cap not
-    reached) until then so the stub does not block any requests.
-    """
-    return False  # Placeholder — never blocks in Phase A-1
+def check_daily_cap(session: Session, tenant_id: str, max_tokens: int) -> int:
+    """Return tokens used today for this tenant.  0 if ai_invocations doesn't exist yet."""
+    try:
+        row = session.execute(
+            text(
+                """
+                SELECT COALESCE(SUM(input_tokens + output_tokens), 0)
+                FROM   public.ai_invocations
+                WHERE  tenant_id = :tid
+                  AND  created_at >= current_date
+                """
+            ),
+            {"tid": tenant_id},
+        ).scalar()
+        return int(row or 0)
+    except Exception as exc:
+        log.warning("ai_cap_check_failed", error=str(exc))
+        return 0
 
 
 def write_invocation_row(
-    session: Any,
+    session: Session,
     *,
-    tenant_id: int,
+    tenant_id: str,
     run_id: str,
     insight_type: str,
     model: str,
     input_tokens: int,
     output_tokens: int,
-    cost_cents: float,
+    cost_cents: Decimal,
     duration_ms: int,
-    status: str,
+    status: str = "success",
     error_message: str | None = None,
 ) -> None:
-    """Insert one row into ``public.ai_invocations``.
+    """Insert a row into public.ai_invocations (best-effort; never raises)."""
+    try:
+        session.execute(
+            text(
+                """
+                INSERT INTO public.ai_invocations
+                    (tenant_id, run_id, insight_type, model,
+                     input_tokens, output_tokens, cost_cents,
+                     duration_ms, status, error_message)
+                VALUES
+                    (:tenant_id, :run_id::uuid, :insight_type, :model,
+                     :input_tokens, :output_tokens, :cost_cents,
+                     :duration_ms, :status, :error_message)
+                """
+            ),
+            {
+                "tenant_id": int(tenant_id),
+                "run_id": run_id,
+                "insight_type": insight_type,
+                "model": model,
+                "input_tokens": input_tokens,
+                "output_tokens": output_tokens,
+                "cost_cents": cost_cents,
+                "duration_ms": duration_ms,
+                "status": status,
+                "error_message": error_message,
+            },
+        )
+        session.commit()
+    except Exception as exc:
+        import contextlib
 
-    Called as a fire-and-forget side effect from the ``cost_track`` node.
-    Errors are logged but not re-raised (observability must not block the
-    API response).
-
-    Implementation note (Phase A-1): no-op stub.  Phase A implements the
-    ``INSERT`` using raw SQL via ``session.execute(text(...), {...})``.
-    """
-    return  # Placeholder — no-op in Phase A-1
+        log.warning("ai_invocation_write_failed", run_id=run_id, error=str(exc))
+        with contextlib.suppress(Exception):
+            session.rollback()
