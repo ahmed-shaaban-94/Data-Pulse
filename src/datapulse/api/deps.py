@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 from collections.abc import Generator
-from typing import Annotated
+from typing import TYPE_CHECKING, Annotated
+
+if TYPE_CHECKING:
+    from datapulse.inventory.service import InventoryService
 
 import structlog
 from fastapi import Depends
@@ -259,3 +262,13 @@ def get_search_service(
     from datapulse.analytics.search_repository import SearchRepository
 
     return SearchService(SearchRepository(session))
+
+
+def get_inventory_service(
+    session: Annotated[Session, Depends(get_tenant_session)],
+) -> InventoryService:
+    from datapulse.inventory.repository import InventoryRepository
+    from datapulse.inventory.service import InventoryService
+
+    repo = InventoryRepository(session)
+    return InventoryService(repo)

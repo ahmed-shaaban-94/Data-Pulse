@@ -240,6 +240,13 @@ def create_app() -> FastAPI:
         app.include_router(control_center.router, prefix="/api/v1")
         logger.info("control_center_enabled")
 
+    # Pharmaceutical Platform — inventory, expiry, dispensing, POS features
+    if settings.feature_platform:
+        from datapulse.api.routes import inventory as inventory_routes
+
+        app.include_router(inventory_routes.router, prefix="/api/v1")
+        logger.info("feature_platform_enabled")
+
     # Prometheus metrics — exposes /metrics endpoint with HTTP request
     # counters and duration histograms.  Nginx should block external access
     # (only internal/ops scraping).  Excluded paths keep cardinality low.
