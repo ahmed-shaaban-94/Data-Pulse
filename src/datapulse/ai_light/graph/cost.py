@@ -1,70 +1,95 @@
-"""Token→cost mapping and invocation tracking for the AI Light graph."""
+"""Token → cost mapping and invocation tracking for AI-Light graph.
+
+Cost values are approximate (in USD cents per 1k tokens) and updated manually.
+Rounds up to nearest 0.0001 cent for precision without float weirdness.
+"""
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from decimal import ROUND_UP, Decimal
+
+from sqlalchemy import text
+from sqlalchemy.orm import Session
 
 from datapulse.logging import get_logger
 
-if TYPE_CHECKING:
-    from sqlalchemy.orm import Session
-
 log = get_logger(__name__)
 
-# Cost per 1 million tokens in USD cents (as of 2025-Q4).
-# Only models used via OpenRouter are listed here; add more as needed.
-_COST_PER_MILLION: dict[str, dict[str, float]] = {
-    "openai/gpt-4o-mini": {"input": 15.0, "output": 60.0},
-    "openai/gpt-4o": {"input": 250.0, "output": 1000.0},
-    "anthropic/claude-3-5-haiku": {"input": 80.0, "output": 400.0},
-    "anthropic/claude-3-5-sonnet": {"input": 300.0, "output": 1500.0},
-    "openrouter/free": {"input": 0.0, "output": 0.0},
+# Cost in USD cents per 1,000 tokens (input / output)
+# Source: openrouter.ai pricing as of 2026-04
+_COST_TABLE: dict[str, tuple[float, float]] = {
+    "openai/gpt-4o-mini": (0.015, 0.060),       # 0.015 / 0.060 per 1k
+    "openai/gpt-4o": (0.25, 0.75),
+    "anthropic/claude-3.5-haiku": (0.025, 0.125),
+    "anthropic/claude-3.5-sonnet": (0.15, 0.75),
+    "openrouter/free": (0.0, 0.0),
 }
+_DEFAULT_COST = (0.05, 0.15)  # conservative fallback for unknown models
 
-_DEFAULT_COST = {"input": 200.0, "output": 800.0}  # conservative estimate
+
+def estimate_cost_cents(model: str, input_tokens: int, output_tokens: int) -> Decimal:
+    """Return cost estimate in USD cents (Decimal for DB storage)."""
+    in_rate, out_rate = _COST_TABLE.get(model, _DEFAULT_COST)
+    raw = (input_tokens * in_rate + output_tokens * out_rate) / 1000
+    return Decimal(str(raw)).quantize(Decimal("0.0001"), rounding=ROUND_UP)
 
 
-def compute_cost_cents(model: str, input_tokens: int, output_tokens: int) -> float:
-    """Return cost in USD cents for a model invocation."""
-    rates = _COST_PER_MILLION.get(model, _DEFAULT_COST)
-    return (input_tokens * rates["input"] + output_tokens * rates["output"]) / 1_000_000
+def check_daily_cap(session: Session, tenant_id: str, max_tokens: int) -> int:
+    """Return tokens used today for this tenant.  0 if ai_invocations doesn't exist yet."""
+    try:
+        row = session.execute(
+            text(
+                """
+                SELECT COALESCE(SUM(input_tokens + output_tokens), 0)
+                FROM   public.ai_invocations
+                WHERE  tenant_id = :tid
+                  AND  created_at >= current_date
+                """
+            ),
+            {"tid": tenant_id},
+        ).scalar()
+        return int(row or 0)
+    except Exception as exc:
+        log.warning("ai_cap_check_failed", error=str(exc))
+        return 0
 
 
 def write_invocation_row(
     session: Session,
     *,
+    tenant_id: str,
     run_id: str,
     insight_type: str,
     model: str,
-    token_usage: dict[str, int],
-    cost_cents: float,
+    input_tokens: int,
+    output_tokens: int,
+    cost_cents: Decimal,
     duration_ms: int,
     status: str = "success",
     error_message: str | None = None,
-    tenant_id: int = 1,
 ) -> None:
-    """Insert one row into public.ai_invocations (best-effort — never raises)."""
-    from sqlalchemy import text
-
+    """Insert a row into public.ai_invocations (best-effort; never raises)."""
     try:
         session.execute(
-            text("""
+            text(
+                """
                 INSERT INTO public.ai_invocations
                     (tenant_id, run_id, insight_type, model,
                      input_tokens, output_tokens, cost_cents,
                      duration_ms, status, error_message)
                 VALUES
-                    (:tenant_id, :run_id, :insight_type, :model,
+                    (:tenant_id, :run_id::uuid, :insight_type, :model,
                      :input_tokens, :output_tokens, :cost_cents,
                      :duration_ms, :status, :error_message)
-            """),
+                """
+            ),
             {
-                "tenant_id": tenant_id,
+                "tenant_id": int(tenant_id),
                 "run_id": run_id,
                 "insight_type": insight_type,
                 "model": model,
-                "input_tokens": token_usage.get("input", 0),
-                "output_tokens": token_usage.get("output", 0),
+                "input_tokens": input_tokens,
+                "output_tokens": output_tokens,
                 "cost_cents": cost_cents,
                 "duration_ms": duration_ms,
                 "status": status,
@@ -73,5 +98,8 @@ def write_invocation_row(
         )
         session.commit()
     except Exception as exc:
-        log.warning("ai_invocation_write_failed", error=str(exc))
-        session.rollback()
+        import contextlib
+
+        log.warning("ai_invocation_write_failed", run_id=run_id, error=str(exc))
+        with contextlib.suppress(Exception):
+            session.rollback()

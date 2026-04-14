@@ -1,569 +1,450 @@
-"""LangGraph node functions for the AI Light graph.
+"""LangGraph node functions for the AI-Light insight graph.
 
-Every node is a pure function:  ``(state, tools, client, settings) -> dict``
-returning only the *delta* keys it produces. The graph builder wraps these
-in lambdas that supply the closed-over dependencies.
+Each node is a pure function:  state -> dict  (partial state update).
+Nodes never mutate the input state; they return deltas.
 
-Node execution order (non-deep-dive):
-    cache_check → route → plan_* → fetch_data → analyze → validate
-        → synthesize  (happy path)
-        → analyze     (retry, up to 2 times)
-        → fallback    (after 2 retries)
-    cost_track → cache_write → END
+Node execution order (happy path):
+    cache_check -> route -> plan_* -> fetch_data -> analyze
+                -> validate -> synthesize -> cost_track -> cache_write -> END
+
+Phase D additions:
+    synthesize is an interrupt point when state["require_review"] is True.
+    After human approval the graph resumes at synthesize with optional edits merged.
 """
 
 from __future__ import annotations
 
 import json
-import re
 import statistics
 import time
-from collections.abc import Callable
-from datetime import date, timedelta
-from typing import TYPE_CHECKING, Any
+from datetime import UTC, datetime
 
-from datapulse.ai_light.graph.schemas import SCHEMA_REGISTRY
+import httpx
+
+from datapulse.ai_light.graph.cost import estimate_cost_cents, write_invocation_row
+from datapulse.ai_light.graph.prompts import (
+    ANOMALY_PROMPT,
+    CHANGES_PROMPT,
+    DEEP_DIVE_PROMPT,
+    SUMMARY_PROMPT,
+    SYSTEM_PROMPT,
+)
+from datapulse.ai_light.graph.schemas import SCHEMA_MAP
 from datapulse.logging import get_logger
-
-if TYPE_CHECKING:
-    from datapulse.ai_light.client import OpenRouterClient
-    from datapulse.ai_light.graph.state import AILightState
-    from datapulse.config import Settings
 
 log = get_logger(__name__)
 
-_CONTROL_CHARS = re.compile(r"[\x00-\x1f\x7f-\x9f]")
-_INJECTION_RE = re.compile(
-    r"(?i)(ignore\s+(previous|above)|system\s*:|<\s*/?\s*system|you\s+are\s+now)"
-)
+OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions"
+_MAX_TOOL_ITERATIONS = 5
+_MAX_VALIDATE_RETRIES = 2
 
 
-def _sanitize(text: str, max_len: int = 200) -> str:
-    cleaned = _CONTROL_CHARS.sub(" ", str(text))
-    cleaned = _INJECTION_RE.sub("", cleaned)
-    return cleaned.strip()[:max_len]
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+def _now_ts() -> str:
+    return datetime.now(UTC).isoformat()
 
 
-def _trace(node: str, **extra: Any) -> dict[str, Any]:
-    return {"node": node, "ts": time.time(), **extra}
+def _step(node: str, status: str, **extra) -> dict:
+    return {"step_trace": [{"node": node, "ts": _now_ts(), "status": status, **extra}]}
 
 
-# ── plan nodes ────────────────────────────────────────────────────────────
+def _call_openrouter(
+    api_key: str,
+    model: str,
+    system: str,
+    user: str,
+    temperature: float = 0.3,
+) -> tuple[str, dict]:
+    """Call OpenRouter and return (content, usage_dict).  Raises on failure."""
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+        "HTTP-Referer": "https://datapulse.dev",
+        "X-Title": "DataPulse AI-Light",
+    }
+    payload = {
+        "model": model,
+        "messages": [
+            {"role": "system", "content": system},
+            {"role": "user", "content": user},
+        ],
+        "temperature": temperature,
+        "max_tokens": 2048,
+    }
+    resp = httpx.post(OPENROUTER_API_URL, json=payload, headers=headers, timeout=45)
+    resp.raise_for_status()
+    data = resp.json()
+    content = data["choices"][0]["message"]["content"]
+    usage = data.get("usage", {})
+    return content, usage
 
 
-def plan_summary(state: AILightState) -> dict[str, Any]:
-    """Declare the tool calls needed for the summary path."""
+def _parse_json(raw: str) -> dict | list:
+    cleaned = raw.strip()
+    if cleaned.startswith("```"):
+        lines = [ln for ln in cleaned.split("\n") if not ln.strip().startswith("```")]
+        cleaned = "\n".join(lines)
+    return json.loads(cleaned)
+
+
+# ---------------------------------------------------------------------------
+# cache_check
+# ---------------------------------------------------------------------------
+
+def cache_check(state: dict) -> dict:
+    """Check Redis for a cached response.  Returns cache_hit=True and pre-fills
+    outputs if found, or cache_hit=False to continue the graph."""
+    # Redis cache check is handled by graph_service.py before invoking the graph.
+    # Nodes don't have direct access to Redis; the service short-circuits instead.
+    return {**_step("cache_check", "pass"), "cache_hit": False}
+
+
+# ---------------------------------------------------------------------------
+# route  (no-op — handled by conditional edge in builder)
+# ---------------------------------------------------------------------------
+
+def route(state: dict) -> dict:
+    return _step("route", "pass")
+
+
+# ---------------------------------------------------------------------------
+# plan_* nodes
+# ---------------------------------------------------------------------------
+
+def plan_summary(state: dict) -> dict:
     return {
-        "step_trace": [_trace("plan_summary")],
-        "_tools_plan": ["get_kpi_summary", "get_top_products", "get_top_customers"],
+        **_step("plan_summary", "pass"),
+        "planned_tools": ["get_kpi_summary", "get_top_products", "get_top_customers"],
     }
 
 
-def plan_anomalies(state: AILightState) -> dict[str, Any]:
-    """Declare tool calls needed for anomaly detection.
-
-    Fetches daily trend data + active monitoring alerts so the LLM can
-    combine statistical signals with pre-existing alert context.
-    """
+def plan_anomalies(state: dict) -> dict:
     return {
-        "step_trace": [_trace("plan_anomalies")],
-        "_tools_plan": ["get_daily_trend", "get_active_anomaly_alerts"],
+        **_step("plan_anomalies", "pass"),
+        "planned_tools": ["get_daily_trend", "get_active_anomaly_alerts"],
     }
 
 
-def plan_changes(state: AILightState) -> dict[str, Any]:
-    """Declare tool calls needed for change narrative.
-
-    Fetches KPI snapshots for both periods plus top gainers/losers and
-    top staff, giving the LLM multi-dimensional change context.
-    """
+def plan_changes(state: dict) -> dict:
     return {
-        "step_trace": [_trace("plan_changes")],
-        "_tools_plan": [
-            "get_kpi_current",
-            "get_kpi_previous",
-            "get_top_gainers",
-            "get_top_losers",
-            "get_top_staff",
+        **_step("plan_changes", "pass"),
+        "planned_tools": ["get_kpi_summary"],
+    }
+
+
+def plan_deep_dive(state: dict) -> dict:
+    return {
+        **_step("plan_deep_dive", "pass"),
+        "planned_tools": [
+            "get_kpi_summary", "get_daily_trend", "get_monthly_trend",
+            "get_top_products", "get_top_customers",
+            "get_active_anomaly_alerts", "get_forecast_summary", "get_target_vs_actual",
         ],
     }
 
 
-# ── fetch_data node ───────────────────────────────────────────────────────
+# ---------------------------------------------------------------------------
+# fetch_data
+# ---------------------------------------------------------------------------
 
+def fetch_data(state: dict) -> dict:
+    """Execute pre-planned tool calls using closures bound to the tenant session.
 
-def make_fetch_data_node(
-    tools: dict[str, Callable[..., dict[str, Any]]],
-) -> Callable[[AILightState], dict[str, Any]]:
-    """Return a fetch_data node closed over *tools*."""
+    For Phase A–C the tool registry (injected via state["_tools"]) maps tool
+    names to callables.  For deep_dive the same registry is used; the
+    plan_deep_dive node pre-selects which tools to run.
 
-    def fetch_data(state: AILightState) -> dict[str, Any]:  # noqa: C901 (acceptable complexity)
-        insight = state.get("insight_type", "summary")
-        start = state.get("start_date")
-        end = state.get("end_date")
-        target = state.get("target_date")
-        current = state.get("current_date")
-        previous = state.get("previous_date")
-        updates: dict[str, Any] = {"step_trace": [_trace("fetch_data", insight=insight)]}
+    If a tool raises, it is logged and omitted (degraded mode).
+    """
+    tools: dict = state.get("_tools", {})
+    planned: list[str] = state.get("planned_tools", [])
 
+    results: dict = {}
+    errors: list[str] = []
+
+    for tool_name in planned:
+        fn = tools.get(tool_name)
+        if fn is None:
+            continue
         try:
-            if insight == "summary":
-                updates["kpi_data"] = tools["get_kpi_summary"](target_date=target)
-                updates["top_products"] = tools["get_top_products"](start_date=start, end_date=end)
-                updates["top_customers"] = tools["get_top_customers"](
-                    start_date=start, end_date=end
-                )
-
-            elif insight == "anomalies":
-                updates["daily_trend"] = tools["get_daily_trend"](start_date=start, end_date=end)
-                updates["anomaly_alerts"] = tools["get_active_anomaly_alerts"](limit=10).get(
-                    "alerts", []
-                )
-
-            elif insight == "changes":
-                updates["kpi_current"] = tools["get_kpi_summary"](target_date=current)
-                updates["kpi_previous"] = tools["get_kpi_summary"](target_date=previous)
-
-                # Build date windows for movers: 30-day window around each anchor date
-                if current and previous:
-                    curr_end = current
-                    curr_start = current - timedelta(days=30)
-                    prev_end = previous
-                    prev_start = previous - timedelta(days=30)
-
-                    gainers = tools["get_top_gainers"](
-                        current_start=curr_start,
-                        current_end=curr_end,
-                        previous_start=prev_start,
-                        previous_end=prev_end,
-                    )
-                    losers = tools["get_top_losers"](
-                        current_start=curr_start,
-                        current_end=curr_end,
-                        previous_start=prev_start,
-                        previous_end=prev_end,
-                    )
-                    staff = tools["get_top_staff"](start_date=curr_start, end_date=curr_end)
-                    updates["top_gainers"] = gainers
-                    updates["top_losers"] = losers
-                    updates["top_staff"] = staff
-
+            results[tool_name] = fn()
         except Exception as exc:
-            log.error("fetch_data_failed", error=str(exc), insight=insight)
-            existing = list(state.get("errors") or [])
-            updates["errors"] = [*existing, f"fetch_data: {exc}"]
+            log.warning("tool_call_failed", tool=tool_name, error=str(exc))
+            errors.append(f"{tool_name}: {exc}")
 
-        return updates
-
-    return fetch_data
-
-
-# ── analyze node ─────────────────────────────────────────────────────────
-
-
-def _build_anomaly_stats(daily_trend: dict[str, Any]) -> dict[str, Any]:
-    """Compute statistical summary from daily trend data."""
-    points = daily_trend.get("points", [])
-    values = [float(p.get("value", 0)) for p in points if p.get("value") is not None]
-    if len(values) < 2:
-        return {"avg": 0.0, "std": 0.0, "min": 0.0, "max": 0.0, "count": len(values)}
-    avg = statistics.mean(values)
-    std = statistics.stdev(values)
     return {
-        "avg": round(avg, 2),
-        "std": round(std, 2),
-        "min": round(min(values), 2),
-        "max": round(max(values), 2),
-        "count": len(values),
+        **_step("fetch_data", "done", tools_executed=list(results.keys())),
+        "fetched_data": results,
+        "errors": errors,
     }
 
 
-def _build_changes_stats(
-    kpi_current: dict[str, Any], kpi_previous: dict[str, Any]
-) -> dict[str, Any]:
-    """Compute period-over-period deltas for the statistical_analysis."""
-    metrics = [
-        "today_gross",
-        "mtd_gross",
-        "ytd_gross",
-        "daily_transactions",
-        "daily_customers",
-    ]
-    deltas: list[dict[str, Any]] = []
-    for m in metrics:
-        curr = float(kpi_current.get(m, 0) or 0)
-        prev = float(kpi_previous.get(m, 0) or 0)
-        pct = ((curr - prev) / abs(prev) * 100) if prev != 0 else 0.0
-        deltas.append(
-            {
-                "metric": m,
-                "current_value": curr,
-                "previous_value": prev,
-                "change_pct": round(pct, 2),
-                "direction": "up" if pct > 1 else ("down" if pct < -1 else "flat"),
-            }
-        )
-    return {"deltas": deltas}
+# ---------------------------------------------------------------------------
+# analyze
+# ---------------------------------------------------------------------------
 
+def analyze(state: dict) -> dict:
+    """Run statistical analysis and call OpenRouter for the narrative."""
+    api_key: str = state.get("_openrouter_api_key", "")
+    model: str = state.get("_openrouter_model", "openrouter/free")
+    insight_type: str = state.get("insight_type", "summary")
+    fetched: dict = state.get("fetched_data", {})
+    retries: int = state.get("validation_retries", 0)
 
-def make_analyze_node(
-    client: OpenRouterClient,
-    settings: Settings,
-) -> Callable[[AILightState], dict[str, Any]]:
-    """Return an analyze node closed over *client*."""
+    # --- Statistical analysis (always; used as fallback too) ---
+    stats: dict = {}
+    daily = fetched.get("get_daily_trend", {})
+    if daily and "points" in daily:
+        values = [float(p.get("value", 0)) for p in daily["points"]]
+        if len(values) >= 2:
+            stats["mean"] = round(statistics.mean(values), 2)
+            stats["stdev"] = round(statistics.stdev(values), 2)
+            stats["min"] = round(min(values), 2)
+            stats["max"] = round(max(values), 2)
 
-    from datapulse.ai_light.graph.prompts import (
-        ANOMALY_PROMPT_V2,
-        CHANGES_PROMPT_V2,
-        SUMMARY_PROMPT_V2,
-        SYSTEM_PROMPT,
-    )
-
-    def analyze(state: AILightState) -> dict[str, Any]:  # noqa: C901
-        insight = state.get("insight_type", "summary")
-        updates: dict[str, Any] = {"step_trace": [_trace("analyze", insight=insight)]}
-        stat_analysis: dict[str, Any] = {}
-        prompt: str | None = None
-
-        # Build statistical analysis + prompt per insight type
-        if insight == "summary":
-            kpi = state.get("kpi_data") or {}
-            top_products = state.get("top_products") or {}
-            top_customers = state.get("top_customers") or {}
-
-            products_text = "\n".join(
-                f"  {i.get('rank', idx + 1)}. {_sanitize(i.get('name', ''))}: "
-                f"{float(i.get('value', 0)):,.0f} EGP"
-                for idx, i in enumerate((top_products.get("items") or [])[:5])
-            )
-            customers_text = "\n".join(
-                f"  {i.get('rank', idx + 1)}. {_sanitize(i.get('name', ''))}: "
-                f"{float(i.get('value', 0)):,.0f} EGP"
-                for idx, i in enumerate((top_customers.get("items") or [])[:5])
-            )
-            stat_analysis = {
-                "today_gross": kpi.get("today_gross", 0),
-                "mtd_gross": kpi.get("mtd_gross", 0),
-            }
-            prompt = SUMMARY_PROMPT_V2.format(
-                today_gross=f"{float(kpi.get('today_gross', 0)):,.0f}",
-                mtd_gross=f"{float(kpi.get('mtd_gross', 0)):,.0f}",
-                ytd_gross=f"{float(kpi.get('ytd_gross', 0)):,.0f}",
-                mom_growth=f"{float(kpi.get('mom_growth_pct') or 0):.1f}",
-                yoy_growth=f"{float(kpi.get('yoy_growth_pct') or 0):.1f}",
-                daily_transactions=kpi.get("daily_transactions", 0),
-                daily_customers=kpi.get("daily_customers", 0),
-                top_products=products_text or "No data",
-                top_customers=customers_text or "No data",
-            )
-
-        elif insight == "anomalies":
-            daily = state.get("daily_trend") or {}
-            alerts = state.get("anomaly_alerts") or []
-            stat_analysis = _build_anomaly_stats(daily)
-            points = daily.get("points", [])
-            daily_text = "\n".join(
-                f"  {_sanitize(p.get('period', ''))}: {float(p.get('value', 0)):,.0f} EGP"
-                for p in points
-            )
-            alerts_text = (
-                "\n".join(
-                    f"  - {_sanitize(a.get('metric', ''))}: {a.get('severity', 'medium')} "
-                    f"severity on {_sanitize(a.get('period', ''))}"
-                    for a in alerts[:5]
-                )
-                or "None"
-            )
-            prompt = ANOMALY_PROMPT_V2.format(
-                daily_data=daily_text or "No data",
-                avg=f"{stat_analysis['avg']:,.0f}",
-                std_dev=f"{stat_analysis['std']:,.0f}",
-                min_val=f"{stat_analysis['min']:,.0f}",
-                max_val=f"{stat_analysis['max']:,.0f}",
-                active_alerts=alerts_text,
-            )
-
-        elif insight == "changes":
-            kpi_curr = state.get("kpi_current") or {}
-            kpi_prev = state.get("kpi_previous") or {}
-            stat_analysis = _build_changes_stats(kpi_curr, kpi_prev)
-            gainers = state.get("top_gainers") or {}
-            losers = state.get("top_losers") or {}
-            staff = state.get("top_staff") or {}
-
-            def _fmt_movers(items: list) -> str:
-                return (
-                    ", ".join(
-                        f"{_sanitize(m.get('name', ''))}: {float(m.get('change_pct', 0)):+.1f}%"
-                        for m in items[:3]
-                    )
-                    or "None"
-                )
-
-            def _fmt_staff(items: list) -> str:
-                return (
-                    ", ".join(
-                        f"{_sanitize(m.get('name', ''))}: {float(m.get('value', 0)):,.0f} EGP"
-                        for m in items[:3]
-                    )
-                    or "None"
-                )
-
-            current_dt = state.get("current_date") or date.today()
-            previous_dt = state.get("previous_date") or (current_dt - timedelta(days=30))
-
-            prompt = CHANGES_PROMPT_V2.format(
-                current_period=current_dt.isoformat(),
-                previous_period=previous_dt.isoformat(),
-                current_net=f"{float(kpi_curr.get('today_gross', 0)):,.0f}",
-                current_txns=kpi_curr.get("daily_transactions", 0),
-                current_customers=kpi_curr.get("daily_customers", 0),
-                previous_net=f"{float(kpi_prev.get('today_gross', 0)):,.0f}",
-                previous_txns=kpi_prev.get("daily_transactions", 0),
-                previous_customers=kpi_prev.get("daily_customers", 0),
-                top_gainers=_fmt_movers(gainers.get("gainers") or []),
-                top_losers=_fmt_movers(losers.get("losers") or []),
-                top_staff=_fmt_staff(staff.get("items") or []),
-            )
-
-        updates["statistical_analysis"] = stat_analysis
-
-        # LLM call — skip if no prompt or client unconfigured
-        if prompt and client.is_configured:
-            try:
-                raw = client.chat(SYSTEM_PROMPT, prompt, temperature=0.2)
-                updates["llm_raw_output"] = raw
-                updates["model_used"] = getattr(settings, "openrouter_model", "unknown")
-                # Best-effort token usage (may not be returned by all models)
-                updates["token_usage"] = {"input": 0, "output": 0, "total": 0}
-                # Parse JSON
-                cleaned = raw.strip()
-                if cleaned.startswith("```"):
-                    lines = [ln for ln in cleaned.split("\n") if not ln.strip().startswith("```")]
-                    cleaned = "\n".join(lines)
-                parsed = json.loads(cleaned)
-                updates["llm_parsed_output"] = parsed
-            except json.JSONDecodeError as exc:
-                log.warning("analyze_json_parse_failed", error=str(exc))
-                existing = list(state.get("errors") or [])
-                updates["errors"] = [*existing, f"json_parse: {exc}"]
-            except Exception as exc:
-                log.warning("analyze_llm_failed", error=str(exc))
-                existing = list(state.get("errors") or [])
-                updates["errors"] = [*existing, f"llm: {exc}"]
-
-        return updates
-
-    return analyze
-
-
-# ── validate node ─────────────────────────────────────────────────────────
-
-
-def validate(state: AILightState) -> dict[str, Any]:
-    """Validate llm_parsed_output against the insight-type Pydantic schema.
-
-    Returns:
-        ``validation_retries`` incremented by 1 if validation fails.
-        No changes on success (edges handle routing).
-    """
-    insight = state.get("insight_type", "summary")
-    parsed = state.get("llm_parsed_output")
-
-    if parsed is None:
-        retries = (state.get("validation_retries") or 0) + 1
-        log.warning("validate_no_output", retries=retries)
+    if not api_key:
         return {
-            "validation_retries": retries,
-            "step_trace": [_trace("validate", result="no_output", retries=retries)],
+            **_step("analyze", "no_api_key"),
+            "statistical_analysis": stats,
+            "llm_raw_output": None,
+            "llm_parsed_output": None,
+            "token_usage": {"input": 0, "output": 0, "total": 0},
         }
 
-    schema_cls = SCHEMA_REGISTRY.get(insight)
+    # --- Build prompt based on insight_type ---
+    prompt = _build_prompt(insight_type, fetched, state, stats)
+
+    try:
+        raw, usage = _call_openrouter(api_key, model, SYSTEM_PROMPT, prompt)
+        parsed = _parse_json(raw)
+        return {
+            **_step("analyze", "done", attempt=retries),
+            "statistical_analysis": stats,
+            "llm_raw_output": raw,
+            "llm_parsed_output": parsed if isinstance(parsed, dict) else {"items": parsed},
+            "model_used": model,
+            "token_usage": {
+                "input": usage.get("prompt_tokens", 0),
+                "output": usage.get("completion_tokens", 0),
+                "total": usage.get("total_tokens", 0),
+            },
+        }
+    except Exception as exc:
+        log.warning("analyze_failed", error=str(exc), attempt=retries)
+        return {
+            **_step("analyze", "error", error=str(exc)),
+            "statistical_analysis": stats,
+            "llm_raw_output": None,
+            "llm_parsed_output": None,
+            "errors": [f"analyze: {exc}"],
+            "token_usage": {"input": 0, "output": 0, "total": 0},
+        }
+
+
+def _build_prompt(insight_type: str, fetched: dict, state: dict, stats: dict) -> str:
+    kpi = fetched.get("get_kpi_summary", {})
+    daily = fetched.get("get_daily_trend", {})
+    points = daily.get("points", [])
+
+    if insight_type == "summary":
+        top_products = fetched.get("get_top_products", {}).get("items", [])
+        top_customers = fetched.get("get_top_customers", {}).get("items", [])
+        return SUMMARY_PROMPT.format(
+            today_date=state.get("target_date", "today"),
+            today_gross=f"{kpi.get('today_gross', 0):,.0f}",
+            mtd_gross=f"{kpi.get('mtd_gross', 0):,.0f}",
+            ytd_gross=f"{kpi.get('ytd_gross', 0):,.0f}",
+            mom_growth=f"{kpi.get('mom_growth_pct') or 0:.1f}",
+            yoy_growth=f"{kpi.get('yoy_growth_pct') or 0:.1f}",
+            daily_transactions=kpi.get("daily_transactions", 0),
+            daily_customers=kpi.get("daily_customers", 0),
+            top_products="\n".join(
+                f"  {i+1}. {p.get('name','')}: {p.get('value',0):,.0f} EGP"
+                for i, p in enumerate(top_products[:5])
+            ),
+            top_customers="\n".join(
+                f"  {i+1}. {c.get('name','')}: {c.get('value',0):,.0f} EGP"
+                for i, c in enumerate(top_customers[:5])
+            ),
+        )
+
+    if insight_type == "anomalies":
+        daily_text = "\n".join(
+            f"  {p.get('period','')}: {p.get('value',0):,.0f} EGP" for p in points
+        )
+        return ANOMALY_PROMPT.format(
+            daily_data=daily_text or "(no data)",
+            avg=f"{stats.get('mean', 0):,.0f}",
+            std_dev=f"{stats.get('stdev', 0):,.0f}",
+            min_val=f"{stats.get('min', 0):,.0f}",
+            max_val=f"{stats.get('max', 0):,.0f}",
+        )
+
+    if insight_type == "changes":
+        kpi2 = fetched.get("get_kpi_summary_previous", kpi)
+        return CHANGES_PROMPT.format(
+            current_period=state.get("end_date", "current"),
+            previous_period=state.get("start_date", "previous"),
+            current_net=f"{kpi.get('today_gross', 0):,.0f}",
+            current_txns=kpi.get("daily_transactions", 0),
+            current_customers=kpi.get("daily_customers", 0),
+            previous_net=f"{kpi2.get('today_gross', 0):,.0f}",
+            previous_txns=kpi2.get("daily_transactions", 0),
+            previous_customers=kpi2.get("daily_customers", 0),
+            top_movers="(see data above)",
+        )
+
+    # deep_dive
+    return DEEP_DIVE_PROMPT.format(
+        start_date=state.get("start_date", ""),
+        end_date=state.get("end_date", ""),
+    )
+
+
+# ---------------------------------------------------------------------------
+# validate
+# ---------------------------------------------------------------------------
+
+def validate(state: dict) -> dict:
+    """Validate LLM output against the Pydantic schema for this insight type.
+
+    Returns validation_retries unchanged on success, incremented on failure.
+    The conditional edge uses this to route to analyze (retry) or fallback.
+    """
+    insight_type: str = state.get("insight_type", "summary")
+    parsed = state.get("llm_parsed_output")
+    retries: int = state.get("validation_retries", 0)
+
+    if parsed is None:
+        return {
+            **_step("validate", "null_output"),
+            "validation_retries": retries + 1,
+            "errors": ["validate: llm_parsed_output is None"],
+        }
+
+    schema_cls = SCHEMA_MAP.get(insight_type)
     if schema_cls is None:
-        # Unknown type — pass through
-        return {"step_trace": [_trace("validate", result="unknown_type")]}
+        return {**_step("validate", "no_schema"), "validation_retries": retries}
 
     try:
         schema_cls.model_validate(parsed)
-        return {"step_trace": [_trace("validate", result="ok")]}
+        return {**_step("validate", "ok"), "validation_retries": retries}
     except Exception as exc:
-        retries = (state.get("validation_retries") or 0) + 1
-        log.warning("validate_schema_failed", insight=insight, retries=retries, error=str(exc))
-        existing = list(state.get("errors") or [])
+        log.warning("validation_failed", insight_type=insight_type, error=str(exc))
         return {
-            "validation_retries": retries,
-            "errors": [*existing, f"validation: {exc}"],
-            "step_trace": [_trace("validate", result="failed", retries=retries)],
+            **_step("validate", "schema_error", error=str(exc)),
+            "validation_retries": retries + 1,
+            "errors": [f"validate: {exc}"],
         }
 
 
-# ── fallback node ─────────────────────────────────────────────────────────
+# ---------------------------------------------------------------------------
+# fallback
+# ---------------------------------------------------------------------------
 
+def fallback(state: dict) -> dict:
+    """Stats-only narrative when LLM validation exhausted or circuit open."""
+    stats = state.get("statistical_analysis") or {}
+    insight_type = state.get("insight_type", "summary")
 
-def fallback(state: AILightState) -> dict[str, Any]:
-    """Produce a stats-only response when LLM validation fails after max retries.
+    if stats:
+        narrative = (
+            f"Statistical summary ({insight_type}): "
+            f"mean={stats.get('mean', 'N/A')}, "
+            f"std={stats.get('stdev', 'N/A')}, "
+            f"range=[{stats.get('min', 'N/A')}, {stats.get('max', 'N/A')}]."
+        )
+    else:
+        narrative = f"Insight generation encountered an error. Please retry. ({insight_type})"
 
-    Contract: must return the exact same shape as ``synthesize``.
-    ``degraded=True`` signals to callers that the LLM path was not used.
-    """
-    insight = state.get("insight_type", "summary")
-    updates: dict[str, Any] = {
+    return {
+        **_step("fallback", "degraded"),
+        "narrative": narrative,
+        "highlights": ["Statistical analysis used; AI narrative unavailable."],
+        "anomalies_list": [],
+        "deltas": [],
         "degraded": True,
-        "step_trace": [_trace("fallback", insight=insight)],
     }
 
-    if insight == "summary":
-        kpi = state.get("kpi_data") or {}
-        gross = float(kpi.get("today_gross", 0))
-        mtd = float(kpi.get("mtd_gross", 0))
-        updates["narrative"] = (
-            f"Today's gross sales: {gross:,.0f} EGP. "
-            f"Month-to-date: {mtd:,.0f} EGP. "
-            "(AI narrative unavailable — statistical summary only.)"
-        )
-        updates["highlights"] = [
-            f"Today gross: {gross:,.0f} EGP",
-            f"MTD: {mtd:,.0f} EGP",
-        ]
-        updates["anomalies_list"] = None
-        updates["deltas"] = None
 
-    elif insight == "anomalies":
-        stat = state.get("statistical_analysis") or {}
-        updates["narrative"] = (
-            f"Statistical analysis detected anomalies in daily sales data. "
-            f"Average: {stat.get('avg', 0):,.0f} EGP, "
-            f"Std dev: {stat.get('std', 0):,.0f} EGP. "
-            "(AI narrative unavailable — statistical summary only.)"
-        )
-        updates["highlights"] = None
-        updates["anomalies_list"] = []
-        updates["deltas"] = None
+# ---------------------------------------------------------------------------
+# synthesize  (Phase D: interrupt point for HITL)
+# ---------------------------------------------------------------------------
 
-    elif insight == "changes":
-        stat = state.get("statistical_analysis") or {}
-        deltas = stat.get("deltas", [])
-        parts = [
-            f"{d['metric']}: {d['current_value']:,.0f} "
-            f"({d['direction']} {abs(d['change_pct']):.1f}%)"
-            for d in deltas
-        ]
-        updates["narrative"] = (
-            "Period comparison: " + "; ".join(parts) + ". (AI narrative unavailable.)"
-        )
-        updates["highlights"] = None
-        updates["anomalies_list"] = None
-        updates["deltas"] = deltas
+def synthesize(state: dict) -> dict:
+    """Compose the final response from validated LLM output.
 
-    else:
-        updates["narrative"] = "AI analysis unavailable — statistical fallback."
-        updates["highlights"] = None
-        updates["anomalies_list"] = None
-        updates["deltas"] = None
-
-    return updates
-
-
-# ── synthesize node ───────────────────────────────────────────────────────
-
-
-def synthesize(state: AILightState) -> dict[str, Any]:
-    """Compose final output from validated LLM output + statistical analysis.
-
-    Contract: produces the same keys as ``fallback`` with ``degraded=False``.
+    Phase D: when require_review=True this node is the interrupt point.
+    After interrupt_before=["synthesize"] fires, the run pauses here.
+    On resume (POST /approve), human edits are merged into state before
+    this node executes.
     """
-    insight = state.get("insight_type", "summary")
     parsed = state.get("llm_parsed_output") or {}
-    stat = state.get("statistical_analysis") or {}
-    updates: dict[str, Any] = {
+    human_edits: dict = state.get("human_edits") or {}
+
+    # Merge human edits (override specific keys)
+    effective = {**parsed, **human_edits}
+
+    narrative = effective.get("narrative", "")
+    highlights = effective.get("highlights", [])
+    anomalies_list = effective.get("anomalies", effective.get("anomalies_list", []))
+    deltas = effective.get("deltas", [])
+
+    return {
+        **_step("synthesize", "done"),
+        "narrative": narrative,
+        "highlights": highlights if isinstance(highlights, list) else [],
+        "anomalies_list": anomalies_list if isinstance(anomalies_list, list) else [],
+        "deltas": deltas if isinstance(deltas, list) else [],
         "degraded": False,
-        "step_trace": [_trace("synthesize", insight=insight)],
     }
 
-    if insight == "summary":
-        updates["narrative"] = parsed.get("narrative", "")
-        updates["highlights"] = parsed.get("highlights", [])
-        updates["anomalies_list"] = None
-        updates["deltas"] = None
 
-    elif insight == "anomalies":
-        raw_anomalies = parsed.get("anomalies", [])
-        updates["narrative"] = parsed.get("narrative", "")
-        updates["highlights"] = None
-        updates["anomalies_list"] = [
-            {
-                "date": a.get("date", ""),
-                "description": _sanitize(a.get("description", ""), 500),
-                "severity": (
-                    a.get("severity", "low")
-                    if a.get("severity") in ("low", "medium", "high")
-                    else "low"
-                ),
-            }
-            for a in raw_anomalies
-            if isinstance(a, dict)
-        ]
-        updates["deltas"] = None
+# ---------------------------------------------------------------------------
+# cost_track
+# ---------------------------------------------------------------------------
 
-    elif insight == "changes":
-        updates["narrative"] = parsed.get("narrative", "")
-        updates["highlights"] = parsed.get("key_changes", [])
-        updates["anomalies_list"] = None
-        updates["deltas"] = stat.get("deltas")
+def cost_track(state: dict) -> dict:
+    """Write an ai_invocations row (best-effort; never raises)."""
+    session = state.get("_session")
+    if session is None:
+        return _step("cost_track", "skip_no_session")
 
-    else:
-        updates["narrative"] = parsed.get("narrative", "")
-        updates["highlights"] = None
-        updates["anomalies_list"] = None
-        updates["deltas"] = None
+    usage = state.get("token_usage") or {}
+    input_t = int(usage.get("input", 0))
+    output_t = int(usage.get("output", 0))
+    model = state.get("model_used", "")
+    cost = estimate_cost_cents(model, input_t, output_t)
+    start_ms = state.get("_start_ms", 0)
+    duration = int((time.monotonic() * 1000) - start_ms) if start_ms else 0
+    status = "degraded" if state.get("degraded") else "success"
+    errors = state.get("errors", [])
+    if errors:
+        status = "error" if not state.get("narrative") else status
 
-    return updates
-
-
-# ── cost_track node ───────────────────────────────────────────────────────
+    write_invocation_row(
+        session,
+        tenant_id=str(state.get("tenant_id", "1")),
+        run_id=state.get("run_id", ""),
+        insight_type=state.get("insight_type", "unknown"),
+        model=model,
+        input_tokens=input_t,
+        output_tokens=output_t,
+        cost_cents=cost,
+        duration_ms=duration,
+        status=status,
+        error_message="; ".join(errors) if errors else None,
+    )
+    return {**_step("cost_track", "done"), "cost_cents": float(cost)}
 
 
-def make_cost_track_node(
-    session: Any,
-    start_time_ref: list[float],
-) -> Callable[[AILightState], dict[str, Any]]:
-    """Return a cost_track node that writes to ai_invocations."""
+# ---------------------------------------------------------------------------
+# cache_write
+# ---------------------------------------------------------------------------
 
-    def cost_track(state: AILightState) -> dict[str, Any]:
-        from datapulse.ai_light.graph.cost import compute_cost_cents, write_invocation_row
-
-        token_usage = state.get("token_usage") or {}
-        model = state.get("model_used") or ""
-        cost = compute_cost_cents(
-            model,
-            token_usage.get("input", 0),
-            token_usage.get("output", 0),
-        )
-        t_start = start_time_ref[0] if start_time_ref else time.time()
-        duration_ms = int((time.time() - t_start) * 1000)
-        status = "degraded" if state.get("degraded") else "success"
-        errors = state.get("errors") or []
-
-        try:
-            tid_str = state.get("tenant_id", "1")
-            write_invocation_row(
-                session,
-                run_id=state.get("run_id", ""),
-                insight_type=state.get("insight_type", ""),
-                model=model,
-                token_usage=token_usage,
-                cost_cents=cost,
-                duration_ms=duration_ms,
-                status=status,
-                error_message="; ".join(errors[:3]) if errors else None,
-                tenant_id=int(tid_str) if str(tid_str).isdigit() else 1,
-            )
-        except Exception as exc:
-            log.warning("cost_track_write_failed", error=str(exc))
-
-        return {
-            "cost_cents": cost,
-            "step_trace": [_trace("cost_track", cost_cents=cost, status=status)],
-        }
-
-    return cost_track
+def cache_write(state: dict) -> dict:
+    """Write result to Redis (delegated to graph_service; node is a no-op marker)."""
+    return _step("cache_write", "delegated")

@@ -1,13 +1,11 @@
-"""AI-Light module — summaries, anomaly detection, change narratives via OpenRouter."""
+"""AI-Light module — summaries, anomaly detection, change narratives via OpenRouter.
+
+Phase D: LangGraph orchestration, HITL approval, SSE streaming.
+"""
 
 from datapulse.ai_light.service import AILightService
 
-__all__ = ["AILightService", "AILightGraphService"]
+__all__ = ["AILightService"]
 
-
-def __getattr__(name: str) -> object:
-    if name == "AILightGraphService":
-        from datapulse.ai_light.graph_service import AILightGraphService
-
-        return AILightGraphService
-    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+# AILightGraphService and build_graph are lazy-imported in deps.py to keep
+# langgraph out of the critical import path when the feature flag is off.

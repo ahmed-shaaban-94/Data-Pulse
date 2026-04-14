@@ -1,79 +1,86 @@
-"""V2 prompt templates for the AI Light LangGraph nodes.
+"""LangGraph v2 prompts for AI-Light insight generation.
 
-PROMPT_VERSION is embedded in cache keys so that updating a prompt
-automatically invalidates cached responses.
+PROMPT_VERSION is embedded in cache keys so bumping it auto-invalidates
+all cached AI outputs without touching Redis directly.
 """
 
 from __future__ import annotations
 
-PROMPT_VERSION = "2.0"
+PROMPT_VERSION = "v2.0"
 
-SYSTEM_PROMPT = (
-    "You are a business analytics assistant for DataPulse, a pharma/sales analytics platform. "
-    "You analyze sales data and provide concise, actionable insights in English. "
-    "Keep responses short and data-driven. Use bullet points for highlights. "
-    "Currency is EGP (Egyptian Pounds). All numbers should be formatted clearly. "
-    "Always return valid JSON — no markdown code fences, no extra text."
-)
+SYSTEM_PROMPT = """You are DataPulse, an expert business analyst AI for a sales analytics platform.
+Respond with concise, actionable insights. Use precise numbers from the data provided.
+Return only well-formed JSON when asked for JSON output.
+Never fabricate data. If a metric is unavailable, omit it rather than guessing."""
 
-SUMMARY_PROMPT_V2 = """\
-Analyze the following sales data and write a brief executive summary.
-Return valid JSON with schema: {{"narrative": "...", "highlights": ["...", ...]}}
+SUMMARY_PROMPT = """Analyze the following sales data and generate an executive summary.
 
-**KPI Snapshot:**
-- Today's Gross Sales: {today_gross} EGP
-- Month-to-Date: {mtd_gross} EGP
-- Year-to-Date: {ytd_gross} EGP
+Today ({today_date}):
+- Gross Sales: {today_gross} EGP
+- MTD Gross: {mtd_gross} EGP
+- YTD Gross: {ytd_gross} EGP
 - MoM Growth: {mom_growth}%
 - YoY Growth: {yoy_growth}%
-- Daily Transactions: {daily_transactions}
-- Daily Customers: {daily_customers}
+- Transactions: {daily_transactions}
+- Customers: {daily_customers}
 
-**Top 5 Products by Revenue:**
+Top Products:
 {top_products}
 
-**Top 5 Customers by Revenue:**
+Top Customers:
 {top_customers}
 
-Return only valid JSON."""
+Return JSON with keys: "narrative" (2-3 sentence summary)
+and "highlights" (list of 3-5 bullet strings)."""
 
-ANOMALY_PROMPT_V2 = """\
-Analyze the following daily sales time series and identify anomalies \
-(unusual spikes, drops, or pattern breaks).
-Return valid JSON with schema:
-{{"anomalies": [{{"date": "YYYY-MM-DD", "description": "...", "severity": "low|medium|high"}}],\
- "narrative": "overall summary"}}
+ANOMALY_PROMPT = """Detect anomalies in this daily sales time series.
 
-**Daily Sales Data:**
+Data (date: value EGP):
 {daily_data}
 
-**Statistics:**
-- Average: {avg} EGP
-- Std Dev: {std_dev} EGP
-- Min: {min_val} EGP
-- Max: {max_val} EGP
+Statistics: avg={avg} EGP, std_dev={std_dev} EGP, min={min_val} EGP, max={max_val} EGP
 
-**Active Monitoring Alerts:**
-{active_alerts}
+Return JSON array of objects with keys: "date", "severity" (low/medium/high),
+"description" (1 sentence).
+Only include genuine anomalies (>2 std devs). Return empty array [] if none found."""
 
-Return only valid JSON. Use empty list [] if no anomalies found."""
+CHANGES_PROMPT = """Compare two sales periods and explain the key changes.
 
-CHANGES_PROMPT_V2 = """\
-Compare these two periods and explain the key business performance changes.
-Return valid JSON with schema: {{"narrative": "...", "key_changes": ["...", ...]}}
+Current ({current_period}): net={current_net} EGP,
+  txns={current_txns}, customers={current_customers}
+Previous ({previous_period}): net={previous_net} EGP,
+  txns={previous_txns}, customers={previous_customers}
 
-**Current Period ({current_period}):**
-- Net Sales: {current_net} EGP
-- Transactions: {current_txns}
-- Customers: {current_customers}
+Top movers: {top_movers}
 
-**Previous Period ({previous_period}):**
-- Net Sales: {previous_net} EGP
-- Transactions: {previous_txns}
-- Customers: {previous_customers}
+Return JSON with keys:
+  "narrative" (2-3 sentences explaining the most important changes)
+  "deltas" (list of objects: metric, previous_value, current_value, change_pct, direction)"""
 
-**Top Gainers (products):** {top_gainers}
-**Top Losers (products):** {top_losers}
-**Top Staff by Sales:** {top_staff}
+DEEP_DIVE_PROMPT = """You are a senior business analyst with access to DataPulse analytics tools.
 
-Return only valid JSON."""
+Conduct a comprehensive deep-dive analysis for the period {start_date} to {end_date}.
+
+Use the available tools to gather data across KPIs, trends, anomalies, forecasts, and targets.
+Then synthesize findings into a structured report.
+
+Return JSON with keys:
+  "narrative" (4-6 sentences executive summary)
+  "highlights" (5-7 key findings as bullet strings)
+  "anomalies_list" (list of objects: date, severity, description)
+  "deltas" (list of objects: metric, previous_value, current_value, change_pct, direction)
+
+Focus on: revenue drivers, anomalies, forecast vs actuals, top performers."""
+
+REVIEW_INSTRUCTION = """The analyst has requested human review before finalizing this report.
+
+DRAFT NARRATIVE:
+{draft_narrative}
+
+DRAFT HIGHLIGHTS:
+{draft_highlights}
+
+DATA SNAPSHOT (summary):
+{data_snapshot}
+
+The reviewer may approve as-is or provide edits. Incorporate any edits and finalize."""

@@ -285,7 +285,8 @@ CREATE POLICY tenant_isolation ON <table>
 | Async Tasks | Celery | ≥5.3 |
 | Data Pipeline | Polars + PyArrow + dbt | ≥1.0, ≥1.8 |
 | Forecasting | statsmodels | ≥0.14 |
-| AI | OpenRouter (free tier) | - |
+| AI | OpenRouter (free tier) + LangGraph | - |
+| AI Orchestration | LangGraph + langgraph-checkpoint-postgres | ≥0.2 |
 | Auth | Auth0 OIDC + PyJWT | - |
 | Frontend | Next.js 14 + TypeScript | 14.2.35 |
 | State | SWR + React Context | 2.3.3 |
@@ -294,3 +295,64 @@ CREATE POLICY tenant_isolation ON <table>
 | Monitoring | Sentry + structlog | ≥2.0 |
 | Automation | n8n | 2.13.4 |
 | CI | GitHub Actions | 6 jobs |
+
+---
+
+## AI-Light Phase D — HITL Sequence Diagram
+
+When a request is made with `require_review=true`, the LangGraph pauses before
+the `synthesize` node and waits for analyst approval.
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant API as FastAPI /ai-light
+    participant Graph as LangGraph Graph
+    participant PG_CKP as PostgreSQL<br/>ai_checkpoints schema
+    participant Analyst
+
+    Client->>API: POST /deep-dive<br/>{"require_review": true}
+    API->>Graph: invoke(state, interrupt_before=["synthesize"])
+    Graph->>Graph: cache_check → route → plan_deep_dive
+    Graph->>Graph: fetch_data (tool calls)
+    Graph->>Graph: analyze (OpenRouter LLM call)
+    Graph->>Graph: validate
+    Graph-->>PG_CKP: checkpoint state at synthesize boundary
+    Graph-->>API: return partial state (paused)
+    API-->>Client: 202 Accepted + DeepDiveDraft<br/>{run_id, narrative_draft, highlights_draft, data_snapshot}
+
+    Analyst->>API: GET /review/{run_id}
+    API->>PG_CKP: get_state(thread_id)
+    PG_CKP-->>API: checkpoint snapshot
+    API-->>Analyst: DeepDiveDraft (narrative_draft, highlights_draft, data_snapshot)
+
+    Analyst->>API: POST /review/{run_id}/approve<br/>{"narrative": "Revised text..."}
+    API->>Graph: update_state(human_edits) + invoke(None, resume)
+    Graph->>Graph: synthesize (merges human_edits)
+    Graph->>Graph: cost_track → cache_write
+    Graph-->>API: final state
+    API-->>Client: 200 OK + DeepDiveResponse<br/>{narrative, highlights, anomalies, deltas, meta}
+```
+
+### HITL Permission Model
+
+| Role   | insights:view | insights:approve |
+|--------|--------------|-----------------|
+| owner  | ✓            | ✓               |
+| admin  | ✓            | ✓               |
+| editor | ✓            |                 |
+| viewer | ✓            |                 |
+
+### SSE Streaming Mode
+
+All four insight endpoints accept `stream=true` for Server-Sent Events output:
+
+```
+GET /ai-light/summary?stream=true
+POST /ai-light/deep-dive     body: {"stream": true}
+```
+
+Each SSE event carries: `{"node": "<name>", "status": "done", "partial_state": {...}}`
+
+The event sequence for a summary run is:
+`start → cache_check → route → plan_summary → fetch_data → analyze → validate → synthesize → cost_track → cache_write → end`

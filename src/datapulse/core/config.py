@@ -113,17 +113,15 @@ class Settings(BaseSettings):
     openrouter_api_key: str = ""
     openrouter_model: str = "openrouter/free"
 
-    # AI-Light — LangGraph feature flag and runtime controls
-    # Set AI_LIGHT_USE_LANGGRAPH=true to enable; OFF by default.
+    # AI-Light — LangGraph feature flags (Phase D)
     ai_light_use_langgraph: bool = False
-    # Global daily token cap across all tenants.
     ai_light_max_tokens_per_day: int = 100_000
-    # "memory" (Phase A-C) or "postgres" (Phase D HITL).
-    ai_light_checkpoint_backend: str = "memory"
-    # Tool-capable model, e.g. "openai/gpt-4o-mini" or "anthropic/claude-3.5-haiku".
-    openrouter_agent_model: str = ""
-    langsmith_api_key: str = ""  # Optional LangSmith observability
-    langsmith_project: str = ""  # LangSmith project name
+    ai_light_checkpoint_backend: str = "memory"  # "memory" | "postgres"
+    openrouter_agent_model: str = ""  # tool-capable model, e.g. openai/gpt-4o-mini
+
+    # LangSmith observability (optional — omit to disable tracing)
+    langsmith_api_key: str = ""
+    langsmith_project: str = "datapulse-ai-light"
 
     # Brain (session memory) — embedding model for semantic search
     brain_embed_model: str = "openai/text-embedding-3-small"
