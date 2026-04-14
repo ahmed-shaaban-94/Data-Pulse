@@ -88,6 +88,8 @@ def pytest_configure(config):
                 "reports:view",
                 "reports:create",
                 "sectors:manage",
+                "inventory:read",
+                "inventory:write",
             },
             sector_ids=[],
             is_admin=True,
