@@ -23,6 +23,8 @@ from datapulse.api.app import create_app
 from datapulse.api.auth import get_current_user
 from datapulse.api.deps import get_ai_light_service
 
+pytestmark = pytest.mark.unit
+
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------

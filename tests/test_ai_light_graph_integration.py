@@ -14,6 +14,8 @@ import pytest
 
 from datapulse.ai_light.graph.builder import build_graph
 
+pytestmark = pytest.mark.unit
+
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------

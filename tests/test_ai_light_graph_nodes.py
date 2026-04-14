@@ -7,6 +7,8 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 from datapulse.ai_light.graph.nodes import (
     analyze,
     cache_check,
@@ -20,6 +22,8 @@ from datapulse.ai_light.graph.nodes import (
     synthesize,
     validate,
 )
+
+pytestmark = pytest.mark.unit
 
 # ---------------------------------------------------------------------------
 # Helpers
