@@ -125,9 +125,7 @@ class ReorderConfigService:
         )
         return ReorderConfigResponse.from_repo(config)
 
-    def deactivate_config(
-        self, tenant_id: int, drug_code: str, site_code: str
-    ) -> bool:
+    def deactivate_config(self, tenant_id: int, drug_code: str, site_code: str) -> bool:
         """Soft-delete a reorder config. Returns False if not found."""
         return self._repo.deactivate_config(tenant_id, drug_code, site_code)
 

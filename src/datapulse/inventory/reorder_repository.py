@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import UTC, datetime
+from decimal import Decimal
 
 from sqlalchemy import text
 from sqlalchemy.orm import Session
@@ -12,26 +14,21 @@ from datapulse.logging import get_logger
 log = get_logger(__name__)
 
 
+@dataclass
 class ReorderConfig:
     """In-memory representation of a reorder_config row."""
 
-    __slots__ = (
-        "id",
-        "tenant_id",
-        "drug_code",
-        "site_code",
-        "min_stock",
-        "reorder_point",
-        "max_stock",
-        "reorder_lead_days",
-        "is_active",
-        "updated_at",
-        "updated_by",
-    )
-
-    def __init__(self, **kwargs):  # type: ignore[no-untyped-def]
-        for k, v in kwargs.items():
-            setattr(self, k, v)
+    id: int
+    tenant_id: int
+    drug_code: str
+    site_code: str
+    min_stock: Decimal
+    reorder_point: Decimal
+    max_stock: Decimal
+    reorder_lead_days: int
+    is_active: bool
+    updated_at: datetime | None = None
+    updated_by: str | None = None
 
 
 class ReorderConfigRepository:
@@ -46,9 +43,7 @@ class ReorderConfigRepository:
 
     # ── Reads ─────────────────────────────────────────────────────────────────
 
-    def get_config(
-        self, tenant_id: int, drug_code: str, site_code: str
-    ) -> ReorderConfig | None:
+    def get_config(self, tenant_id: int, drug_code: str, site_code: str) -> ReorderConfig | None:
         """Return a single reorder config row or None if not found."""
         stmt = text("""
             SELECT
@@ -60,10 +55,14 @@ class ReorderConfigRepository:
               AND drug_code  = :drug_code
               AND site_code  = :site_code
         """)
-        row = self._session.execute(
-            stmt,
-            {"tenant_id": tenant_id, "drug_code": drug_code, "site_code": site_code},
-        ).mappings().first()
+        row = (
+            self._session.execute(
+                stmt,
+                {"tenant_id": tenant_id, "drug_code": drug_code, "site_code": site_code},
+            )
+            .mappings()
+            .first()
+        )
         if row is None:
             return None
         return ReorderConfig(**dict(row))
@@ -145,20 +144,25 @@ class ReorderConfigRepository:
                 min_stock, reorder_point, max_stock,
                 reorder_lead_days, is_active, updated_at, updated_by
         """)
-        row = self._session.execute(
-            stmt,
-            {
-                "tenant_id": tenant_id,
-                "drug_code": drug_code,
-                "site_code": site_code,
-                "min_stock": min_stock,
-                "reorder_point": reorder_point,
-                "max_stock": max_stock,
-                "reorder_lead_days": reorder_lead_days,
-                "updated_at": now,
-                "updated_by": updated_by,
-            },
-        ).mappings().first()
+        row = (
+            self._session.execute(
+                stmt,
+                {
+                    "tenant_id": tenant_id,
+                    "drug_code": drug_code,
+                    "site_code": site_code,
+                    "min_stock": min_stock,
+                    "reorder_point": reorder_point,
+                    "max_stock": max_stock,
+                    "reorder_lead_days": reorder_lead_days,
+                    "updated_at": now,
+                    "updated_by": updated_by,
+                },
+            )
+            .mappings()
+            .first()
+        )
+        assert row is not None, "RETURNING clause must produce a row after upsert"
         log.info(
             "reorder_config_upserted",
             tenant_id=tenant_id,
@@ -167,9 +171,7 @@ class ReorderConfigRepository:
         )
         return ReorderConfig(**dict(row))
 
-    def deactivate_config(
-        self, tenant_id: int, drug_code: str, site_code: str
-    ) -> bool:
+    def deactivate_config(self, tenant_id: int, drug_code: str, site_code: str) -> bool:
         """Soft-delete a reorder config by setting is_active=false.
 
         Returns True if a row was updated, False if the config did not exist.
