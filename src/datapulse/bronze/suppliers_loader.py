@@ -74,11 +74,7 @@ class ExcelSuppliersLoader(BronzeLoader):
                 .cast(pl.Utf8, strict=False)
                 .str.to_lowercase()
                 .map_elements(
-                    lambda v: (
-                        True
-                        if v in _VALID_BOOL_TRUE
-                        else v not in _VALID_BOOL_FALSE
-                    ),
+                    lambda v: True if v in _VALID_BOOL_TRUE else v not in _VALID_BOOL_FALSE,
                     return_dtype=pl.Boolean,
                 )
                 .alias("is_active")

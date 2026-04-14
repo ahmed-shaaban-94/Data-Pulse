@@ -38,14 +38,16 @@ class TestExcelSuppliersLoaderMeta:
 
 class TestValidate:
     def _make_raw_df(self):
-        return pl.DataFrame({
-            "Supplier Code": ["SUP001", "SUP002"],
-            "Supplier Name": ["Pharma Co", "MedSupply"],
-            "Contact Name": ["John", None],
-            "Active": ["true", "false"],
-            "Payment Terms (Days)": [30, 45],
-            "Lead Time (Days)": [7, 14],
-        })
+        return pl.DataFrame(
+            {
+                "Supplier Code": ["SUP001", "SUP002"],
+                "Supplier Name": ["Pharma Co", "MedSupply"],
+                "Contact Name": ["John", None],
+                "Active": ["true", "false"],
+                "Payment Terms (Days)": [30, 45],
+                "Lead Time (Days)": [7, 14],
+            }
+        )
 
     def test_renames_columns(self, loader):
         raw = self._make_raw_df()
@@ -55,29 +57,35 @@ class TestValidate:
         assert "Supplier Code" not in result.columns
 
     def test_is_active_coercion_true(self, loader):
-        raw = pl.DataFrame({
-            "Supplier Code": ["S1"],
-            "Supplier Name": ["Test"],
-            "Active": ["yes"],
-        })
+        raw = pl.DataFrame(
+            {
+                "Supplier Code": ["S1"],
+                "Supplier Name": ["Test"],
+                "Active": ["yes"],
+            }
+        )
         result = loader.validate(raw)
         assert result["is_active"][0] is True
 
     def test_is_active_coercion_false(self, loader):
-        raw = pl.DataFrame({
-            "Supplier Code": ["S1"],
-            "Supplier Name": ["Test"],
-            "Active": ["no"],
-        })
+        raw = pl.DataFrame(
+            {
+                "Supplier Code": ["S1"],
+                "Supplier Name": ["Test"],
+                "Active": ["no"],
+            }
+        )
         result = loader.validate(raw)
         assert result["is_active"][0] is False
 
     def test_only_allowed_columns_returned(self, loader):
-        raw = pl.DataFrame({
-            "Supplier Code": ["S1"],
-            "Supplier Name": ["Test"],
-            "SECRET_COLUMN": ["hack"],
-        })
+        raw = pl.DataFrame(
+            {
+                "Supplier Code": ["S1"],
+                "Supplier Name": ["Test"],
+                "SECRET_COLUMN": ["hack"],
+            }
+        )
         result = loader.validate(raw)
         assert "SECRET_COLUMN" not in result.columns
 

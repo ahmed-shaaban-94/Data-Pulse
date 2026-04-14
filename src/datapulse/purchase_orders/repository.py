@@ -502,9 +502,7 @@ class PurchaseOrderRepository:
 
         where = " AND ".join(clauses)
 
-        count_stmt = text(
-            f"SELECT COUNT(*) FROM public_marts.agg_margin_analysis ma WHERE {where}"
-        )
+        count_stmt = text(f"SELECT COUNT(*) FROM public_marts.agg_margin_analysis ma WHERE {where}")
         total = self._session.execute(count_stmt, params).scalar_one()
 
         select_stmt = text(f"""

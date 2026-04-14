@@ -147,7 +147,7 @@ class TestReceivePO:
         mock_po_repo.recalculate_po_status.return_value = "received"
         mock_po_repo.get_po.side_effect = [
             _make_po(status="submitted"),  # first call in receive_po
-            _make_po(status="received"),   # final get_po after update
+            _make_po(status="received"),  # final get_po after update
         ]
 
         req = self._make_receive_req(po_number)

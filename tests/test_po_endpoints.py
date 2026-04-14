@@ -91,8 +91,12 @@ class TestListPOs:
         app.dependency_overrides[get_po_service] = lambda: svc
         app.dependency_overrides[get_tenant_plan_limits] = lambda: _starter_limits()
         app.dependency_overrides[get_current_user] = lambda: {
-            "sub": "test-user", "email": "", "preferred_username": "",
-            "tenant_id": "1", "roles": [], "raw_claims": {},
+            "sub": "test-user",
+            "email": "",
+            "preferred_username": "",
+            "tenant_id": "1",
+            "roles": [],
+            "raw_claims": {},
         }
         c = TestClient(app, raise_server_exceptions=True)
         resp = c.get("/api/v1/purchase-orders")
@@ -204,9 +208,7 @@ class TestReceivePO:
             "po_number": "PO-1-20250115-0001",
             "lines": [{"line_number": 1, "received_quantity": "5"}],
         }
-        resp = client.post(
-            "/api/v1/purchase-orders/PO-1-20250115-0001/receive", json=payload
-        )
+        resp = client.post("/api/v1/purchase-orders/PO-1-20250115-0001/receive", json=payload)
         assert resp.status_code == 409
 
 
@@ -243,9 +245,7 @@ class TestMarginAnalysis:
         client, svc, repo = po_api_client
         # repo doesn't have get_margin_analysis — service calls it directly
         # patch the service method
-        svc.get_margin_analysis = MagicMock(
-            return_value=MarginAnalysisList(items=[], total=0)
-        )
+        svc.get_margin_analysis = MagicMock(return_value=MarginAnalysisList(items=[], total=0))
         resp = client.get("/api/v1/margins/analysis")
         assert resp.status_code == 200
 

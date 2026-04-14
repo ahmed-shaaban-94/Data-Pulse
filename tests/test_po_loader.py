@@ -33,14 +33,16 @@ class TestExcelPOLoaderMeta:
 
 class TestValidateHeaders:
     def _make_raw_headers(self):
-        return pl.DataFrame({
-            "PO Number": ["PO-001", "PO-002"],
-            "PO Date": ["2025-01-15", "2025-01-16"],
-            "Supplier Code": ["SUP001", "SUP002"],
-            "Site Code": ["SITE01", "SITE01"],
-            "Status": ["draft", "INVALID_STATUS"],
-            "source_file": ["test.xlsx", "test.xlsx"],
-        })
+        return pl.DataFrame(
+            {
+                "PO Number": ["PO-001", "PO-002"],
+                "PO Date": ["2025-01-15", "2025-01-16"],
+                "Supplier Code": ["SUP001", "SUP002"],
+                "Site Code": ["SITE01", "SITE01"],
+                "Status": ["draft", "INVALID_STATUS"],
+                "source_file": ["test.xlsx", "test.xlsx"],
+            }
+        )
 
     def test_renames_header_columns(self, loader):
         raw = self._make_raw_headers()
@@ -62,14 +64,16 @@ class TestValidateHeaders:
 
 class TestValidateLines:
     def _make_raw_lines(self):
-        return pl.DataFrame({
-            "PO Number": ["PO-001", "PO-001"],
-            "Line Number": [1, 2],
-            "Drug Code": ["DRUG001", "DRUG002"],
-            "Ordered Quantity": [10.0, -5.0],  # negative should be clipped to 0
-            "Unit Price": [5.50, 3.25],
-            "Received Quantity": [0.0, 0.0],
-        })
+        return pl.DataFrame(
+            {
+                "PO Number": ["PO-001", "PO-001"],
+                "Line Number": [1, 2],
+                "Drug Code": ["DRUG001", "DRUG002"],
+                "Ordered Quantity": [10.0, -5.0],  # negative should be clipped to 0
+                "Unit Price": [5.50, 3.25],
+                "Received Quantity": [0.0, 0.0],
+            }
+        )
 
     def test_renames_line_columns(self, loader):
         raw = self._make_raw_lines()

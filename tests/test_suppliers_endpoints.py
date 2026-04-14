@@ -96,8 +96,12 @@ class TestListSuppliers:
         app.dependency_overrides[get_supplier_service] = lambda: svc
         app.dependency_overrides[get_tenant_plan_limits] = lambda: get_plan_limits("starter")
         app.dependency_overrides[get_current_user] = lambda: {
-            "sub": "test", "email": "", "preferred_username": "",
-            "tenant_id": "1", "roles": [], "raw_claims": {},
+            "sub": "test",
+            "email": "",
+            "preferred_username": "",
+            "tenant_id": "1",
+            "roles": [],
+            "raw_claims": {},
         }
         c = TestClient(app, raise_server_exceptions=True)
         resp = c.get("/api/v1/suppliers")
@@ -107,7 +111,7 @@ class TestListSuppliers:
 class TestCreateSupplier:
     def test_creates_returns_201(self, supplier_api_client):
         client, svc, repo = supplier_api_client
-        repo.get_supplier.return_value = None   # no existing supplier
+        repo.get_supplier.return_value = None  # no existing supplier
         repo.create_supplier.return_value = _make_supplier()
 
         payload = {
