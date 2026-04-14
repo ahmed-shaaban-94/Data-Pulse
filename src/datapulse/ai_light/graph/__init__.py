@@ -1,18 +1,10 @@
-"""AI-Light LangGraph orchestration package.
+"""AI-Light LangGraph package — Phase A-2 (summary path).
 
-This package introduces LangGraph as the orchestration engine behind the existing
-``ai_light`` endpoints.  It is loaded lazily (only when
-``settings.ai_light_use_langgraph`` is True) so the optional ``[ai]`` dependencies
-are not required for the default runtime.
-
-Public API
-----------
-``build_graph``   — compile the LangGraph state-machine once at startup.
-``AILightState``  — typed state dict shared across all graph nodes.
+Public symbols are NOT imported here to avoid mypy following the import chain
+into graph/ subpackage (which triggers a mypy int64 cache crash on Linux CI
+due to Annotated[..., callable] type aliases). Import directly from submodules:
+    from datapulse.ai_light.graph.builder import build_graph
+    from datapulse.ai_light.graph.state import AILightState
 """
-
-# Placeholder — populated in Phase A (summary path).
-# from datapulse.ai_light.graph.builder import build_graph  # noqa: F401
-# from datapulse.ai_light.graph.state import AILightState    # noqa: F401
 
 __all__: list[str] = []
