@@ -41,8 +41,8 @@ class CashDrawerEventType(StrEnum):
 
     sale = "sale"
     refund = "refund"
-    float = "float"       # opening float added to drawer
-    pickup = "pickup"     # cash removed from drawer mid-shift
+    float = "float"  # opening float added to drawer
+    pickup = "pickup"  # cash removed from drawer mid-shift
 
 
 class ReturnReason(StrEnum):
@@ -57,9 +57,9 @@ class ReturnReason(StrEnum):
 class ReceiptFormat(StrEnum):
     """Output formats for a receipt."""
 
-    thermal = "thermal"   # ESC/POS byte stream for thermal printers
-    pdf = "pdf"           # PDF binary for email / archiving
-    email = "email"       # Metadata row for email delivery tracking
+    thermal = "thermal"  # ESC/POS byte stream for thermal printers
+    pdf = "pdf"  # PDF binary for email / archiving
+    email = "email"  # Metadata row for email delivery tracking
 
 
 # Controlled-substance drug categories that require pharmacist verification.

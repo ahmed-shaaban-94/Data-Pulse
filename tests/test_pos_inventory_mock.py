@@ -121,29 +121,21 @@ class TestMockInventoryService:
         assert isinstance(mock_svc, InventoryServiceProtocol)
 
     def test_get_stock_level_returns_stock_level(self, mock_svc: MockInventoryService):
-        result = asyncio.run(
-            mock_svc.get_stock_level("DRUG001", "SITE01")
-        )
+        result = asyncio.run(mock_svc.get_stock_level("DRUG001", "SITE01"))
         assert isinstance(result, StockLevel)
         assert result.drug_code == "DRUG001"
         assert result.site_code == "SITE01"
         assert result.quantity_available > Decimal("0")
 
-    def test_check_batch_expiry_returns_list_of_batch_info(
-        self, mock_svc: MockInventoryService
-    ):
-        result = asyncio.run(
-            mock_svc.check_batch_expiry("DRUG001", "SITE01")
-        )
+    def test_check_batch_expiry_returns_list_of_batch_info(self, mock_svc: MockInventoryService):
+        result = asyncio.run(mock_svc.check_batch_expiry("DRUG001", "SITE01"))
         assert isinstance(result, list)
         assert len(result) >= 1
         assert all(isinstance(b, BatchInfo) for b in result)
 
     def test_check_batch_expiry_sorted_fefo(self, mock_svc: MockInventoryService):
         """Default mock returns at least one batch; real FEFO is tested in service."""
-        batches = asyncio.run(
-            mock_svc.check_batch_expiry("DRUG001", "SITE01")
-        )
+        batches = asyncio.run(mock_svc.check_batch_expiry("DRUG001", "SITE01"))
         dates = [b.expiry_date for b in batches if b.expiry_date is not None]
         assert dates == sorted(dates)
 
@@ -156,14 +148,10 @@ class TestMockInventoryService:
             reference_id="TXN-001",
             movement_type="sale",
         )
-        result = asyncio.run(
-            mock_svc.record_movement(mv)
-        )
+        result = asyncio.run(mock_svc.record_movement(mv))
         assert result is None
 
-    def test_record_movement_stores_for_assertions(
-        self, mock_svc: MockInventoryService
-    ):
+    def test_record_movement_stores_for_assertions(self, mock_svc: MockInventoryService):
         mv = StockMovement(
             drug_code="DRUG001",
             site_code="SITE01",
@@ -177,12 +165,8 @@ class TestMockInventoryService:
         assert len(recorded) == 1
         assert recorded[0].reference_id == "TXN-042"
 
-    def test_get_reorder_alerts_returns_empty_list(
-        self, mock_svc: MockInventoryService
-    ):
-        result = asyncio.run(
-            mock_svc.get_reorder_alerts("SITE01")
-        )
+    def test_get_reorder_alerts_returns_empty_list(self, mock_svc: MockInventoryService):
+        result = asyncio.run(mock_svc.get_reorder_alerts("SITE01"))
         assert isinstance(result, list)
         assert result == []
 
@@ -215,9 +199,7 @@ class TestMockInventoryService:
 
         assert len(mock_svc.get_recorded_movements()) == 3
 
-    def test_get_recorded_movements_returns_copy(
-        self, mock_svc: MockInventoryService
-    ):
+    def test_get_recorded_movements_returns_copy(self, mock_svc: MockInventoryService):
         """Mutating the returned list must not affect internal state."""
         movements = mock_svc.get_recorded_movements()
         movements.append(None)  # type: ignore[arg-type]
@@ -254,9 +236,7 @@ class TestAsyncMockCompatibility:
             quantity_available=Decimal("50"),
             reorder_point=Decimal("10"),
         )
-        result = asyncio.run(
-            mock.get_stock_level("DRUG001", "SITE01")
-        )
+        result = asyncio.run(mock.get_stock_level("DRUG001", "SITE01"))
         assert isinstance(result, StockLevel)
         assert result.quantity_available == Decimal("50")
 
@@ -270,7 +250,5 @@ class TestAsyncMockCompatibility:
             quantity_available=Decimal("0"),
             reorder_point=Decimal("5"),
         )
-        result = asyncio.run(
-            mock.get_stock_level("DRUG999", "SITE01")
-        )
+        result = asyncio.run(mock.get_stock_level("DRUG999", "SITE01"))
         assert result.quantity_available == Decimal("0")
