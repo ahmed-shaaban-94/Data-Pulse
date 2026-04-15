@@ -69,9 +69,7 @@ def _make_app(service: MagicMock) -> FastAPI:
         return JSONResponse(status_code=409, content={"detail": exc.message})
 
     @app.exception_handler(PharmacistVerificationRequiredError)
-    async def _h3(
-        _req: Request, exc: PharmacistVerificationRequiredError
-    ) -> JSONResponse:
+    async def _h3(_req: Request, exc: PharmacistVerificationRequiredError) -> JSONResponse:
         return JSONResponse(status_code=403, content={"detail": exc.message})
 
     return app
@@ -158,7 +156,9 @@ class TestTerminalRoutes:
         mock_service.open_terminal.assert_called_once()
 
     def test_get_terminal_404_when_missing(
-        self, client: TestClient, mock_service: MagicMock,
+        self,
+        client: TestClient,
+        mock_service: MagicMock,
     ):
         mock_service.get_terminal.return_value = None
         assert client.get("/api/v1/pos/terminals/999").status_code == 404
@@ -170,10 +170,13 @@ class TestTerminalRoutes:
         assert resp.json()["status"] == "paused"
 
     def test_pause_terminal_409_on_illegal_transition(
-        self, client: TestClient, mock_service: MagicMock,
+        self,
+        client: TestClient,
+        mock_service: MagicMock,
     ):
         mock_service.pause_terminal.side_effect = TerminalNotActiveError(
-            terminal_id=1, current_status="closed",
+            terminal_id=1,
+            current_status="closed",
         )
         resp = client.post("/api/v1/pos/terminals/1/pause")
         assert resp.status_code == 409
@@ -192,7 +195,9 @@ class TestTerminalRoutes:
         assert resp.status_code == 200
 
     def test_list_active_terminals_200(
-        self, client: TestClient, mock_service: MagicMock,
+        self,
+        client: TestClient,
+        mock_service: MagicMock,
     ):
         mock_service.list_active_terminals.return_value = [
             _terminal_session(TerminalStatus.active),
@@ -210,24 +215,24 @@ class TestTerminalRoutes:
 class TestTransactionRoutes:
     def test_create_transaction_201(self, client: TestClient, mock_service: MagicMock):
         mock_service.create_transaction.return_value = _transaction_response()
-        resp = client.post(
-            "/api/v1/pos/transactions?terminal_id=1&site_code=SITE01"
-        )
+        resp = client.post("/api/v1/pos/transactions?terminal_id=1&site_code=SITE01")
         assert resp.status_code == 201
 
     def test_create_transaction_409_when_terminal_paused(
-        self, client: TestClient, mock_service: MagicMock,
+        self,
+        client: TestClient,
+        mock_service: MagicMock,
     ):
         mock_service.create_transaction.side_effect = TerminalNotActiveError(
-            terminal_id=1, current_status="paused",
+            terminal_id=1,
+            current_status="paused",
         )
-        resp = client.post(
-            "/api/v1/pos/transactions?terminal_id=1&site_code=SITE01"
-        )
+        resp = client.post("/api/v1/pos/transactions?terminal_id=1&site_code=SITE01")
         assert resp.status_code == 409
 
     def test_get_transaction_200(self, client: TestClient, mock_service: MagicMock):
         from datapulse.pos.models import TransactionDetailResponse
+
         mock_service.get_transaction_detail.return_value = TransactionDetailResponse(
             id=100,
             terminal_id=1,
@@ -257,6 +262,7 @@ class TestTransactionRoutes:
     def test_add_item_201(self, client: TestClient, mock_service: MagicMock):
         # detail lookup needed for site_code resolution
         from datapulse.pos.models import TransactionDetailResponse
+
         mock_service.get_transaction_detail.return_value = TransactionDetailResponse(
             id=100,
             terminal_id=1,
@@ -280,19 +286,29 @@ class TestTransactionRoutes:
         assert body["drug_code"] == "DRUG001"
 
     def test_add_item_409_insufficient_stock(
-        self, client: TestClient, mock_service: MagicMock,
+        self,
+        client: TestClient,
+        mock_service: MagicMock,
     ):
         from datapulse.pos.models import TransactionDetailResponse
+
         mock_service.get_transaction_detail.return_value = TransactionDetailResponse(
-            id=100, terminal_id=1, staff_id="s", site_code="SITE01",
-            subtotal=Decimal("0"), discount_total=Decimal("0"),
-            tax_total=Decimal("0"), grand_total=Decimal("0"),
+            id=100,
+            terminal_id=1,
+            staff_id="s",
+            site_code="SITE01",
+            subtotal=Decimal("0"),
+            discount_total=Decimal("0"),
+            tax_total=Decimal("0"),
+            grand_total=Decimal("0"),
             status=TransactionStatus.draft,
             created_at=datetime(2026, 4, 15, 10, 30, tzinfo=UTC),
             items=[],
         )
         mock_service.add_item.side_effect = InsufficientStockError(
-            "DRUG001", Decimal("5"), Decimal("3"),
+            "DRUG001",
+            Decimal("5"),
+            Decimal("3"),
         )
         resp = client.post(
             "/api/v1/pos/transactions/100/items",
@@ -301,19 +317,28 @@ class TestTransactionRoutes:
         assert resp.status_code == 409
 
     def test_add_item_403_pharmacist_required(
-        self, client: TestClient, mock_service: MagicMock,
+        self,
+        client: TestClient,
+        mock_service: MagicMock,
     ):
         from datapulse.pos.models import TransactionDetailResponse
+
         mock_service.get_transaction_detail.return_value = TransactionDetailResponse(
-            id=100, terminal_id=1, staff_id="s", site_code="SITE01",
-            subtotal=Decimal("0"), discount_total=Decimal("0"),
-            tax_total=Decimal("0"), grand_total=Decimal("0"),
+            id=100,
+            terminal_id=1,
+            staff_id="s",
+            site_code="SITE01",
+            subtotal=Decimal("0"),
+            discount_total=Decimal("0"),
+            tax_total=Decimal("0"),
+            grand_total=Decimal("0"),
             status=TransactionStatus.draft,
             created_at=datetime(2026, 4, 15, 10, 30, tzinfo=UTC),
             items=[],
         )
         mock_service.add_item.side_effect = PharmacistVerificationRequiredError(
-            "MORPHINE", "narcotic",
+            "MORPHINE",
+            "narcotic",
         )
         resp = client.post(
             "/api/v1/pos/transactions/100/items",
@@ -332,7 +357,9 @@ class TestTransactionRoutes:
         assert resp.status_code == 404
 
     def test_checkout_returns_response(
-        self, client: TestClient, mock_service: MagicMock,
+        self,
+        client: TestClient,
+        mock_service: MagicMock,
     ):
         mock_service.checkout.return_value = CheckoutResponse(
             transaction_id=100,

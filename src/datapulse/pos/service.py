@@ -243,9 +243,7 @@ class PosService:
         )
         return TransactionResponse.model_validate(row)
 
-    def get_transaction_detail(
-        self, transaction_id: int
-    ) -> TransactionDetailResponse | None:
+    def get_transaction_detail(self, transaction_id: int) -> TransactionDetailResponse | None:
         """Full transaction with line items hydrated."""
         header = self._repo.get_transaction(transaction_id)
         if header is None:
@@ -365,7 +363,10 @@ class PosService:
         if discount is not None:
             line_total = (line_total - _to_decimal(discount)).quantize(Decimal("0.0001"))
         row = self._repo.update_item_quantity(
-            item_id, quantity=quantity, line_total=line_total, discount=discount,
+            item_id,
+            quantity=quantity,
+            line_total=line_total,
+            discount=discount,
         )
         if row is None:
             raise PosError(
@@ -373,8 +374,9 @@ class PosService:
                 detail=f"item_id={item_id}",
             )
         # ``unit_price`` is not returned by update_item_quantity; merge it in for the response.
-        return PosCartItem.model_validate({**row, "unit_price": unit_price,
-                                           "drug_name": row.get("drug_name", "")})
+        return PosCartItem.model_validate(
+            {**row, "unit_price": unit_price, "drug_name": row.get("drug_name", "")}
+        )
 
     def remove_item(self, item_id: int) -> bool:
         """Delete a single item from a draft transaction."""
@@ -427,7 +429,7 @@ class PosService:
             start=Decimal("0"),
         )
         tax_total = Decimal("0")  # Tax engine added in a later session
-        grand_total = (subtotal - _to_decimal(request.transaction_discount) + tax_total)
+        grand_total = subtotal - _to_decimal(request.transaction_discount) + tax_total
         grand_total = grand_total.quantize(Decimal("0.0001"))
 
         # ── Payment validation ──────────────────────────────────────
@@ -437,8 +439,7 @@ class PosService:
             if tendered < grand_total:
                 raise PosError(
                     message=(
-                        f"Cash tendered ({tendered}) is less than grand total "
-                        f"({grand_total})"
+                        f"Cash tendered ({tendered}) is less than grand total ({grand_total})"
                     ),
                     detail=f"transaction_id={transaction_id}",
                 )

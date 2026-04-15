@@ -163,9 +163,7 @@ def close_terminal(
 ) -> TerminalSessionResponse:
     """Close a terminal — records closing cash and seals the shift."""
     _ = user
-    session = service.close_terminal(
-        terminal_id, closing_cash=Decimal(str(body.closing_cash))
-    )
+    session = service.close_terminal(terminal_id, closing_cash=Decimal(str(body.closing_cash)))
     return TerminalSessionResponse.model_validate(session.model_dump())
 
 
@@ -215,9 +213,7 @@ def get_transaction(
     _ = user
     detail = service.get_transaction_detail(transaction_id)
     if detail is None:
-        raise HTTPException(
-            status_code=404, detail=f"Transaction {transaction_id} not found"
-        )
+        raise HTTPException(status_code=404, detail=f"Transaction {transaction_id} not found")
     return detail
 
 
@@ -258,9 +254,7 @@ async def add_item(
     """Add a drug to the active draft transaction (FEFO batch + stock check)."""
     txn = service.get_transaction_detail(transaction_id)
     if txn is None:
-        raise HTTPException(
-            status_code=404, detail=f"Transaction {transaction_id} not found"
-        )
+        raise HTTPException(status_code=404, detail=f"Transaction {transaction_id} not found")
     return await service.add_item(
         transaction_id=transaction_id,
         tenant_id=_tenant_id_of(user),

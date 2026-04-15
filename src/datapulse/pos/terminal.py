@@ -98,12 +98,11 @@ def assert_transactable(terminal_id: int, current: TerminalStatus | str) -> None
     try:
         cur = TerminalStatus(current)
     except ValueError as exc:
-        raise TerminalNotActiveError(
-            terminal_id=terminal_id, current_status=str(current)
-        ) from exc
+        raise TerminalNotActiveError(terminal_id=terminal_id, current_status=str(current)) from exc
     if cur not in _TRANSACTABLE_STATES:
         raise TerminalNotActiveError(
-            terminal_id=terminal_id, current_status=str(cur),
+            terminal_id=terminal_id,
+            current_status=str(cur),
         )
 
 

@@ -239,38 +239,42 @@ class TestTerminalStateMachine:
 
 class TestTerminalLifecycle:
     def test_open_terminal_persists_and_returns_session(
-        self, service: PosService, mock_repo: MagicMock,
+        self,
+        service: PosService,
+        mock_repo: MagicMock,
     ):
         mock_repo.create_terminal_session.return_value = _terminal_row("open")
 
-        session = service.open_terminal(
-            tenant_id=1, site_code="SITE01", staff_id="staff-1"
-        )
+        session = service.open_terminal(tenant_id=1, site_code="SITE01", staff_id="staff-1")
 
         assert session.id == 1
         assert session.status == TerminalStatus.open
         mock_repo.create_terminal_session.assert_called_once()
 
     def test_pause_terminal_valid_transition(
-        self, service: PosService, mock_repo: MagicMock,
+        self,
+        service: PosService,
+        mock_repo: MagicMock,
     ):
         mock_repo.get_terminal_session.return_value = _terminal_row("active")
         mock_repo.update_terminal_status.return_value = _terminal_row("paused")
         result = service.pause_terminal(1)
         assert result.status == TerminalStatus.paused
-        mock_repo.update_terminal_status.assert_called_once_with(
-            1, "paused", closing_cash=None
-        )
+        mock_repo.update_terminal_status.assert_called_once_with(1, "paused", closing_cash=None)
 
     def test_pause_terminal_rejects_closed(
-        self, service: PosService, mock_repo: MagicMock,
+        self,
+        service: PosService,
+        mock_repo: MagicMock,
     ):
         mock_repo.get_terminal_session.return_value = _terminal_row("closed")
         with pytest.raises(TerminalNotActiveError):
             service.pause_terminal(1)
 
     def test_resume_terminal_only_from_paused(
-        self, service: PosService, mock_repo: MagicMock,
+        self,
+        service: PosService,
+        mock_repo: MagicMock,
     ):
         mock_repo.get_terminal_session.return_value = _terminal_row("paused")
         mock_repo.update_terminal_status.return_value = _terminal_row("active")
@@ -278,7 +282,9 @@ class TestTerminalLifecycle:
         assert result.status == TerminalStatus.paused or result.status == TerminalStatus.active
 
     def test_close_terminal_records_closing_cash(
-        self, service: PosService, mock_repo: MagicMock,
+        self,
+        service: PosService,
+        mock_repo: MagicMock,
     ):
         mock_repo.get_terminal_session.return_value = _terminal_row("active")
         mock_repo.update_terminal_status.return_value = {
@@ -288,18 +294,24 @@ class TestTerminalLifecycle:
         result = service.close_terminal(1, closing_cash=Decimal("250"))
         assert result.status == TerminalStatus.closed
         mock_repo.update_terminal_status.assert_called_once_with(
-            1, "closed", closing_cash=Decimal("250"),
+            1,
+            "closed",
+            closing_cash=Decimal("250"),
         )
 
     def test_close_unknown_terminal_raises(
-        self, service: PosService, mock_repo: MagicMock,
+        self,
+        service: PosService,
+        mock_repo: MagicMock,
     ):
         mock_repo.get_terminal_session.return_value = None
         with pytest.raises(PosError):
             service.close_terminal(99, closing_cash=Decimal("0"))
 
     def test_list_active_terminals(
-        self, service: PosService, mock_repo: MagicMock,
+        self,
+        service: PosService,
+        mock_repo: MagicMock,
     ):
         mock_repo.get_active_terminals.return_value = [
             _terminal_row("active"),
@@ -316,7 +328,9 @@ class TestTerminalLifecycle:
 
 class TestCreateTransaction:
     def test_create_promotes_open_to_active(
-        self, service: PosService, mock_repo: MagicMock,
+        self,
+        service: PosService,
+        mock_repo: MagicMock,
     ):
         mock_repo.get_terminal_session.return_value = _terminal_row("open")
         mock_repo.create_transaction.return_value = _txn_row()
@@ -330,26 +344,35 @@ class TestCreateTransaction:
 
         # Open terminal should be promoted to active before transaction insert
         assert any(
-            call.args[1] == "active"
-            for call in mock_repo.update_terminal_status.call_args_list
+            call.args[1] == "active" for call in mock_repo.update_terminal_status.call_args_list
         )
 
     def test_create_rejects_paused_terminal(
-        self, service: PosService, mock_repo: MagicMock,
+        self,
+        service: PosService,
+        mock_repo: MagicMock,
     ):
         mock_repo.get_terminal_session.return_value = _terminal_row("paused")
         with pytest.raises(TerminalNotActiveError):
             service.create_transaction(
-                tenant_id=1, terminal_id=1, staff_id="staff-1", site_code="SITE01",
+                tenant_id=1,
+                terminal_id=1,
+                staff_id="staff-1",
+                site_code="SITE01",
             )
 
     def test_create_rejects_closed_terminal(
-        self, service: PosService, mock_repo: MagicMock,
+        self,
+        service: PosService,
+        mock_repo: MagicMock,
     ):
         mock_repo.get_terminal_session.return_value = _terminal_row("closed")
         with pytest.raises(TerminalNotActiveError):
             service.create_transaction(
-                tenant_id=1, terminal_id=1, staff_id="staff-1", site_code="SITE01",
+                tenant_id=1,
+                terminal_id=1,
+                staff_id="staff-1",
+                site_code="SITE01",
             )
 
 
@@ -505,7 +528,9 @@ class TestAddItem:
 
     @pytest.mark.asyncio
     async def test_unknown_drug_raises(
-        self, service: PosService, mock_repo: MagicMock,
+        self,
+        service: PosService,
+        mock_repo: MagicMock,
     ):
         mock_repo.get_product_by_code.return_value = None
         with pytest.raises(PosError):
@@ -575,7 +600,9 @@ class TestAddItem:
 
 class TestUpdateRemoveItem:
     def test_update_item_recalculates_line_total(
-        self, service: PosService, mock_repo: MagicMock,
+        self,
+        service: PosService,
+        mock_repo: MagicMock,
     ):
         mock_repo.update_item_quantity.return_value = {
             "id": 1,
@@ -589,7 +616,9 @@ class TestUpdateRemoveItem:
             "is_controlled": False,
         }
         item = service.update_item(
-            1, quantity=Decimal("4"), unit_price=Decimal("12.5"),
+            1,
+            quantity=Decimal("4"),
+            unit_price=Decimal("12.5"),
         )
         # Service computes line_total from unit_price × quantity
         assert item.quantity == Decimal("4")
@@ -599,14 +628,18 @@ class TestUpdateRemoveItem:
         assert kwargs["line_total"] == Decimal("50.0000")
 
     def test_update_unknown_item_raises(
-        self, service: PosService, mock_repo: MagicMock,
+        self,
+        service: PosService,
+        mock_repo: MagicMock,
     ):
         mock_repo.update_item_quantity.return_value = None
         with pytest.raises(PosError):
             service.update_item(99, quantity=Decimal("1"), unit_price=Decimal("1"))
 
     def test_remove_item_returns_repo_result(
-        self, service: PosService, mock_repo: MagicMock,
+        self,
+        service: PosService,
+        mock_repo: MagicMock,
     ):
         mock_repo.remove_item.return_value = True
         assert service.remove_item(1) is True
@@ -624,25 +657,43 @@ class TestCheckout:
         mock_repo.get_transaction.return_value = _txn_row("draft")
         items = [
             {
-                "id": 1, "transaction_id": 100, "drug_code": "DRUG001",
-                "drug_name": "A", "quantity": Decimal("2"),
-                "unit_price": Decimal("10"), "line_total": Decimal("20"),
-                "discount": Decimal("0"), "batch_number": "B1",
-                "is_controlled": False, "pharmacist_id": None,
+                "id": 1,
+                "transaction_id": 100,
+                "drug_code": "DRUG001",
+                "drug_name": "A",
+                "quantity": Decimal("2"),
+                "unit_price": Decimal("10"),
+                "line_total": Decimal("20"),
+                "discount": Decimal("0"),
+                "batch_number": "B1",
+                "is_controlled": False,
+                "pharmacist_id": None,
             },
             {
-                "id": 2, "transaction_id": 100, "drug_code": "DRUG002",
-                "drug_name": "B", "quantity": Decimal("3"),
-                "unit_price": Decimal("5"), "line_total": Decimal("15"),
-                "discount": Decimal("0"), "batch_number": "B2",
-                "is_controlled": False, "pharmacist_id": None,
+                "id": 2,
+                "transaction_id": 100,
+                "drug_code": "DRUG002",
+                "drug_name": "B",
+                "quantity": Decimal("3"),
+                "unit_price": Decimal("5"),
+                "line_total": Decimal("15"),
+                "discount": Decimal("0"),
+                "batch_number": "B2",
+                "is_controlled": False,
+                "pharmacist_id": None,
             },
             {
-                "id": 3, "transaction_id": 100, "drug_code": "DRUG003",
-                "drug_name": "C", "quantity": Decimal("4"),
-                "unit_price": Decimal("10"), "line_total": Decimal("40"),
-                "discount": Decimal("0"), "batch_number": "B3",
-                "is_controlled": False, "pharmacist_id": None,
+                "id": 3,
+                "transaction_id": 100,
+                "drug_code": "DRUG003",
+                "drug_name": "C",
+                "quantity": Decimal("4"),
+                "unit_price": Decimal("10"),
+                "line_total": Decimal("40"),
+                "discount": Decimal("0"),
+                "batch_number": "B3",
+                "is_controlled": False,
+                "pharmacist_id": None,
             },
         ]
         mock_repo.get_transaction_items.return_value = items
@@ -653,8 +704,11 @@ class TestCheckout:
             "subtotal": Decimal("75.0000"),
         }
         mock_repo.insert_bronze_pos_transaction.return_value = {
-            "id": 1, "transaction_id": "POS-R1-1-100", "drug_code": "X",
-            "net_amount": Decimal("0"), "loaded_at": datetime.now(tz=UTC),
+            "id": 1,
+            "transaction_id": "POS-R1-1-100",
+            "drug_code": "X",
+            "net_amount": Decimal("0"),
+            "loaded_at": datetime.now(tz=UTC),
         }
         return {"items": items}
 
@@ -757,7 +811,9 @@ class TestCheckout:
 
     @pytest.mark.asyncio
     async def test_checkout_unknown_transaction_raises(
-        self, service: PosService, mock_repo: MagicMock,
+        self,
+        service: PosService,
+        mock_repo: MagicMock,
     ):
         mock_repo.get_transaction.return_value = None
         with pytest.raises(PosError):
@@ -818,7 +874,9 @@ class TestCheckout:
 
 class TestProductSearch:
     def test_search_returns_pos_results(
-        self, service: PosService, mock_repo: MagicMock,
+        self,
+        service: PosService,
+        mock_repo: MagicMock,
     ):
         mock_repo.search_dim_products.return_value = [
             {
@@ -863,22 +921,32 @@ class TestProductSearch:
 
 class TestQueries:
     def test_get_transaction_detail_returns_none_when_missing(
-        self, service: PosService, mock_repo: MagicMock,
+        self,
+        service: PosService,
+        mock_repo: MagicMock,
     ):
         mock_repo.get_transaction.return_value = None
         assert service.get_transaction_detail(1) is None
 
     def test_get_transaction_detail_includes_items(
-        self, service: PosService, mock_repo: MagicMock,
+        self,
+        service: PosService,
+        mock_repo: MagicMock,
     ):
         mock_repo.get_transaction.return_value = _txn_row("completed")
         mock_repo.get_transaction_items.return_value = [
             {
-                "id": 1, "transaction_id": 100, "drug_code": "X",
-                "drug_name": "X", "quantity": Decimal("1"),
-                "unit_price": Decimal("10"), "line_total": Decimal("10"),
-                "discount": Decimal("0"), "batch_number": None,
-                "is_controlled": False, "pharmacist_id": None,
+                "id": 1,
+                "transaction_id": 100,
+                "drug_code": "X",
+                "drug_name": "X",
+                "quantity": Decimal("1"),
+                "unit_price": Decimal("10"),
+                "line_total": Decimal("10"),
+                "discount": Decimal("0"),
+                "batch_number": None,
+                "is_controlled": False,
+                "pharmacist_id": None,
             }
         ]
         detail = service.get_transaction_detail(100)
@@ -886,18 +954,30 @@ class TestQueries:
         assert len(detail.items) == 1
 
     def test_list_transactions_passes_filters(
-        self, service: PosService, mock_repo: MagicMock,
+        self,
+        service: PosService,
+        mock_repo: MagicMock,
     ):
         mock_repo.list_transactions.return_value = [_txn_row("completed")]
         service.list_transactions(
-            tenant_id=1, terminal_id=2, status="completed", limit=10, offset=0,
+            tenant_id=1,
+            terminal_id=2,
+            status="completed",
+            limit=10,
+            offset=0,
         )
         mock_repo.list_transactions.assert_called_once_with(
-            1, terminal_id=2, status="completed", limit=10, offset=0,
+            1,
+            terminal_id=2,
+            status="completed",
+            limit=10,
+            offset=0,
         )
 
     def test_get_terminal_returns_none_when_missing(
-        self, service: PosService, mock_repo: MagicMock,
+        self,
+        service: PosService,
+        mock_repo: MagicMock,
     ):
         mock_repo.get_terminal_session.return_value = None
         assert service.get_terminal(99) is None

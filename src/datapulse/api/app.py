@@ -151,9 +151,7 @@ def create_app() -> FastAPI:
         return JSONResponse(status_code=409, content={"detail": exc.message})
 
     @app.exception_handler(ShiftNotOpenError)
-    async def pos_shift_not_open_handler(
-        request: Request, exc: ShiftNotOpenError
-    ) -> JSONResponse:
+    async def pos_shift_not_open_handler(request: Request, exc: ShiftNotOpenError) -> JSONResponse:
         return JSONResponse(status_code=409, content={"detail": exc.message})
 
     @app.exception_handler(DataPulseError)
