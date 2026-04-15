@@ -15,6 +15,7 @@
 - No `TODO`/`FIXME`/`HACK`/`XXX` markers exist in `src/`. No debt-comment triage needed.
 - Scope narrows to: **8 file splits + final quality gate + PR**.
 
+
 **Environment amendment (2026-04-15, post-Task-0 retry):**
 - **No local Docker available.** PostgreSQL lives on the droplet; DB-dependent tests can't run on the Windows dev machine.
 - **Local gate (this sprint):** `pytest -m unit` must stay green and `ruff check/format` clean at every task. Unit-test coverage baseline is whatever Task 0 actually measures — each subsequent task must not drop it.
@@ -52,6 +53,7 @@ ruff check src/ tests/
 
 Expected: both commands exit 0. If they don't, STOP and report — the baseline is not clean and this plan's invariant ("no new lint warnings") can't be measured.
 
+
 - [ ] **Step 3: Run unit-test baseline (local gate — no DB)**
 
 ```bash
@@ -67,6 +69,13 @@ pytest -x -q --ignore=tests/test_api_endpoints.py --cov=src/datapulse --cov-repo
 ```
 
 (Excludes the known DB-dependent suite. Other DB-dependent tests will skip or fail cleanly — record which.)
+- [ ] **Step 3: Run test baseline**
+
+```bash
+pytest -x -q --cov=src/datapulse --cov-fail-under=95 2>&1 | tee /tmp/baseline-tests.txt
+```
+
+Expected: all tests pass, coverage ≥ 95%. Record the final coverage percentage in a scratchpad — it becomes the invariant for every subsequent task.
 
 - [ ] **Step 4: Snapshot oversized-file list**
 
