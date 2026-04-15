@@ -242,6 +242,19 @@ class VoidRequest(BaseModel):
     reason: str = Field(min_length=3, max_length=500)
 
 
+class VoidResponse(BaseModel):
+    """Audit record returned after a transaction is voided."""
+
+    model_config = ConfigDict(frozen=True)
+
+    id: int
+    transaction_id: int
+    tenant_id: int
+    voided_by: str
+    reason: str
+    voided_at: datetime
+
+
 # ---------------------------------------------------------------------------
 # Returns
 # ---------------------------------------------------------------------------
@@ -293,6 +306,23 @@ class ReturnDetailResponse(BaseModel):
 # ---------------------------------------------------------------------------
 # Shift management
 # ---------------------------------------------------------------------------
+
+
+class StartShiftRequest(BaseModel):
+    """Request body to start a new cashier shift on a terminal."""
+
+    model_config = ConfigDict(frozen=True)
+
+    terminal_id: int = Field(ge=1)
+    opening_cash: JsonDecimal = Decimal("0")
+
+
+class CloseShiftRequest(BaseModel):
+    """Request body to close a cashier shift and record the closing cash total."""
+
+    model_config = ConfigDict(frozen=True)
+
+    closing_cash: JsonDecimal
 
 
 class ShiftRecord(BaseModel):

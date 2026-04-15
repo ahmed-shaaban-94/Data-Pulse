@@ -28,17 +28,28 @@ from datapulse.api.limiter import limiter
 from datapulse.logging import get_logger
 from datapulse.pos.models import (
     AddItemRequest,
+    CashCountRequest,
+    CashDrawerEventResponse,
     CheckoutRequest,
     CheckoutResponse,
+    CloseShiftRequest,
     PosCartItem,
     PosProductResult,
     PosStockInfo,
+    ReturnDetailResponse,
+    ReturnRequest,
+    ReturnResponse,
+    ShiftRecord,
+    ShiftSummaryResponse,
+    StartShiftRequest,
     TerminalCloseRequest,
     TerminalOpenRequest,
     TerminalSessionResponse,
     TransactionDetailResponse,
     TransactionResponse,
     UpdateItemRequest,
+    VoidRequest,
+    VoidResponse,
 )
 from datapulse.pos.service import PosService
 
@@ -422,3 +433,244 @@ def send_receipt_email(
     _ = service.get_receipt_pdf(transaction_id, _tenant_id_of(user))
     log.info("pos.receipt.email_queued", transaction_id=transaction_id, email=body.email)
     return {"sent": True, "email": body.email}
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Void (B6a)
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+@router.post(
+    "/transactions/{transaction_id}/void",
+    response_model=VoidResponse,
+)
+@limiter.limit("10/minute")
+async def void_transaction(
+    request: Request,
+    transaction_id: Annotated[int, Path(ge=1)],
+    body: VoidRequest,
+    service: ServiceDep,
+    user: CurrentUser,
+) -> VoidResponse:
+    """Void a completed transaction — reverses inventory and writes an audit log.
+
+    Restricted to supervisors / managers. Only ``completed`` transactions
+    may be voided; draft transactions should be abandoned by removing items.
+    """
+    return await service.void_transaction(
+        transaction_id=transaction_id,
+        tenant_id=_tenant_id_of(user),
+        reason=body.reason,
+        voided_by=_staff_id_of(user),
+    )
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Returns (B6a)
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+@router.post(
+    "/returns",
+    response_model=ReturnResponse,
+    status_code=201,
+)
+@limiter.limit("20/minute")
+async def process_return(
+    request: Request,
+    body: ReturnRequest,
+    service: ServiceDep,
+    user: CurrentUser,
+) -> ReturnResponse:
+    """Process a drug return against a completed transaction.
+
+    Creates a return transaction, restocks inventory via FEFO movement,
+    and records a ``pos.returns`` audit entry.
+    """
+    return await service.process_return(
+        original_transaction_id=body.original_transaction_id,
+        tenant_id=_tenant_id_of(user),
+        staff_id=_staff_id_of(user),
+        items=list(body.items),
+        reason=body.reason,
+        refund_method=body.refund_method,
+        notes=body.notes,
+    )
+
+
+@router.get("/returns/{return_id}", response_model=ReturnDetailResponse)
+@limiter.limit("60/minute")
+def get_return(
+    request: Request,
+    return_id: Annotated[int, Path(ge=1)],
+    service: ServiceDep,
+    user: CurrentUser,
+) -> ReturnDetailResponse:
+    """Fetch a single return record with its line items."""
+    _ = user
+    detail = service.get_return(return_id)
+    if detail is None:
+        raise HTTPException(status_code=404, detail=f"Return {return_id} not found")
+    return detail
+
+
+@router.get(
+    "/transactions/{transaction_id}/returns",
+    response_model=list[ReturnResponse],
+)
+@limiter.limit("60/minute")
+def list_transaction_returns(
+    request: Request,
+    transaction_id: Annotated[int, Path(ge=1)],
+    service: ServiceDep,
+    user: CurrentUser,
+) -> list[ReturnResponse]:
+    """List all return records for an original transaction."""
+    _ = user
+    return service.list_returns_for_transaction(transaction_id)
+
+
+@router.get("/returns", response_model=list[ReturnResponse])
+@limiter.limit("60/minute")
+def list_returns(
+    request: Request,
+    service: ServiceDep,
+    user: CurrentUser,
+    limit: Annotated[int, Query(ge=1, le=200)] = 50,
+    offset: Annotated[int, Query(ge=0)] = 0,
+) -> list[ReturnResponse]:
+    """List all return records for the tenant, most recent first."""
+    return service.list_returns(
+        _tenant_id_of(user),
+        limit=limit,
+        offset=offset,
+    )
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Shifts (B6a)
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+@router.post("/shifts", response_model=ShiftRecord, status_code=201)
+@limiter.limit("20/minute")
+def start_shift(
+    request: Request,
+    body: StartShiftRequest,
+    service: ServiceDep,
+    user: CurrentUser,
+) -> ShiftRecord:
+    """Start a new cashier shift on the specified terminal.
+
+    Raises 409 if the terminal already has an open shift.
+    """
+    return service.start_shift(
+        terminal_id=body.terminal_id,
+        tenant_id=_tenant_id_of(user),
+        staff_id=_staff_id_of(user),
+        opening_cash=Decimal(str(body.opening_cash)),
+    )
+
+
+@router.get("/shifts", response_model=list[ShiftRecord])
+@limiter.limit("60/minute")
+def list_shifts(
+    request: Request,
+    service: ServiceDep,
+    user: CurrentUser,
+    terminal_id: Annotated[int | None, Query(ge=1)] = None,
+    limit: Annotated[int, Query(ge=1, le=200)] = 30,
+    offset: Annotated[int, Query(ge=0)] = 0,
+) -> list[ShiftRecord]:
+    """List shift records for the tenant, most recent first."""
+    return service.list_shifts(
+        _tenant_id_of(user),
+        terminal_id=terminal_id,
+        limit=limit,
+        offset=offset,
+    )
+
+
+@router.get("/shifts/current/{terminal_id}", response_model=ShiftRecord)
+@limiter.limit("60/minute")
+def get_current_shift(
+    request: Request,
+    terminal_id: Annotated[int, Path(ge=1)],
+    service: ServiceDep,
+    user: CurrentUser,
+) -> ShiftRecord:
+    """Return the currently open shift for a terminal."""
+    _ = user
+    shift = service.get_current_shift(terminal_id)
+    if shift is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No open shift found for terminal {terminal_id}",
+        )
+    return shift
+
+
+@router.post("/shifts/{shift_id}/close", response_model=ShiftSummaryResponse)
+@limiter.limit("20/minute")
+def close_shift(
+    request: Request,
+    shift_id: Annotated[int, Path(ge=1)],
+    body: CloseShiftRequest,
+    service: ServiceDep,
+    user: CurrentUser,
+) -> ShiftSummaryResponse:
+    """Close a cashier shift and compute cash reconciliation.
+
+    Returns ``expected_cash``, ``variance`` (closing - expected), transaction count,
+    and total sales for the shift.
+    """
+    _ = user
+    return service.close_shift(
+        shift_id=shift_id,
+        closing_cash=Decimal(str(body.closing_cash)),
+    )
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Cash drawer events (B6a)
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+@router.post(
+    "/terminals/{terminal_id}/cash-events",
+    response_model=CashDrawerEventResponse,
+    status_code=201,
+)
+@limiter.limit("30/minute")
+def record_cash_event(
+    request: Request,
+    terminal_id: Annotated[int, Path(ge=1)],
+    body: CashCountRequest,
+    service: ServiceDep,
+    user: CurrentUser,
+) -> CashDrawerEventResponse:
+    """Record a mid-shift cash drawer event (float, pickup, sale, refund)."""
+    return service.record_cash_event(
+        terminal_id=terminal_id,
+        tenant_id=_tenant_id_of(user),
+        event_type=body.event_type.value,
+        amount=Decimal(str(body.amount)),
+        reference_id=body.reference_id,
+    )
+
+
+@router.get(
+    "/terminals/{terminal_id}/cash-events",
+    response_model=list[CashDrawerEventResponse],
+)
+@limiter.limit("60/minute")
+def list_cash_events(
+    request: Request,
+    terminal_id: Annotated[int, Path(ge=1)],
+    service: ServiceDep,
+    user: CurrentUser,
+    limit: Annotated[int, Query(ge=1, le=500)] = 100,
+) -> list[CashDrawerEventResponse]:
+    """List cash drawer events for a terminal, most recent first."""
+    _ = user
+    return service.get_cash_events(terminal_id, limit=limit)

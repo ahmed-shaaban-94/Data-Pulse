@@ -696,6 +696,86 @@ class PosRepository:
         )
         return dict(row)
 
+    def get_shift_by_id(self, shift_id: int) -> dict[str, Any] | None:
+        """Return a single shift record by ID."""
+        row = (
+            self._session.execute(
+                text("""
+                    SELECT id, terminal_id, tenant_id, staff_id, shift_date,
+                           opened_at, closed_at, opening_cash, closing_cash,
+                           expected_cash, variance
+                    FROM   pos.shift_records
+                    WHERE  id = :shift_id
+                """),
+                {"shift_id": shift_id},
+            )
+            .mappings()
+            .first()
+        )
+        return dict(row) if row else None
+
+    def get_shift_summary_data(
+        self,
+        terminal_id: int,
+        *,
+        opened_at: datetime,
+        closed_at: datetime,
+    ) -> dict[str, Any]:
+        """Return transaction count + total completed sales for a shift time window."""
+        row = (
+            self._session.execute(
+                text("""
+                    SELECT
+                        COUNT(*)::INT                                        AS transaction_count,
+                        COALESCE(SUM(grand_total) FILTER (WHERE status = 'completed'), 0)
+                                                                             AS total_sales
+                    FROM pos.transactions
+                    WHERE terminal_id = :terminal_id
+                    AND   created_at >= :opened_at
+                    AND   created_at <= :closed_at
+                """),
+                {
+                    "terminal_id": terminal_id,
+                    "opened_at": opened_at,
+                    "closed_at": closed_at,
+                },
+            )
+            .mappings()
+            .first()
+        )
+        if row:
+            return dict(row)
+        return {"transaction_count": 0, "total_sales": Decimal("0")}
+
+    def list_returns(
+        self,
+        tenant_id: int,
+        *,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> list[dict[str, Any]]:
+        """List return records for a tenant, most recent first."""
+        rows = (
+            self._session.execute(
+                text("""
+                    SELECT id, tenant_id, original_transaction_id, return_transaction_id,
+                           staff_id, reason, refund_amount, refund_method, notes, created_at
+                    FROM   pos.returns
+                    WHERE  tenant_id = :tenant_id
+                    ORDER  BY created_at DESC
+                    LIMIT  :limit OFFSET :offset
+                """),
+                {
+                    "tenant_id": tenant_id,
+                    "limit": limit,
+                    "offset": offset,
+                },
+            )
+            .mappings()
+            .all()
+        )
+        return [dict(r) for r in rows]
+
     def get_void_log(self, transaction_id: int) -> dict[str, Any] | None:
         """Return the void record for a transaction (at most one per transaction)."""
         row = (
