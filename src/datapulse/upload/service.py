@@ -297,7 +297,6 @@ class UploadService:
         Uses a separate directory from sales files to keep data organized.
         """
         raw_dir = Path(target_dir) if target_dir else self._raw_dir.parent / "inventory"
-        raw_dir.mkdir(parents=True, exist_ok=True)
         moved = []
         for fid in file_ids:
             try:
@@ -308,6 +307,7 @@ class UploadService:
             matching = list(self._tenant_dir.glob(f"{normalized_fid}.*"))
             if not matching:
                 continue
+            raw_dir.mkdir(parents=True, exist_ok=True)
             src = matching[0]
             dest = raw_dir / src.name
             shutil.move(str(src), str(dest))
