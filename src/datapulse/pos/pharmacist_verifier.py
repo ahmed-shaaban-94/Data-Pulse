@@ -16,6 +16,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
 
 from datapulse.logging import get_logger
@@ -86,7 +87,7 @@ class PharmacistVerifier:
     """
 
     secret_key: str
-    pin_lookup: object  # Callable[[str], str | None]
+    pin_lookup: Callable[[str], str | None]
     ttl: int = TOKEN_TTL_SECONDS
 
     # ------------------------------------------------------------------
@@ -101,7 +102,7 @@ class PharmacistVerifier:
         PharmacistVerificationRequiredError
             When the credential is wrong or the user has no PIN hash stored.
         """
-        stored_hash = self.pin_lookup(pharmacist_id)  # type: ignore[call-arg]
+        stored_hash = self.pin_lookup(pharmacist_id)
         if stored_hash is None:
             log.warning("pos.pharmacist.no_pin_hash", pharmacist_id=pharmacist_id)
             raise PharmacistVerificationRequiredError(
