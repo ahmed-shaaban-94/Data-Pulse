@@ -25,7 +25,6 @@ from typing import Any
 from datapulse.logging import get_logger
 from datapulse.pos.constants import (
     CONTROLLED_CATEGORIES,
-    ReturnReason,
     TerminalStatus,
     TransactionStatus,
 )
@@ -41,20 +40,16 @@ from datapulse.pos.inventory_contract import (
 )
 from datapulse.pos.models import (
     BatchSummary,
-    CashDrawerEventResponse,
     CheckoutRequest,
     CheckoutResponse,
     PosCartItem,
     PosProductResult,
     PosStockInfo,
-    ReturnDetailResponse,
     ReturnResponse,
-    ShiftRecord,
     ShiftSummaryResponse,
     TerminalSession,
     TransactionDetailResponse,
     TransactionResponse,
-    VoidResponse,
 )
 from datapulse.pos.payment import get_gateway
 from datapulse.pos.receipt import generate_pdf_receipt, generate_thermal_receipt
@@ -650,23 +645,22 @@ class PosService:
         return content
 
     # ──────────────────────────────────────────────────────────────
-    # Void (B6a)
+    # Void transaction (B6a)
     # ──────────────────────────────────────────────────────────────
 
-    async def void_transaction(
+    def void_transaction(
         self,
         *,
         transaction_id: int,
         tenant_id: int,
+        staff_id: str,
         reason: str,
-        voided_by: str,
-    ) -> VoidResponse:
-        """Void a completed transaction — reverses inventory, writes audit log.
+    ) -> TransactionResponse:
+        """Mark a completed transaction as voided and record in void_log.
 
-        Only ``completed`` transactions may be voided. Draft transactions are
-        abandoned by removing all items; voiding a ``voided`` transaction raises.
-
-        Raises :class:`PosError` for not-found or wrong-state.
+        Only ``completed`` transactions may be voided. Voiding is idempotent
+        in the sense that a second attempt raises an error rather than creating
+        a duplicate void record.
         """
         header = self._repo.get_transaction(transaction_id)
         if header is None:
@@ -677,402 +671,125 @@ class PosService:
         if header["status"] != TransactionStatus.completed.value:
             raise PosError(
                 message=(
-                    f"Only completed transactions can be voided (current: {header['status']})"
+                    f"Only completed transactions can be voided "
+                    f"(current: {header['status']})"
                 ),
                 detail=f"transaction_id={transaction_id} status={header['status']}",
             )
-
-        # Reverse inventory movements first — before status update
-        items = self._repo.get_transaction_items(transaction_id)
-        for item in items:
-            await self._inventory.record_movement(
-                StockMovement(
-                    drug_code=item["drug_code"],
-                    site_code=header["site_code"],
-                    quantity_delta=_to_decimal(item["quantity"]),  # positive = restock
-                    batch_number=item.get("batch_number"),
-                    reference_id=f"VOID-{transaction_id}",
-                    movement_type="void",
-                ),
+        if self._repo.get_void_log(transaction_id) is not None:
+            raise PosError(
+                message=f"Transaction {transaction_id} has already been voided",
+                detail=f"transaction_id={transaction_id}",
             )
-
-        self._repo.update_transaction_status(
+        self._repo.create_void_log(
+            transaction_id=transaction_id,
+            tenant_id=tenant_id,
+            voided_by=staff_id,
+            reason=reason,
+        )
+        updated = self._repo.update_transaction_status(
             transaction_id,
             status=TransactionStatus.voided.value,
         )
-
-        void_row = self._repo.create_void_log(
-            transaction_id=transaction_id,
-            tenant_id=tenant_id,
-            voided_by=voided_by,
-            reason=reason,
-        )
-
+        if updated is None:
+            raise PosError(
+                message=f"Failed to void transaction {transaction_id}",
+                detail=f"transaction_id={transaction_id}",
+            )
         log.info(
-            "pos.void.completed",
+            "pos.transaction.voided",
             transaction_id=transaction_id,
-            voided_by=voided_by,
+            voided_by=staff_id,
         )
-        return VoidResponse.model_validate(void_row)
+        return TransactionResponse.model_validate(updated)
 
     # ──────────────────────────────────────────────────────────────
     # Returns (B6a)
     # ──────────────────────────────────────────────────────────────
 
-    async def process_return(
+    def process_return(
         self,
         *,
         original_transaction_id: int,
         tenant_id: int,
         staff_id: str,
-        items: list[PosCartItem],
-        reason: ReturnReason,
+        reason: str,
         refund_method: str,
         notes: str | None = None,
     ) -> ReturnResponse:
-        """Process a drug return — creates return transaction, restocks inventory.
+        """Record a drug return against a completed transaction.
 
-        Steps
-        -----
-        1. Verify original transaction is completed.
-        2. Compute refund amount from returned items.
-        3. Create a ``returned``-status transaction (links back to original terminal).
-        4. Insert return items into ``pos.transaction_items``.
-        5. Create a ``pos.returns`` audit record.
-        6. Record positive inventory movements (restock).
-        7. Write bronze entries with ``is_return=True``.
-
-        Raises :class:`PosError` for not-found, wrong-state, or empty items.
+        The refund amount mirrors the full ``grand_total`` of the original
+        transaction. Partial-item returns are planned for B7.
+        Updates the original transaction status to ``returned``.
         """
-        original = self._repo.get_transaction(original_transaction_id)
-        if original is None:
+        header = self._repo.get_transaction(original_transaction_id)
+        if header is None:
             raise PosError(
                 message=f"Transaction {original_transaction_id} not found",
                 detail=f"original_transaction_id={original_transaction_id}",
             )
-        if original["status"] != TransactionStatus.completed.value:
+        if header["status"] != TransactionStatus.completed.value:
             raise PosError(
                 message=(
-                    f"Returns only allowed on completed transactions "
-                    f"(current: {original['status']})"
+                    f"Only completed transactions can be returned "
+                    f"(current: {header['status']})"
                 ),
-                detail=(
-                    f"original_transaction_id={original_transaction_id} status={original['status']}"
-                ),
+                detail=f"transaction_id={original_transaction_id} status={header['status']}",
             )
-        if not items:
-            raise PosError(
-                message="Return must include at least one item",
-                detail=f"original_transaction_id={original_transaction_id}",
-            )
-
-        refund_amount = sum(
-            (_to_decimal(item.line_total) for item in items),
-            start=Decimal("0"),
-        ).quantize(Decimal("0.0001"))
-
-        # Create a return transaction on the same terminal
-        terminal_id = int(original["terminal_id"])
-        site_code = str(original["site_code"])
-        return_txn = self._repo.create_transaction(
-            tenant_id=tenant_id,
-            terminal_id=terminal_id,
-            staff_id=staff_id,
-            site_code=site_code,
-        )
-        return_txn_id = int(return_txn["id"])
-
-        now = datetime.now(tz=UTC)
-        bronze_return_id = f"POS-RET-{original_transaction_id}"
-
-        for item in items:
-            self._repo.add_transaction_item(
-                transaction_id=return_txn_id,
-                tenant_id=tenant_id,
-                drug_code=item.drug_code,
-                drug_name=item.drug_name,
-                quantity=_to_decimal(item.quantity),
-                unit_price=_to_decimal(item.unit_price),
-                line_total=_to_decimal(item.line_total),
-                discount=_to_decimal(item.discount),
-                batch_number=item.batch_number,
-                expiry_date=item.expiry_date,
-                is_controlled=item.is_controlled,
-                pharmacist_id=item.pharmacist_id,
-            )
-
-            # Positive delta = restock
-            await self._inventory.record_movement(
-                StockMovement(
-                    drug_code=item.drug_code,
-                    site_code=site_code,
-                    quantity_delta=_to_decimal(item.quantity),
-                    batch_number=item.batch_number,
-                    reference_id=f"RET-{original_transaction_id}",
-                    movement_type="return",
-                ),
-            )
-
-            # Bronze row with is_return=True
-            self._repo.insert_bronze_pos_transaction(
-                tenant_id=tenant_id,
-                transaction_id=bronze_return_id,
-                transaction_date=now,
-                site_code=site_code,
-                register_id=str(original["terminal_id"]),
-                cashier_id=staff_id,
-                customer_id=original.get("customer_id"),
-                drug_code=item.drug_code,
-                batch_number=item.batch_number,
-                quantity=_to_decimal(item.quantity),
-                unit_price=_to_decimal(item.unit_price),
-                discount=_to_decimal(item.discount),
-                net_amount=_to_decimal(item.line_total),
-                payment_method=str(original.get("payment_method") or "cash"),
-                is_return=True,
-            )
-
-        self._repo.update_transaction_status(
-            return_txn_id,
-            status=TransactionStatus.returned.value,
-        )
-
-        return_row = self._repo.create_return(
+        refund_amount = _to_decimal(header.get("grand_total", 0))
+        row = self._repo.create_return(
             tenant_id=tenant_id,
             original_transaction_id=original_transaction_id,
             staff_id=staff_id,
-            reason=reason.value,
+            reason=reason,
             refund_amount=refund_amount,
             refund_method=refund_method,
-            return_transaction_id=return_txn_id,
             notes=notes,
         )
-
+        self._repo.update_transaction_status(
+            original_transaction_id,
+            status=TransactionStatus.returned.value,
+        )
         log.info(
             "pos.return.processed",
-            return_id=return_row["id"],
-            original_txn_id=original_transaction_id,
+            return_id=row["id"],
+            original_transaction_id=original_transaction_id,
             refund_amount=str(refund_amount),
-            refund_method=refund_method,
         )
-        return ReturnResponse.model_validate(return_row)
-
-    def get_return(self, return_id: int) -> ReturnDetailResponse | None:
-        """Return the full detail of a return record, including its items."""
-        row = self._repo.get_return(return_id)
-        if row is None:
-            return None
-        # Items come from the linked return transaction
-        items: list[PosCartItem] = []
-        if row.get("return_transaction_id"):
-            item_rows = self._repo.get_transaction_items(int(row["return_transaction_id"]))
-            items = [PosCartItem.model_validate(r) for r in item_rows]
-        return ReturnDetailResponse.model_validate({**row, "items": items})
-
-    def list_returns_for_transaction(
-        self,
-        original_transaction_id: int,
-    ) -> list[ReturnResponse]:
-        """List all return records linked to an original transaction."""
-        rows = self._repo.list_returns_for_transaction(original_transaction_id)
-        return [ReturnResponse.model_validate(r) for r in rows]
-
-    def list_returns(
-        self,
-        tenant_id: int,
-        *,
-        limit: int = 50,
-        offset: int = 0,
-    ) -> list[ReturnResponse]:
-        """List return records for the tenant, most recent first."""
-        rows = self._repo.list_returns(tenant_id, limit=limit, offset=offset)
-        return [ReturnResponse.model_validate(r) for r in rows]
+        return ReturnResponse.model_validate(row)
 
     # ──────────────────────────────────────────────────────────────
-    # Shifts (B6a)
+    # Shift summary (B6a)
     # ──────────────────────────────────────────────────────────────
 
-    def start_shift(
+    def get_shift_summary(
         self,
         *,
         terminal_id: int,
         tenant_id: int,
-        staff_id: str,
-        opening_cash: Decimal = Decimal("0"),
-    ) -> ShiftRecord:
-        """Open a new cashier shift for a terminal.
+    ) -> ShiftSummaryResponse | None:
+        """Return the open shift record for a terminal with live transaction counts.
 
-        Raises :class:`PosError` if the terminal already has an open shift —
-        the current shift must be closed before starting a new one.
+        Returns ``None`` when the terminal has no open shift (i.e. not yet
+        opened or already closed).
         """
-        existing = self._repo.get_current_shift(terminal_id)
-        if existing is not None:
-            raise PosError(
-                message=(
-                    f"Terminal {terminal_id} already has an open shift "
-                    f"(shift_id={existing['id']}). Close it before starting a new one."
-                ),
-                detail=f"terminal_id={terminal_id} shift_id={existing['id']}",
-            )
-
-        now = datetime.now(tz=UTC)
-        row = self._repo.create_shift_record(
-            terminal_id=terminal_id,
-            tenant_id=tenant_id,
-            staff_id=staff_id,
-            shift_date=now.date(),
-            opened_at=now,
-            opening_cash=opening_cash,
-        )
-        log.info("pos.shift.started", shift_id=row["id"], terminal_id=terminal_id)
-        return ShiftRecord.model_validate(row)
-
-    def close_shift(
-        self,
-        *,
-        shift_id: int,
-        closing_cash: Decimal,
-    ) -> ShiftSummaryResponse:
-        """Close a shift — computes expected cash and variance from drawer events.
-
-        ``expected_cash`` = opening + cash_sales + floats_in - cash_refunds - pickups.
-        ``variance`` = closing_cash - expected_cash (positive = over, negative = short).
-        """
-        from datapulse.pos.terminal import compute_expected_cash, compute_variance
-
-        shift = self._repo.get_shift_by_id(shift_id)
+        shift = self._repo.get_current_shift(terminal_id)
         if shift is None:
-            raise PosError(
-                message=f"Shift {shift_id} not found",
-                detail=f"shift_id={shift_id}",
-            )
-        if shift.get("closed_at") is not None:
-            raise PosError(
-                message=f"Shift {shift_id} is already closed",
-                detail=f"shift_id={shift_id}",
-            )
-
-        # Aggregate cash drawer events since shift opened
-        shift_opened = shift["opened_at"]
-        cash_events = self._repo.get_cash_events(int(shift["terminal_id"]), limit=10000)
-        events_in_shift = [e for e in cash_events if e["timestamp"] >= shift_opened]
-
-        cash_sales = sum(
-            (_to_decimal(e["amount"]) for e in events_in_shift if e["event_type"] == "sale"),
+            return None
+        txns = self._repo.list_transactions(
+            tenant_id,
+            terminal_id=terminal_id,
+            status=TransactionStatus.completed.value,
+        )
+        total_sales = sum(
+            (_to_decimal(t.get("grand_total", 0)) for t in txns),
             start=Decimal("0"),
-        )
-        cash_refunds = sum(
-            (_to_decimal(e["amount"]) for e in events_in_shift if e["event_type"] == "refund"),
-            start=Decimal("0"),
-        )
-        floats_in = sum(
-            (_to_decimal(e["amount"]) for e in events_in_shift if e["event_type"] == "float"),
-            start=Decimal("0"),
-        )
-        pickups = sum(
-            (_to_decimal(e["amount"]) for e in events_in_shift if e["event_type"] == "pickup"),
-            start=Decimal("0"),
-        )
-
-        expected = compute_expected_cash(
-            opening_cash=_to_decimal(shift["opening_cash"]),
-            cash_sales=cash_sales,
-            cash_refunds=cash_refunds,
-            floats_in=floats_in,
-            pickups=pickups,
-        )
-        variance = compute_variance(
-            opening_cash=_to_decimal(shift["opening_cash"]),
-            closing_cash=closing_cash,
-            expected_cash=expected,
-        )
-
-        now = datetime.now(tz=UTC)
-        updated = self._repo.update_shift_record(
-            shift_id,
-            closing_cash=closing_cash,
-            expected_cash=expected,
-            variance=variance,
-            closed_at=now,
-        )
-        if updated is None:
-            raise PosError(
-                message=f"Failed to close shift {shift_id}",
-                detail=f"shift_id={shift_id}",
-            )
-
-        summary_data = self._repo.get_shift_summary_data(
-            int(shift["terminal_id"]),
-            opened_at=shift_opened,
-            closed_at=now,
-        )
-
-        log.info(
-            "pos.shift.closed",
-            shift_id=shift_id,
-            closing_cash=str(closing_cash),
-            expected_cash=str(expected),
-            variance=str(variance),
         )
         return ShiftSummaryResponse.model_validate(
             {
-                **updated,
-                "transaction_count": summary_data.get("transaction_count", 0),
-                "total_sales": summary_data.get("total_sales", Decimal("0")),
+                **shift,
+                "transaction_count": len(txns),
+                "total_sales": total_sales,
             }
         )
-
-    def get_current_shift(self, terminal_id: int) -> ShiftRecord | None:
-        """Return the currently open shift for a terminal (None if no open shift)."""
-        row = self._repo.get_current_shift(terminal_id)
-        return ShiftRecord.model_validate(row) if row else None
-
-    def list_shifts(
-        self,
-        tenant_id: int,
-        *,
-        terminal_id: int | None = None,
-        limit: int = 30,
-        offset: int = 0,
-    ) -> list[ShiftRecord]:
-        """List shift records for a tenant, most recent first."""
-        rows = self._repo.list_shifts(
-            tenant_id,
-            terminal_id=terminal_id,
-            limit=limit,
-            offset=offset,
-        )
-        return [ShiftRecord.model_validate(r) for r in rows]
-
-    # ──────────────────────────────────────────────────────────────
-    # Cash drawer events (B6a)
-    # ──────────────────────────────────────────────────────────────
-
-    def record_cash_event(
-        self,
-        *,
-        terminal_id: int,
-        tenant_id: int,
-        event_type: str,
-        amount: Decimal,
-        reference_id: str | None = None,
-    ) -> CashDrawerEventResponse:
-        """Record a mid-shift cash drawer event (float, pickup, refund, sale)."""
-        row = self._repo.record_cash_event(
-            terminal_id=terminal_id,
-            tenant_id=tenant_id,
-            event_type=event_type,
-            amount=amount,
-            reference_id=reference_id,
-        )
-        return CashDrawerEventResponse.model_validate(row)
-
-    def get_cash_events(
-        self,
-        terminal_id: int,
-        *,
-        limit: int = 100,
-    ) -> list[CashDrawerEventResponse]:
-        """Return cash drawer events for a terminal, most recent first."""
-        rows = self._repo.get_cash_events(terminal_id, limit=limit)
-        return [CashDrawerEventResponse.model_validate(r) for r in rows]

@@ -2,10 +2,11 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, ChevronLeft, ChevronRight, RefreshCw } from "lucide-react";
+import { ArrowLeft, ChevronLeft, ChevronRight, RefreshCw, RotateCcw, XCircle } from "lucide-react";
+import { VoidModal } from "@/components/pos/VoidModal";
 import { usePosHistory } from "@/hooks/use-pos-history";
 import { cn } from "@/lib/utils";
-import type { TransactionStatus } from "@/types/pos";
+import type { TransactionResponse, TransactionStatus } from "@/types/pos";
 
 const STATUS_COLORS: Record<TransactionStatus, string> = {
   draft: "text-text-secondary bg-surface-raised",
@@ -26,6 +27,14 @@ export default function PosHistoryPage() {
   const { transactions, total, isLoading, isError, mutate } = usePosHistory({ page, limit });
 
   const totalPages = Math.ceil(total / limit);
+
+  // Void modal state
+  const [voidTarget, setVoidTarget] = useState<TransactionResponse | null>(null);
+
+  function handleVoidSuccess() {
+    setVoidTarget(null);
+    void mutate();
+  }
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -59,7 +68,7 @@ export default function PosHistoryPage() {
         {isLoading && !transactions.length && (
           <div className="space-y-2">
             {Array.from({ length: 8 }, (_, i) => (
-              <div key={i} className="h-16 animate-pulse rounded-xl bg-surface" />
+              <div key={i} className="h-20 animate-pulse rounded-xl bg-surface" />
             ))}
           </div>
         )}
@@ -92,7 +101,7 @@ export default function PosHistoryPage() {
                     </span>
                   </div>
                   <p className="mt-0.5 text-xs text-text-secondary">
-                    {new Date(txn.created_at).toLocaleString()} · {txn.site_code}
+                    {new Date(txn.created_at).toLocaleString()} · {txn.payment_method ?? "—"}
                   </p>
                   {txn.customer_id && (
                     <p className="text-xs text-text-secondary">Customer: {txn.customer_id}</p>
@@ -102,9 +111,40 @@ export default function PosHistoryPage() {
                   <p className="text-sm font-semibold tabular-nums text-text-primary">
                     EGP {fmt(txn.grand_total)}
                   </p>
-                  <p className="text-xs uppercase text-text-secondary">{txn.payment_method}</p>
                 </div>
               </div>
+
+              {/* Action buttons — only for completed transactions */}
+              {txn.status === "completed" && (
+                <div className="mt-2 flex gap-2 border-t border-border/50 pt-2">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      router.push(`/returns?txn=${txn.id}`)
+                    }
+                    className={cn(
+                      "flex flex-1 items-center justify-center gap-1.5 rounded-lg py-1.5",
+                      "border border-amber-500/30 bg-amber-500/10 text-xs font-medium text-amber-400",
+                      "hover:bg-amber-500/20 transition-colors",
+                    )}
+                  >
+                    <RotateCcw className="h-3 w-3" />
+                    Return
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setVoidTarget(txn)}
+                    className={cn(
+                      "flex flex-1 items-center justify-center gap-1.5 rounded-lg py-1.5",
+                      "border border-destructive/30 bg-destructive/10 text-xs font-medium text-destructive",
+                      "hover:bg-destructive/20 transition-colors",
+                    )}
+                  >
+                    <XCircle className="h-3 w-3" />
+                    Void
+                  </button>
+                </div>
+              )}
             </div>
           ))}
         </div>
@@ -134,6 +174,15 @@ export default function PosHistoryPage() {
           </div>
         )}
       </main>
+
+      {/* Void modal */}
+      {voidTarget && (
+        <VoidModal
+          transaction={voidTarget}
+          onSuccess={handleVoidSuccess}
+          onCancel={() => setVoidTarget(null)}
+        />
+      )}
     </div>
   );
 }
