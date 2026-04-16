@@ -19,9 +19,7 @@ from datapulse.logging import get_logger
 log = get_logger(__name__)
 
 
-def _get_connector(
-    source_type: str, *, session=None, connection_id: int = 0, tenant_id: int = 0
-):  # type: ignore[return]
+def _get_connector(source_type: str, *, session=None, connection_id: int = 0, tenant_id: int = 0):  # type: ignore[return]
     """Return the connector instance for a given source_type, or None.
 
     For credential-aware connectors (postgres, mssql …) the session,
