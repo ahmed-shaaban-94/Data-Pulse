@@ -57,8 +57,12 @@ def _make_app(service: MagicMock) -> FastAPI:
         user_id="test-user",
         role_key="admin",
         permissions={
-            "pos:terminal:open", "pos:transaction:create", "pos:transaction:void",
-            "pos:return:create", "pos:shift:reconcile", "pos:shift:open",
+            "pos:terminal:open",
+            "pos:transaction:create",
+            "pos:transaction:void",
+            "pos:return:create",
+            "pos:shift:reconcile",
+            "pos:shift:open",
             "pos:controlled:verify",
         },
     )
