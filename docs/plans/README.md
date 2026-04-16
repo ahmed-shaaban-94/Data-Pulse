@@ -18,6 +18,8 @@ All completed work is consolidated into single reference documents.
 | **Wild Wolf** | [Beta Release](./completed/wild-wolf-beta-release.md) | Beta release plan, Lean architecture |
 | **Master Audit** | [Master Audit](./completed/master-audit.md) | Full project audit and findings |
 | **Android** | [Android App](./completed/android-app.md) | Kotlin + Jetpack Compose implementation plan |
+| **Dragon Roar** | [Full Project Audit](./completed/dragon-roar.md) | 80+ findings across 6 sprints — pipeline & data integrity |
+| **Iron Curtain** | [Hardening Plan](./completed/iron-curtain.md) | 260+ findings — auth, testing, typing, performance |
 
 ---
 
@@ -26,6 +28,12 @@ All completed work is consolidated into single reference documents.
 | Plan | Document | Priority | Summary |
 |------|----------|----------|---------|
 | **Analytics Optimization** | [Optimization Plan](./optimization-plan.md) | HIGH | Naming fix, core KPIs, forecast pacing, growth decomposition, Egyptian market intelligence |
+| **Market Strike** | [Competitive Features](./market-strike.md) | HIGH | SaaS competitor analysis, activate orphaned billing/RBAC, Arabic/RTL advantage |
+| **Unlock the Vault** | [Activate Built Features](./unlock-the-vault.md) | HIGH | Wire disconnected modules, surface hidden analytics |
+| **LangGraph AI Light** | [AI Orchestration](./langgraph-ai-light.md) | MEDIUM | LangGraph orchestration for AI endpoints + deep-dive |
+| **Hardening Sprint** | [Hardening Sprint](./hardening-sprint.md) | HIGH | Security and reliability hardening |
+| **Control Center** | [Control Center Roadmap](./control-center-roadmap.md) | MEDIUM | Admin dashboard roadmap |
+| **Implementation Plan** | [Graph-Validated Plan](./IMPLEMENTATION_PLAN.md) | HIGH | Critical fixes, frontend, backend improvements |
 
 ---
 
@@ -54,5 +62,17 @@ See [Project Expansion Overview](./project-expansion/README.md) for the full roa
 | [The Final Fixation](../reports/the-final-fixation.md) | Pre-existing CI issues checklist |
 | [Project Review (Opus)](../reports/PROJECT_REVIEW_OPUS.md) | Full architecture review |
 | [Project Analysis Report](../reports/PROJECT_ANALYSIS_REPORT.md) | Comprehensive project analysis |
+| [Deep Analysis Report](../reports/DEEP_ANALYSIS_REPORT.md) | Full-stack analysis (87/100 health score) |
 | [Enhancement 3](../reports/enhancement-3-dashboard-upgrades.md) | Dashboard upgrade specs |
 | [Architecture Flowchart](../reports/architecture-flowchart.md) | Visual architecture diagrams |
+
+---
+
+## Audits
+
+| Document | Description |
+|----------|-------------|
+| [Bronze Audit](../audits/01_BRONZE_AUDIT.md) | Raw data quality checks |
+| [Silver Audit](../audits/02_SILVER_AUDIT.md) | Staging layer validation |
+| [Calculation Audit](../audits/CALCULATION_AUDIT.md) | Business logic verification |
+| [Calculation Logic Audit](../audits/CALCULATION_LOGIC_AUDIT.md) | Full-stack calculation consistency |
