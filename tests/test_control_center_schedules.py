@@ -118,7 +118,7 @@ def test_create_schedule_ok():
 
 def test_create_schedule_connection_not_found():
     svc = _make_service(connection_row=None)
-    svc._connections.get.return_value = None
+    svc._sync._connections.get.return_value = None
     with pytest.raises(ValueError, match="connection_not_found"):
         svc.create_schedule(connection_id=99, tenant_id=1, cron_expr="0 * * * *")
 
@@ -151,7 +151,7 @@ def test_list_schedules_returns_list():
 
 def test_list_schedules_empty():
     svc = _make_service(schedule_rows=[])
-    svc._schedules.list_for_connection.return_value = ([], 0)
+    svc._sync._schedules.list_for_connection.return_value = ([], 0)
     result = svc.list_schedules(connection_id=10)
     assert result.total == 0
     assert result.items == []
