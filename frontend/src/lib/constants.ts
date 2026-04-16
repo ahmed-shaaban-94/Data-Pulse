@@ -68,6 +68,20 @@ const OPERATIONS_GROUP: NavGroup = {
   ],
 };
 
+const POS_GROUP: NavGroup = {
+  id: "pos",
+  label: "Point of Sale",
+  icon: "ShoppingCart",
+  minRole: "editor",
+  items: [
+    { label: "Terminal", href: "/terminal", icon: "Monitor", minRole: "editor" },
+    { label: "Checkout", href: "/checkout", icon: "CreditCard", minRole: "editor" },
+    { label: "Shift Management", href: "/shift", icon: "Clock", minRole: "editor" },
+    { label: "Transaction History", href: "/history", icon: "Receipt", minRole: "viewer" },
+    { label: "Returns", href: "/pos-returns", icon: "RotateCcw", minRole: "editor" },
+  ],
+};
+
 const CONTROL_CENTER_GROUP: NavGroup = {
   id: "control-center",
   label: "Control Center",
@@ -154,6 +168,7 @@ export const NAV_GROUPS: NavGroup[] = [
     ],
   },
   OPERATIONS_GROUP,
+  POS_GROUP,
   CONTROL_CENTER_GROUP,
 ];
 
