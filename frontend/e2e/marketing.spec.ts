@@ -37,7 +37,7 @@ test.describe("Marketing Landing Page — Pharma-First", () => {
 
   test("trust bar shows pharma use-case list", async ({ page }) => {
     await expect(
-      page.getByText(/branch performance/i)
+      page.getByText(/branch performance/i).first()
     ).toBeVisible();
   });
 
@@ -75,7 +75,7 @@ test.describe("Marketing Landing Page — Pharma-First", () => {
   // ── Features ──────────────────────────────────────────────────────────────
 
   test("features section shows pharma-specific capabilities", async ({ page }) => {
-    const section = page.locator("#features");
+    const section = page.locator("#product");
     await expect(section).toBeVisible();
     await expect(section.getByText(/Inventory And Expiry/i).first()).toBeVisible();
   });
@@ -105,7 +105,7 @@ test.describe("Marketing Landing Page — Pharma-First", () => {
   test("pilot tiers use correct names", async ({ page }) => {
     const section = page.locator("#pilot-access");
     await expect(section.getByText("Explorer Pilot")).toBeVisible();
-    await expect(section.getByText("Operations Pilot")).toBeVisible();
+    await expect(section.getByText("Operations Pilot").first()).toBeVisible();
     await expect(section.getByText("Enterprise Rollout")).toBeVisible();
   });
 

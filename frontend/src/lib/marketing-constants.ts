@@ -6,7 +6,7 @@ export const SITE_DESCRIPTION =
 export const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://smartdatapulse.tech";
 
 export const NAV_LINKS = [
-  { label: "Product",      href: "#features"    },
+  { label: "Product",      href: "#product"     },
   { label: "How It Works", href: "#how-it-works" },
   { label: "Use Cases",    href: "#use-cases"   },
   { label: "Pilot Access", href: "#pilot-access" },
