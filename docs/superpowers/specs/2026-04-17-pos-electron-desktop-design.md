@@ -253,8 +253,9 @@ makes it impossible to end a shift while any provisional sale is unresolved.
 **Reconciliation workflow for rejected items** (`/settings → Sync Issues`):
 
 Each rejected provisional sale offers three resolution paths:
-1. **Retry with override** — supervisor PIN + reason (e.g., "physical stock
-   confirmed, server stock was stale"), resubmits with `X-Override-Reason` header
+1. **Retry with override** — single-use supervisor override code (§8.8.2) +
+   reason (e.g., "physical stock confirmed, server stock was stale"), resubmits
+   with `X-Override-Reason` header and `X-Override-Code-Id` header
 2. **Record as loss / no-sale adjustment** — records the physical cash-out in
    `audit_log` as `provisional_loss`, credits the cash drawer expected total
    downward by that amount, prints a reconciliation slip for the pharmacist
@@ -263,7 +264,7 @@ Each rejected provisional sale offers three resolution paths:
 
 **Shift-close guard:** `POST /pos/shifts/{id}/close` refuses on the client side
 whenever the unresolved predicate (§6.1) is true — i.e. any queue row has
-`status IN ('pending','rejected')`. The UI shows a blocking modal:
+`status IN ('pending','syncing','rejected')`. The UI shows a blocking modal:
 `Cannot close shift — 2 provisional sales unresolved. Resolve them in Sync Issues first.`
 This makes it structurally impossible to bank cash for an unconfirmed sale and move on.
 
@@ -354,7 +355,7 @@ CREATE INDEX ix_queue_status_attempt ON transactions_queue(status, next_attempt_
 CREATE INDEX ix_queue_confirmation  ON transactions_queue(confirmation);
 -- Used by shift-close guard: "any unresolved provisional work blocks close"
 CREATE INDEX ix_queue_open_work     ON transactions_queue(status)
-  WHERE status IN ('pending','rejected');
+  WHERE status IN ('pending','syncing','rejected');
 
 -- Sync cursors per entity
 CREATE TABLE sync_state (
@@ -395,14 +396,14 @@ db.stock.forDrug(drugCode, siteCode)   → PosStockInfo
 db.queue.enqueue(transaction)          → { local_id, client_txn_id }
 db.queue.pending()                     → QueueRow[]
 db.queue.rejected()                    → QueueRow[]
-db.queue.stats()                       → { pending, rejected, provisional, last_sync_at }
-db.queue.reconcile(local_id, kind, note, supervisorPin)
+db.queue.stats()                       → { pending, syncing, rejected, unresolved, last_sync_at }
+db.queue.reconcile(local_id, kind, note, overrideCode)
                                        → { status, confirmation, reconciled_at }
 
 authz.currentGrant()                   → OfflineGrant | null
 authz.grantState()                     → 'online' | 'offline_valid' | 'offline_expired' | 'revoked'
 authz.refreshGrant()                   → OfflineGrant   // requires online
-authz.verifySupervisorPin(pin)         → { ok, staff_id } | { ok: false, reason }
+authz.consumeOverrideCode(code)        → { ok, code_id, issued_to_staff_id } | { ok: false, reason }
 authz.capabilities()                   → CapabilitiesDoc   // cached
 
 shift.canClose()                       → { ok, blockers: [{ local_id, reason }] }
@@ -421,7 +422,7 @@ drawer.open()                          → { success }
 
 sync.pushNow()                         → { pushed, rejected }
 sync.pullNow(entity?)                  → { pulled }
-sync.state()                           → { online, last_sync_at, pending, rejected }
+sync.state()                           → { online, last_sync_at, pending, syncing, rejected, unresolved }
 
 updater.check() / updater.install()
 app.version()
@@ -476,10 +477,12 @@ manifest declares:
 }
 ```
 
-The updater refuses to install a version where `requires_queue_drained=true` while
-any `transactions_queue` row has `status in (pending, rejected)`. UI message:
+The updater refuses to install a version where `requires_queue_drained=true`
+while any `transactions_queue` row matches the §6.1 unresolved predicate
+`status IN ('pending','syncing','rejected')`. UI message:
 `Update postponed: 3 provisional sales must sync first.` This prevents a bad
-release from stranding queued cash transactions.
+release from stranding queued cash transactions and from installing while an
+in-flight push is still resolving.
 
 **4. Reversible-by-default migrations.** Every migration ships with a `down.sql`
 sibling unless explicitly marked `requires_queue_drained`. The migration runner
@@ -533,7 +536,8 @@ CREATE TABLE schema_history (
 - Default path: send ESC p command through the printer (RJ11 cable from drawer to printer)
 - Alternate path: direct serialport if configured
 - Auto-opens on `paymentMethod in (cash, mixed)`
-- F12 "no-sale open" requires supervisor PIN (reuses `PharmacistVerification` modal pattern); logged to local `audit_log`
+- F12 "no-sale open" requires a single-use supervisor override code (§8.8.2);
+  logged to local `audit_log` with the consumed `code_id`
 
 ### 5.4 Receipt payload
 
@@ -562,20 +566,34 @@ guard, updater gate, and Sync Issues UI. No section may invent a new state.
 | State | Meaning | Confirmation | Unresolved? |
 |---|---|---|---|
 | `pending` | Enqueued, not yet pushed OR backoff-waiting | `provisional` | **yes** |
-| `syncing` | In-flight push | `provisional` | no (transient — never persists across crashes, recovered to `pending` on boot) |
+| `syncing` | In-flight push — outcome unknown | `provisional` | **yes** (outcome may still turn out to be `rejected`) |
 | `synced` | Server accepted (2xx or 409 replay) | `confirmed` | no |
 | `rejected` | Server refused (4xx non-409) — needs reconciliation | `provisional` | **yes** |
 | `reconciled` | Resolved via supervisor override / record-loss / corrective-void | `reconciled` | no |
 
 **Unresolved predicate** (single source of truth for all safety gates):
 ```sql
-status IN ('pending','rejected')
+status IN ('pending','syncing','rejected')
 ```
+
+`syncing` is treated as unresolved because its outcome is not yet known — a
+5xx or 4xx could still turn it into a `rejected` row after the gate passed.
+Safety gates never race past in-flight provisional work.
 
 Every guard uses exactly this predicate:
 - Shift-close guard (§3.6)
 - Updater-install gate (§4.5 `requires_queue_drained`)
 - Sync Issues UI count + list
+
+**Shift-close drain protocol.** When the user requests shift close:
+1. UI calls `shift.canClose()` → server returns `{ ok, blockers }`.
+2. If blockers include `syncing` rows, the UI shows a short "finalising
+   in-flight sales…" progress indicator (not a blocking modal) and polls
+   `shift.canClose()` every 500ms for up to 10 seconds.
+3. If after 10s any `syncing` row remains, the UI escalates to the same
+   blocking modal as `pending`/`rejected`: force the cashier to either wait,
+   retry, or reconcile. Shift close is never permitted while any unresolved
+   row exists — regardless of whether the push worker believes it's in flight.
 
 **Push worker behaviour:**
 
@@ -997,9 +1015,9 @@ grant payload (signed, not encrypted):
     "can_open_drawer_no_sale": false,
     "can_close_shift":       true
   },
-  "supervisor_pin_hashes": [                       // scrypt(pin, server_pepper)
-    { "staff_id": "s-009", "hash": "scrypt$…" },
-    { "staff_id": "s-014", "hash": "scrypt$…" }
+  "override_codes": [                              // scrypt(code, salt) — see §8.8.2 supervisor codes
+    { "code_id": "c-01", "salt": "base64…", "hash": "scrypt$…", "issued_to_staff_id": "s-009" },
+    { "code_id": "c-02", "salt": "base64…", "hash": "scrypt$…", "issued_to_staff_id": "s-014" }
   ],
   "capabilities_version":   "v1"
 }
@@ -1014,22 +1032,32 @@ grant payload (signed, not encrypted):
   returns array of `{key_id, public_key, valid_from, valid_until}`) on every
   reconnect and caches them DPAPI-encrypted. Old public keys in the overlap
   window stay valid for grant verification but not for issuing new grants.
-- **No tenant signing secret or HMAC pepper ever reaches the terminal.** The only
-  server-side secret the terminal could conceivably be relevant to is the scrypt
-  pepper for supervisor PINs — and that is also NOT shipped; instead, the PINs
-  are hashed on the server with the pepper, and only the scrypt-output hash goes
-  into the grant. Offline PIN verification compares `scrypt(input_pin, pepper_placeholder)`
-  — this is not possible without the pepper, so supervisor PIN verification uses
-  a different pattern:
-    - The grant embeds a short list of **time-bound single-use supervisor codes**
-      (6-digit numeric, scrypt-hashed on the server with a per-grant salt stored
-      in the grant). Each code is valid once for that grant's lifetime.
-    - The pharmacy admin distributes these codes to supervisors verbally at
-      shift-open. Supervisors enter a code for each override action; the client
-      verifies the entered code against the grant's hash set and marks that code
-      used in `audit_log` so it cannot be reused.
-    - This inverts the trust model: the server controls code generation; the
-      terminal only verifies one-way hashes without needing the pepper.
+- **No tenant signing secret or HMAC pepper ever reaches the terminal.** The
+  client holds only public verification keys and one-way hashed supervisor
+  codes — nothing that can forge or elevate a grant.
+
+**Supervisor authorization — ONE-TIME CODES (single mechanism, no PINs):**
+
+The design does not use supervisor PINs anywhere in the offline path. PIN
+hashing on the client would require a server-side pepper that cannot be
+shipped without undermining the whole asymmetric-grant design. Instead:
+
+- The grant embeds a short list of **time-bound single-use supervisor codes**
+  in `override_codes: [{ code_id, salt, hash }]`. Each `hash` is
+  `scrypt(code_plaintext, salt)` where `salt` is random per code (not a
+  server-wide pepper) — the salt travels with the code so verification is
+  fully client-side and requires no tenant-secret material.
+- Codes are 8-character alphanumeric (higher entropy than 6-digit numeric to
+  compensate for the missing pepper), generated by the server at shift-open,
+  and distributed to supervisors verbally or via an authenticated mobile
+  notification. Each code is valid once, for that grant's lifetime.
+- When a cashier triggers a privileged action (void, price override, no-sale
+  drawer, reconciliation override) the UI prompts for an override code. The
+  client runs `scrypt(entered_code, code.salt)` and compares constant-time to
+  `code.hash`. On success, the client marks the `code_id` as used in
+  `audit_log` and the code cannot be reused for the rest of that grant.
+- Reconnect replaces the entire `override_codes` set — used codes are never
+  "forgiven" by a refresh, and unused codes from a prior grant are discarded.
 
 The grant blob + public keys are stored DPAPI-encrypted in `settings`. The grant
 signature is verified on every privileged action in the main process using the
@@ -1053,27 +1081,32 @@ role changes on the server take effect on next reconnect only.
 
 #### 8.8.4 Privileged action enforcement
 
-Every privileged IPC handler in `main` re-verifies the grant before executing:
+Every privileged IPC handler in `main` re-verifies the grant and consumes a
+single-use override code before executing:
 
 ```ts
 // Example: printer.openDrawerNoSale
-ipcMain.handle('drawer:open-no-sale', async (_evt, { supervisorPin }) => {
+ipcMain.handle('drawer:open-no-sale', async (_evt, { overrideCode }) => {
   const grant = await authz.currentGrant();
   if (!grant || authz.isGrantExpired(grant)) {
     throw new AuthzError('offline_expired');
   }
+  if (!authz.verifyGrantSignature(grant)) {
+    throw new AuthzError('grant_tampered');
+  }
   if (!grant.role_snapshot.can_open_drawer_no_sale) {
     throw new AuthzError('insufficient_role');
   }
-  const supervisor = await authz.verifySupervisorPin(supervisorPin);
-  if (!supervisor) throw new AuthzError('supervisor_invalid');
+  const consumed = await authz.consumeOverrideCode(grant, overrideCode);
+  if (!consumed) throw new AuthzError('override_invalid_or_used');
   // ... proceed
 });
 ```
 
-Supervisor PINs are cached at shift-open in the grant's `supervisor_pin_hashes`
-field (scrypt-hashed, pepper from tenant key). Up to 5 supervisor PINs cached
-per grant. A PIN rotation on the server takes effect at the next shift-open.
+`authz.consumeOverrideCode` performs constant-time `scrypt` comparison against
+unused entries in `grant.override_codes`, atomically marks the matched
+`code_id` as used in `audit_log`, and returns the matched entry. All override
+consumption is recorded for forensic audit. No supervisor PINs anywhere.
 
 #### 8.8.5 Grant rotation + reconnect
 
@@ -1119,26 +1152,68 @@ First launch flow (requires online + admin credentials):
 
 #### 8.9.2 Per-request device proof
 
-Every mutating POS request (commit, void, return, shift-open, shift-close,
-terminal-open, terminal-close, drawer-no-sale, reconciliation override) includes:
+**Terminal ID is a required first-class field on every mutating POS request**,
+never inferred from path alone. All protected routes (commit, void, return,
+shift-open, shift-close, terminal-open, terminal-close, drawer-no-sale,
+reconciliation override) require `terminal_id` in the request body (or in
+`X-Terminal-Id` header for routes where the body shape cannot be changed
+without a breaking API version bump). The device-proof verifier binds to
+this explicit field, never to path inference.
+
+**Canonical signed request envelope:**
+
+Every mutating request carries these headers:
 
 ```
-X-Terminal-Token: <base64(ed25519_sign(device_private_key, <canonical_request_digest>))>
-X-Device-Fingerprint: sha256:…
+Idempotency-Key:         <uuid>
+X-Terminal-Id:           42                       // required if body has no terminal_id
+X-Device-Fingerprint:    sha256:…
+X-Signed-At:             2026-04-17T09:42:13Z     // RFC-3339, explicit, immutable
+X-Terminal-Token:        <base64(ed25519_sign(device_private_key, canonical_digest))>
 ```
 
-where `canonical_request_digest = SHA256(method | path | idempotency_key |
-body_sha256 | iso8601_timestamp_rounded_to_minute)`.
+**Canonical digest (single formula, no special cases):**
 
-Server-side `Depends(device_token_verifier)` dependency:
-- Looks up `pos_terminal_devices` row for the `terminal_id` in the request path
-- Verifies the Ed25519 signature with the stored public key
-- Rejects with **401** if: no device row, key revoked, signature fails, fingerprint
-  mismatch, timestamp skew > 5 min
-- Rejects with **403** if: device row exists but is for a different terminal
+```
+canonical_digest = SHA256(
+    method  || '\n' ||
+    path    || '\n' ||
+    idempotency_key  || '\n' ||
+    terminal_id      || '\n' ||     // always included, from body or X-Terminal-Id
+    body_sha256      || '\n' ||
+    signed_at_iso8601                // the exact X-Signed-At value
+)
+```
 
-This means: **a second physical machine cannot operate an existing open terminal
-even with valid JWT, because it lacks the device private key.**
+`X-Signed-At` is signed, immutable, and explicit. There is no second "flight
+timestamp" mode and no wall-clock rounding. This one formula covers both
+immediate (online) requests and queued (offline, replayed hours later) requests.
+
+**Server-side `Depends(device_token_verifier)` dependency** — applies to every
+protected route:
+
+1. Parse `terminal_id` from body first, then `X-Terminal-Id` header (in that
+   order). Both present must match each other exactly or reject 400.
+2. Load `pos_terminal_devices` row for `(tenant_id, terminal_id)`. No row → 401.
+3. Verify Ed25519 signature using the row's `public_key` over the canonical digest.
+   Fail → 401.
+4. Verify `X-Device-Fingerprint` matches the registered fingerprint. Mismatch
+   with valid signature → 401 + auto-revoke + security event logged.
+5. **Signed-at window validation** — two independent bounds:
+   - `signed_at` must not be in the future by more than 2 min (clock skew tolerance)
+   - `signed_at` must fall within the active offline grant window for the terminal
+     (`grant.issued_at ≤ signed_at ≤ grant.offline_expires_at`) for requests that
+     carry `X-Offline-Grant`. Online requests (carrying `Authorization: Bearer`)
+     require `signed_at ≥ now - 168h` to stay within the idempotency retention window.
+   Either bound failing → 401.
+6. Verify `body_sha256` matches `SHA256(raw_body)` → else 400.
+7. Reject **403** if the device row is for a different terminal than the
+   signed `terminal_id` (should be impossible given step 2 loaded by
+   `(tenant_id, terminal_id)`, but enforced as a defense-in-depth check in case
+   of routing bugs).
+
+This contract is identical for `POST /pos/transactions/commit`, `POST /pos/shifts/open`,
+and every other protected route — no route-specific exceptions, no implicit fallback.
 
 #### 8.9.3 Device revocation / re-pairing
 
@@ -1162,11 +1237,26 @@ Administrator actions (via the admin UI, not the POS itself):
 
 #### 8.9.5 Offline behaviour
 
-When offline, the client signs requests with its device private key as usual;
-signatures are validated by the server on reconnect (the timestamp-rounded
-digest accommodates offline queues up to 5 min of skew; longer-queued requests
-use a "flight timestamp" relative to the signed grant window, verified against
-the grant's `issued_at`/`offline_expires_at`).
+When offline, the client signs requests with its device private key **exactly
+as in the online path** — the canonical digest in §8.9.2 has no offline special
+case. The `X-Signed-At` field is captured at queue-enqueue time and never
+mutated; replay on reconnect resubmits the original signed payload without
+re-signing. The server validates using the same two bounds:
+
+- `signed_at ≤ now + 2 min` (reject forged future timestamps)
+- `signed_at` within the grant's `[issued_at, offline_expires_at]` window
+
+Because the grant window (12h) is shorter than the provisional queue window
+(72h), any queued item that was signed outside a still-valid grant fails on
+reconnect and lands in Sync Issues for reconciliation — this is the correct
+behaviour: a sale signed under a grant that has since expired should not
+retroactively commit.
+
+For a pharmacy offline for more than 12 hours, the grant expires and the
+terminal falls to read-only (§8.8.3) — no new provisional sales get signed.
+Already-queued sales from within the valid grant window continue to be valid
+for resubmission as long as they're within the 72h provisional TTL, because
+their `signed_at` is still inside the original grant window.
 
 ---
 
@@ -1196,7 +1286,8 @@ the grant's `issued_at`/`offline_expires_at`).
   - Offline → online reconnect mid-queue → verify all drain
   - **Rejected-provisional reconciliation:** offline checkout → mock server returns
     4xx on reconnect for that row → verify row shows in Sync Issues → apply
-    `retry_override` with supervisor PIN → verify `status=reconciled` + audit log
+    `retry_override` with a single-use override code → verify `status=reconciled`
+    + audit log entry including the consumed `code_id`
   - **Shift-close guard:** provisional pending → attempt close → verify modal
     blocks with blocker list; reconcile → attempt close → verify close succeeds
   - **Single-terminal enforcement:** seed two open terminals for tenant → launch
@@ -1228,6 +1319,21 @@ the grant's `issued_at`/`offline_expires_at`).
   - **Commit atomicity vs draft flow:** mock server returns 500 mid-sync → verify
     offline queue retries `POST /pos/transactions/commit` with same
     `Idempotency-Key` and never falls back to the 3-step draft→items→checkout path
+  - **Syncing-state safety gate:** artificially stall a push mid-request so the
+    row sits in `syncing` for >1s → attempt shift close → verify close is
+    blocked by drain protocol (§6.1), polls, then either completes after
+    `syncing→synced` or escalates to modal if it becomes `rejected`
+  - **Terminal-binding on commit:** submit `POST /pos/transactions/commit` with
+    a signed envelope but with `X-Terminal-Id` value for a terminal this device
+    is not registered for → verify 401 (even with valid signature)
+  - **Signed-at boundary:** sign a request with `X-Signed-At` 13h in the past
+    (outside the 12h grant window) → verify 401 on server; resign the identical
+    payload with a fresh `X-Signed-At` → verify 2xx
+  - **No-supervisor-PIN path:** attempt void with a legacy-style
+    `supervisorPin` argument → verify handler rejects with
+    `override_invalid_or_used` (the PIN path must not exist)
+  - **Override-code consumption:** use a valid `overrideCode` to authorize a
+    void → attempt any further override using the same `code_id` → verify rejected
 
 ### 9.4 Backend
 
@@ -1252,7 +1358,18 @@ the grant's `issued_at`/`offline_expires_at`).
   signature, `offline_expires_at` respects tenant setting
 - pytest for key rotation: old public keys remain valid within 7-day overlap
   window, expired keys rejected
-- pytest for supervisor one-time codes: each code valid once per grant, reuse rejected
+- pytest for override one-time codes: each `code_id` valid once per grant,
+  reuse rejected, constant-time scrypt verification, used-code audit-log entry
+  written atomically with the privileged action
+- pytest asserting NO PIN-based verification endpoint exists on the server
+  side: supervisor PIN hashes must never appear in grant serialization or in
+  any POS API route; enforced by a static check + runtime schema assertion
+- pytest for `signed_at` bounds on the device verifier: requests signed in the
+  future (>2 min ahead), before grant `issued_at`, or after `offline_expires_at`
+  are all rejected; requests on the exact boundary are accepted
+- pytest asserting every mutating POS endpoint requires `terminal_id` in the
+  request body OR `X-Terminal-Id` header (enforced by FastAPI dependency chain;
+  a route missing the dependency fails the contract test)
 - pytest for override reconciliation path (`X-Override-Reason` header on retry)
   requiring supervisor credential and recording in audit log
 - pytest for idempotency retention invariant: `IDEMPOTENCY_TTL > PROVISIONAL_TTL`
@@ -1267,7 +1384,7 @@ Run on a physical dev rig before each tagged release:
 - [ ] Checkout cash → receipt prints with correct formatting
 - [ ] Receipt matches screen preview byte-for-byte
 - [ ] Drawer kicks open on cash payment
-- [ ] F12 no-sale → prompts supervisor PIN → drawer opens → audit log entry
+- [ ] F12 no-sale → prompts supervisor override code → drawer opens → audit log entry records consumed `code_id`
 - [ ] Unplug ethernet mid-checkout → receipt prints, queue row exists
 - [ ] Re-plug ethernet → queue drains within 30s → banner flashes green
 - [ ] Install signed `.exe` on clean Windows VM → no SmartScreen warning
@@ -1349,10 +1466,13 @@ Local SQLite is created on first launch.
 | Bad release ships non-downgradeable schema | §4.5 pre-migration backups, bi-directional version check refuses to boot on newer schema, update manifest gates incompatible releases until queue is drained |
 | Server idempotency accidentally disabled in an incident | §6.6 capability negotiation — clients stop syncing instead of silently retrying non-idempotently; §10.4 designates idempotency as non-revertible capability |
 | Two tills accidentally activated at a single-terminal pharmacy | §1.4 four-layer enforcement (tenant flag + server guard on create + **per-request device-bound Ed25519 proof** + client guard via tenant-scoped state endpoint); a second physical machine cannot mutate an existing terminal |
-| Client-side signing key could mint elevated offline grants | §8.8 grants signed by **server-only** Ed25519 private key; client holds only public verification key + one-way hashed supervisor codes; no signing material or pepper ships to terminal |
+| Client-side signing key could mint elevated offline grants | §8.8 grants signed by **server-only** Ed25519 private key; client holds only public verification key + one-way hashed override codes with per-code salt (no pepper); supervisor PIN verification eliminated entirely |
+| Device-proof could be bypassed on body-based routes (e.g. commit) | §8.9.2 canonical envelope requires `terminal_id` as a first-class field (body or `X-Terminal-Id` header) on every mutating route; verifier binds to that explicit field before business logic runs; same contract applies uniformly to path-based and body-based routes |
+| Long-queued offline requests break device-proof timestamp | §8.9.2 canonical digest uses explicit signed `X-Signed-At` that is captured at enqueue and never mutated; single verification formula covers both immediate and 72h-delayed replay; no "flight timestamp" fallback mode |
+| In-flight (`syncing`) rows race past safety gates | §6.1 treats `syncing` as unresolved; shift-close uses a drain protocol that polls until resolution or escalates to modal after 10s |
 | Dedupe window expires before client stops retrying | §6.4 `idempotency_ttl_hours=168` > `provisional_ttl_hours=72`; stale provisional rows become `rejected` client-side before they can be retried past server dedupe horizon |
 | Idempotency attached to wrong endpoint (draft vs commit) | §3 routes table puts `Idempotency-Key` on `POST /pos/transactions/commit` (new atomic endpoint) + `checkout` + `void` + `return` + `shift-close` + `terminal-close` — never on draft create/item-add; draft changes are reversible cart state, only the commit is irreversible |
-| Queue-state terminology drift across sections | §6.1 defines canonical five-state machine (`pending/syncing/synced/rejected/reconciled`) and unresolved predicate `status IN ('pending','rejected')`; all safety gates reference it by ID rather than redefining |
+| Queue-state terminology drift across sections | §6.1 defines canonical five-state machine (`pending/syncing/synced/rejected/reconciled`) and unresolved predicate `status IN ('pending','syncing','rejected')`; all safety gates reference it by ID rather than redefining |
 
 ---
 
