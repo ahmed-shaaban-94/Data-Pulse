@@ -127,6 +127,24 @@ export interface QualityCheckList {
   total: number;
 }
 
+export type FirstInsightKind =
+  | "mom_change"
+  | "expiry_risk"
+  | "stock_risk"
+  | "top_seller";
+
+export interface FirstInsight {
+  kind: FirstInsightKind;
+  title: string;
+  body: string;
+  action_href: string;
+  confidence: number;
+}
+
+export interface FirstInsightResponse {
+  insight: FirstInsight | null;
+}
+
 export interface QualityRunDetail {
   run_id: string;
   checks: QualityCheck[];
