@@ -127,6 +127,15 @@ export interface QualityCheckList {
   total: number;
 }
 
+export interface QualityRunDetail {
+  run_id: string;
+  checks: QualityCheck[];
+  total_checks: number;
+  passed: number;
+  failed: number;
+  warned: number;
+}
+
 export interface TriggerResponse {
   run_id: string;
   status: string;
