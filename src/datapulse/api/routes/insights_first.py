@@ -17,6 +17,7 @@ from datapulse.api.deps import get_tenant_session
 from datapulse.api.limiter import limiter
 from datapulse.insights_first.models import FirstInsightResponse
 from datapulse.insights_first.repository import (
+    fetch_expiry_risk_candidate,
     fetch_mom_change_candidate,
     fetch_top_seller_candidate,
 )
@@ -37,16 +38,18 @@ def get_first_insight_service(
     Order does not matter (the picker enforces priority), but listing them
     by descending priority keeps the configuration readable.
 
-    Active:
-    - mom_change  (follow-up #2 / this PR)
-    - top_seller  (#402, fallback signal)
+    Active (listed in descending priority for readability; picker enforces
+    the real order):
+    - mom_change    (follow-up #2)
+    - expiry_risk   (follow-up #3)
+    - top_seller    (#402, fallback signal)
 
-    Remaining follow-ups (picker + service already accept new fetchers):
-    - expiry_risk, stock_risk.
+    Remaining follow-ups: stock_risk.
     """
     return FirstInsightService(
         fetchers=[
             lambda tid: fetch_mom_change_candidate(session, tid),
+            lambda tid: fetch_expiry_risk_candidate(session, tid),
             lambda tid: fetch_top_seller_candidate(session, tid),
         ],
     )

@@ -11,9 +11,10 @@ Shipped fetchers:
                                           product or site, picks the one
                                           with the largest absolute
                                           percentage change.
+- `fetch_expiry_risk_candidate`   (#402 follow-up #3)   single SKU most at
+                                          risk of expiry within 30 days.
 
 Tracked follow-ups (picker + service already accept new fetchers):
-- expiry_risk   — SKUs expiring within 30 days.
 - stock_risk    — SKUs below reorder point.
 """
 
@@ -220,4 +221,108 @@ def fetch_mom_change_candidate(session: Session, tenant_id: int) -> InsightCandi
         body=_format_mom_body(dimension, label, current, previous, mom_pct),
         action_href=_mom_action_href(dimension),
         confidence=_mom_confidence(mom_pct),
+    )
+
+
+_EXPIRY_WINDOW_DAYS = 30
+
+_EXPIRY_RISK_SQL = text("""
+    SELECT
+        b.drug_name,
+        b.batch_number,
+        b.site_code,
+        b.current_quantity,
+        b.days_to_expiry,
+        b.alert_level
+    FROM public_marts.feat_expiry_alerts b
+    WHERE b.days_to_expiry <= :days_threshold
+      AND b.current_quantity > 0
+    ORDER BY b.days_to_expiry ASC,
+             b.current_quantity DESC,
+             b.drug_name ASC
+    LIMIT 1
+""")
+
+
+def _expiry_confidence(days_to_expiry: int) -> float:
+    """Already expired → 0.95 (capped). 0 days → 0.92. 30 days → ~0.50.
+
+    Linear ramp down from the cap as the days-to-expiry grows; floored
+    at 0.40 to stay inside the `InsightCandidate` confidence contract.
+    """
+    if days_to_expiry <= 0:
+        return 0.95
+    # 30 days maps to ~0.50, shorter horizons closer to 0.90.
+    conf = 0.95 - (days_to_expiry / 30.0) * 0.45
+    return min(0.95, max(0.40, conf))
+
+
+def _format_expiry_title(drug_name: str, days_to_expiry: int) -> str:
+    if days_to_expiry <= 0:
+        return f"{drug_name}: already expired"
+    return f"{drug_name}: {days_to_expiry} days to expiry"
+
+
+def _format_expiry_body(
+    drug_name: str,
+    batch_number: str,
+    site_code: str,
+    quantity: float,
+    days_to_expiry: int,
+) -> str:
+    qty = f"{quantity:,.0f}"
+    if days_to_expiry <= 0:
+        window = "already past expiry"
+    elif days_to_expiry == 1:
+        window = "1 day from expiry"
+    else:
+        window = f"{days_to_expiry} days from expiry"
+    return (
+        f"Batch {batch_number} at {site_code} carries {qty} units of "
+        f"{drug_name}, {window}. FEFO or write-off before the loss hits."
+    )
+
+
+def fetch_expiry_risk_candidate(session: Session, tenant_id: int) -> InsightCandidate | None:
+    """Single SKU most at risk of expiring within the next 30 days.
+
+    Picks the batch with the smallest ``days_to_expiry`` (ties broken by
+    larger ``current_quantity``). Returns None when no batch meets the
+    threshold or has positive on-hand stock.
+    """
+    try:
+        row = (
+            session.execute(
+                _EXPIRY_RISK_SQL,
+                {"tenant_id": tenant_id, "days_threshold": _EXPIRY_WINDOW_DAYS},
+            )
+            .mappings()
+            .fetchone()
+        )
+    except Exception as exc:  # noqa: BLE001
+        log.warning(
+            "first_insight_expiry_query_failed",
+            tenant_id=tenant_id,
+            error=str(exc),
+        )
+        return None
+
+    if row is None:
+        return None
+
+    quantity = float(row["current_quantity"] or 0.0)
+    if quantity <= 0:
+        return None
+
+    drug_name = str(row["drug_name"] or "(unknown drug)")
+    batch_number = str(row["batch_number"] or "")
+    site_code = str(row["site_code"] or "")
+    days_to_expiry = int(row["days_to_expiry"] or 0)
+
+    return InsightCandidate(
+        kind="expiry_risk",
+        title=_format_expiry_title(drug_name, days_to_expiry),
+        body=_format_expiry_body(drug_name, batch_number, site_code, quantity, days_to_expiry),
+        action_href="/expiry",
+        confidence=_expiry_confidence(days_to_expiry),
     )
