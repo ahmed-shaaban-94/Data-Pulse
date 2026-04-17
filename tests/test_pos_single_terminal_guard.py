@@ -7,7 +7,7 @@ Covers:
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 from unittest.mock import MagicMock
 
@@ -71,7 +71,7 @@ def test_active_for_me_returns_caller_terminals() -> None:
                 {
                     "terminal_id": 42,
                     "device_fingerprint": None,
-                    "opened_at": datetime(2026, 4, 17, 6, 0, tzinfo=timezone.utc),
+                    "opened_at": datetime(2026, 4, 17, 6, 0, tzinfo=UTC),
                 }
             ]
             return m
@@ -127,7 +127,7 @@ def test_open_terminal_409_when_cap_reached() -> None:
 
 
 def test_open_terminal_passes_when_under_cap() -> None:
-    from datetime import datetime as _dt, timezone as _tz
+    from datetime import datetime as _dt
     from decimal import Decimal
 
     from datapulse.pos.constants import TerminalStatus
@@ -156,7 +156,7 @@ def test_open_terminal_passes_when_under_cap() -> None:
         staff_id="test-user",
         terminal_name="T1",
         status=TerminalStatus.open,
-        opened_at=_dt(2026, 4, 17, 6, 0, tzinfo=_tz.utc),
+        opened_at=_dt(2026, 4, 17, 6, 0, tzinfo=UTC),
         opening_cash=Decimal("0.00"),
     )
 

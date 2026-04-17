@@ -21,10 +21,10 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request
 from fastapi.responses import Response
 from pydantic import BaseModel
+from sqlalchemy import text
+from sqlalchemy.orm import Session
 
 from datapulse.api.auth import get_current_user
-from sqlalchemy import text
-
 from datapulse.api.deps import get_pos_service, get_tenant_session
 from datapulse.api.limiter import limiter
 from datapulse.billing.pos_guard import require_pos_plan
@@ -70,6 +70,7 @@ router = APIRouter(
 
 ServiceDep = Annotated[PosService, Depends(get_pos_service)]
 CurrentUser = Annotated[dict, Depends(get_current_user)]
+SessionDep = Annotated[Session, Depends(get_tenant_session)]
 
 
 def _tenant_id_of(user: CurrentUser) -> int:
@@ -99,7 +100,7 @@ def open_terminal(
     body: TerminalOpenRequest,
     service: ServiceDep,
     user: CurrentUser,
-    db_session=Depends(get_tenant_session),
+    db_session: SessionDep,
 ) -> TerminalSessionResponse:
     """Open a fresh POS terminal session (cashier shift).
 
@@ -174,7 +175,7 @@ def list_active_terminals(
 def active_terminals_for_me(
     request: Request,
     user: CurrentUser,
-    db_session=Depends(get_tenant_session),
+    db_session: SessionDep,
 ):
     """Return the caller tenant's currently-active POS terminals + multi-terminal flag.
 
@@ -183,8 +184,10 @@ def active_terminals_for_me(
     Response model is resolved at import time via the forward-declared
     ``ActiveForMeResponse`` imported in the module-late block.
     """
-    from datapulse.pos.models import ActiveForMeResponse as _AFM
-    from datapulse.pos.models import ActiveTerminalRow as _ATR
+    from datapulse.pos.models import (
+        ActiveForMeResponse,
+        ActiveTerminalRow,
+    )
 
     tenant_id = _tenant_id_of(user)
     rows = db_session.execute(
@@ -213,8 +216,8 @@ def active_terminals_for_me(
         {"tid": tenant_id},
     ).mappings().first() or {"pos_multi_terminal_allowed": False, "pos_max_terminals": 1}
 
-    return _AFM(
-        active_terminals=[_ATR(**r) for r in rows],
+    return ActiveForMeResponse(
+        active_terminals=[ActiveTerminalRow(**r) for r in rows],
         multi_terminal_allowed=bool(flags["pos_multi_terminal_allowed"]),
         max_terminals=int(flags["pos_max_terminals"]),
     )
@@ -833,6 +836,7 @@ def verify_pharmacist(
 # has authenticated, so it can decide whether to even attempt login.
 
 from base64 import urlsafe_b64encode  # noqa: E402
+from datetime import UTC  # noqa: E402
 
 from datapulse.pos.capabilities import (  # noqa: E402
     CAPABILITIES,
@@ -844,11 +848,6 @@ from datapulse.pos.capabilities import (  # noqa: E402
     POS_SERVER_VERSION,
     PROVISIONAL_TTL_HOURS,
 )
-from datapulse.pos.models import (  # noqa: E402
-    CapabilitiesDoc,
-    TenantKeysResponse,
-    TenantPublicKey,
-)
 from datapulse.pos.commit import atomic_commit  # noqa: E402
 from datapulse.pos.devices import (  # noqa: E402
     DeviceProof,
@@ -856,13 +855,14 @@ from datapulse.pos.devices import (  # noqa: E402
     register_device,
 )
 from datapulse.pos.idempotency import idempotency_dependency, record_response  # noqa: E402
-from datapulse.pos.models import (  # noqa: E402,F811
-    ActiveForMeResponse,
-    ActiveTerminalRow,
+from datapulse.pos.models import (  # noqa: E402  # noqa: E402,F811
+    CapabilitiesDoc,
     CommitRequest,
     CommitResponse,
     DeviceRegisterRequest,
     DeviceRegisterResponse,
+    TenantKeysResponse,
+    TenantPublicKey,
 )
 from datapulse.pos.tenant_keys import list_public_keys  # noqa: E402
 
@@ -904,7 +904,7 @@ def register_terminal_device(
     request: Request,
     payload: DeviceRegisterRequest,
     user: CurrentUser,
-    session=Depends(get_tenant_session),
+    session: SessionDep,
 ) -> DeviceRegisterResponse:
     """Register a physical device (Ed25519 public key + fingerprint) to a terminal.
 
@@ -913,7 +913,7 @@ def register_terminal_device(
     subsequent mutating POS request is signed with that private key and
     verified by ``device_token_verifier`` (§8.9).
     """
-    from datetime import datetime, timezone
+    from datetime import datetime
 
     tenant_id = _tenant_id_of(user)
     device_id = register_device(
@@ -927,8 +927,15 @@ def register_terminal_device(
     return DeviceRegisterResponse(
         device_id=device_id,
         terminal_id=payload.terminal_id,
-        registered_at=datetime.now(timezone.utc),
+        registered_at=datetime.now(UTC),
     )
+
+
+# B008-safe: pre-construct the dependency at module load time rather than in
+# the arg default. FastAPI consumes the callable from the `Depends(...)` wrap
+# at import — creating it once here is functionally identical to creating it
+# per-call and avoids the ruff B008 false positive on factory dependencies.
+_commit_idempotency_dep = idempotency_dependency("POST /pos/transactions/commit")
 
 
 @router.post(
@@ -941,9 +948,9 @@ async def commit_transaction(
     request: Request,
     payload: CommitRequest,
     user: CurrentUser,
-    proof: DeviceProof = Depends(device_token_verifier),
-    idem=Depends(idempotency_dependency("POST /pos/transactions/commit")),
-    db_session=Depends(get_tenant_session),
+    db_session: SessionDep,
+    proof: Annotated[DeviceProof, Depends(device_token_verifier)],
+    idem: Annotated[object, Depends(_commit_idempotency_dep)],
 ) -> CommitResponse:
     """Atomic POS commit — draft + items + checkout in one payload (§3).
 
@@ -970,7 +977,7 @@ async def commit_transaction(
 def tenant_key(
     request: Request,
     user: CurrentUser,
-    session=Depends(get_tenant_session),
+    session: SessionDep,
 ) -> TenantKeysResponse:
     """Return the tenant's currently-valid POS signing public keys.
 

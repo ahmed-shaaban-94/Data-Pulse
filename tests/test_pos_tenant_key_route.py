@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 from unittest.mock import MagicMock
 
@@ -58,7 +58,7 @@ def _make_app(fake_keys: list[TenantKey]) -> FastAPI:
 
 
 def test_tenant_key_endpoint_returns_encoded_public_keys() -> None:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     keys = [
         TenantKey("k1", 1, b"p" * 32, b"\x01" * 32, now, now + timedelta(days=1)),
         TenantKey("k2", 1, b"q" * 32, b"\x02" * 32, now, now + timedelta(days=2)),

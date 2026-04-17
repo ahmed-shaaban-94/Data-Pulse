@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from unittest.mock import MagicMock
 
 import pytest
@@ -35,7 +35,7 @@ def test_list_public_keys_maps_rows_to_dataclass() -> None:
     from datapulse.pos.tenant_keys import list_public_keys
 
     session = MagicMock()
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     session.execute.return_value.mappings.return_value.all.return_value = [
         {
             "key_id": "k1",
@@ -72,7 +72,7 @@ def test_active_private_key_returns_existing_row() -> None:
     from datapulse.pos.tenant_keys import active_private_key
 
     session = MagicMock()
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     session.execute.return_value.mappings.return_value.first.return_value = {
         "key_id": "k-existing",
         "tenant_id": 3,

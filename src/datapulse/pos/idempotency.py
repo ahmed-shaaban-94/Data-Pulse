@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import hashlib
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from fastapi import Depends, Header, HTTPException, Request, status
@@ -35,7 +35,7 @@ class IdempotencyContext:
 
 
 def _now() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 def hash_body(body: bytes) -> str:
@@ -152,8 +152,8 @@ def idempotency_dependency(endpoint: str):
 
     async def _dep(
         request: Request,
-        idempotency_key: str = Header(..., alias="Idempotency-Key"),
-        session: Session = Depends(get_tenant_session),
+        idempotency_key: str = Header(..., alias="Idempotency-Key"),  # noqa: B008
+        session: Session = Depends(get_tenant_session),  # noqa: B008
     ) -> IdempotencyContext:
         body = await request.body()
         tenant_id = int(getattr(request.state, "tenant_id", 1))

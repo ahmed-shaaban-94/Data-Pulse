@@ -18,7 +18,10 @@ def run(session: Session) -> int:
     result = session.execute(
         text("DELETE FROM pos.idempotency_keys WHERE expires_at < now()")
     )
-    return int(result.rowcount or 0)
+    # ``rowcount`` is SQLAlchemy Core and typed as ``int | None``; the mypy
+    # stubs for Result[Any] omit it. We access it dynamically with getattr.
+    rowcount = getattr(result, "rowcount", 0) or 0
+    return int(rowcount)
 
 
 if __name__ == "__main__":  # pragma: no cover

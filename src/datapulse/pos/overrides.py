@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import json
 from base64 import urlsafe_b64decode
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from fastapi import Depends, Header, HTTPException, Request
 from sqlalchemy import text
@@ -45,9 +45,9 @@ def override_token_verifier(expected_action: str):
 
     async def _dep(
         request: Request,
-        proof: DeviceProof = Depends(device_token_verifier),
-        x_override_token: str = Header(..., alias="X-Override-Token"),
-        session: Session = Depends(get_tenant_session),
+        proof: DeviceProof = Depends(device_token_verifier),  # noqa: B008
+        x_override_token: str = Header(..., alias="X-Override-Token"),  # noqa: B008
+        session: Session = Depends(get_tenant_session),  # noqa: B008
     ) -> OverrideTokenEnvelope:
         try:
             env_dict = json.loads(_pad_b64url(x_override_token).decode())
@@ -78,7 +78,7 @@ def override_token_verifier(expected_action: str):
             raise HTTPException(status_code=401, detail="invalid grant_id")
         if claim.code_id not in row["code_ids"]:
             raise HTTPException(status_code=401, detail="invalid code_id")
-        if row["offline_expires_at"] < datetime.now(timezone.utc):
+        if row["offline_expires_at"] < datetime.now(UTC):
             raise HTTPException(status_code=401, detail="grant expired")
 
         try:
@@ -103,9 +103,11 @@ def override_token_verifier(expected_action: str):
                     "idem": proof.idempotency_key,
                 },
             )
-        except IntegrityError:
+        except IntegrityError as e:
             session.rollback()
-            raise HTTPException(status_code=409, detail="override_already_consumed")
+            raise HTTPException(
+                status_code=409, detail="override_already_consumed"
+            ) from e
 
         return env
 

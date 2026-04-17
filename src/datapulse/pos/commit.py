@@ -10,7 +10,7 @@ Design ref: docs/superpowers/specs/2026-04-17-pos-electron-desktop-design.md §3
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
 
 from fastapi import HTTPException
@@ -22,7 +22,7 @@ from datapulse.pos.models import CommitRequest, CommitResponse
 
 def _next_receipt_number(session: Session, tenant_id: int) -> str:
     """Generate a receipt number of the form ``R-YYYYMMDD-NNNNNN`` per-tenant per-day."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     seq = (
         session.execute(
             text(
@@ -57,7 +57,7 @@ def atomic_commit(
         change_due = Decimal("0")
 
     receipt = _next_receipt_number(session, tenant_id)
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     txn_row = session.execute(
         text(
@@ -90,6 +90,8 @@ def atomic_commit(
             "now": now,
         },
     ).first()
+    if txn_row is None:  # pragma: no cover — INSERT RETURNING always yields a row
+        raise HTTPException(status_code=500, detail="commit_insert_no_rowid")
     transaction_id = int(txn_row[0])
 
     for item in payload.items:

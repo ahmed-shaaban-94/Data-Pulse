@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from base64 import urlsafe_b64decode
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -31,7 +31,7 @@ def _fake_tenant_key():
         encryption_algorithm=NoEncryption(),
     )
     pub = sk.public_key().public_bytes(encoding=Encoding.Raw, format=PublicFormat.Raw)
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     return TenantKey("kid-1", 1, priv, pub, now, now + timedelta(days=1)), pub
 
 
@@ -106,7 +106,7 @@ def test_issue_grant_with_plaintexts_returns_plaintext_map() -> None:
         )
 
     assert set(plain) == {c.code_id for c in env.payload.override_codes}
-    for code_id, plaintext in plain.items():
+    for _code_id, plaintext in plain.items():
         assert len(plaintext) == 8  # OVERRIDE_CODE_LENGTH
 
 

@@ -56,7 +56,13 @@ def enforce_close_guard(
                       claimed_unresolved_count, claimed_unresolved_digest, rejection_reason)
                    VALUES (:s, :t, :term, 'rejected_client', :c, :d, 'provisional_work_pending')"""
             ),
-            {"s": shift_id, "t": tenant_id, "term": terminal_id, "c": claim_count, "d": claim_digest},
+            {
+                "s": shift_id,
+                "t": tenant_id,
+                "term": terminal_id,
+                "c": claim_count,
+                "d": claim_digest,
+            },
         )
         raise HTTPException(status_code=409, detail="provisional_work_pending")
 

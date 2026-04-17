@@ -14,13 +14,15 @@ from __future__ import annotations
 import hashlib
 from base64 import urlsafe_b64decode
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 from fastapi import Depends, Header, HTTPException, Request
 from sqlalchemy import text
 from sqlalchemy.orm import Session
+
+from datapulse.api.deps import get_tenant_session
 
 CLOCK_SKEW_TOLERANCE_MINUTES: int = 2
 
@@ -90,6 +92,8 @@ def register_device(
         ),
         {"tenant": tenant_id, "tid": terminal_id, "pk": pk, "fp": device_fingerprint},
     ).first()
+    if row is None:  # pragma: no cover — INSERT RETURNING always yields a row
+        raise HTTPException(status_code=500, detail="device_insert_no_rowid")
     return int(row[0])
 
 
@@ -122,29 +126,17 @@ def verify_signature(public_key: bytes, message: bytes, signature: bytes) -> boo
 
 async def device_token_verifier(
     request: Request,
-    x_terminal_id: int = Header(..., alias="X-Terminal-Id"),
-    x_device_fingerprint: str = Header(..., alias="X-Device-Fingerprint"),
-    x_signed_at: str = Header(..., alias="X-Signed-At"),
-    x_terminal_token: str = Header(..., alias="X-Terminal-Token"),
-    idempotency_key: str = Header(..., alias="Idempotency-Key"),
+    x_terminal_id: int = Header(..., alias="X-Terminal-Id"),  # noqa: B008
+    x_device_fingerprint: str = Header(..., alias="X-Device-Fingerprint"),  # noqa: B008
+    x_signed_at: str = Header(..., alias="X-Signed-At"),  # noqa: B008
+    x_terminal_token: str = Header(..., alias="X-Terminal-Token"),  # noqa: B008
+    idempotency_key: str = Header(..., alias="Idempotency-Key"),  # noqa: B008
+    session: Session = Depends(get_tenant_session),  # noqa: B008
 ) -> DeviceProof:
     """FastAPI dependency: verify the per-request device-bound Ed25519 proof.
 
-    Reads the session from ``request.state.db_session`` if present (injected
-    by tenant-scoped middleware); otherwise resolves ``get_tenant_session``
-    lazily. Route handlers typically depend on this via
-    ``Depends(device_token_verifier)`` alongside ``get_tenant_session``.
-
     §8.9.2 canonical digest formula.
     """
-    from datapulse.api.deps import get_tenant_session  # local to avoid circular import
-
-    # Resolve session — prefer an already-opened one on request.state
-    session: Session | None = getattr(request.state, "db_session", None)
-    if session is None:
-        session_iter = get_tenant_session()
-        session = next(session_iter)  # pragma: no cover — tests provide request.state
-
     tenant_id = int(getattr(request.state, "tenant_id", 1))
 
     device = load_active_device(session, x_terminal_id, tenant_id)
@@ -160,7 +152,7 @@ async def device_token_verifier(
     except ValueError as e:
         raise HTTPException(status_code=400, detail="invalid X-Signed-At") from e
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     if signed_at_dt > now + timedelta(minutes=CLOCK_SKEW_TOLERANCE_MINUTES):
         raise HTTPException(status_code=401, detail="signed_at in the future")
 

@@ -21,7 +21,7 @@ import json
 import secrets
 import uuid
 from base64 import urlsafe_b64encode
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from hashlib import scrypt as _scrypt
 
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
@@ -112,7 +112,7 @@ def issue_grant_for_shift_with_plaintexts(
     plaintexts to supervisors through an authenticated channel and MUST NOT
     persist them.
     """
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     grant_id = str(uuid.uuid4())
     role = RoleSnapshot(**(role_snapshot_overrides or {}))
 

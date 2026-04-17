@@ -9,7 +9,7 @@ All tests use MagicMock for the DB session — no real database involvement.
 from __future__ import annotations
 
 import hashlib
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from unittest.mock import MagicMock
 
 import pytest
@@ -23,11 +23,11 @@ def _hash(b: bytes) -> str:
 
 
 def _future() -> datetime:
-    return datetime.now(timezone.utc) + timedelta(hours=1)
+    return datetime.now(UTC) + timedelta(hours=1)
 
 
 def _past() -> datetime:
-    return datetime.now(timezone.utc) - timedelta(hours=1)
+    return datetime.now(UTC) - timedelta(hours=1)
 
 
 def test_hash_body_is_sha256_hex() -> None:
