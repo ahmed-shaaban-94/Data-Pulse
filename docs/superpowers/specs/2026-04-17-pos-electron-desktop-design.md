@@ -1704,7 +1704,103 @@ precisely.
    overlap. The implementation plan will define the version bumping policy
    and the server-side verifier fan-out.
 
-## 14. Appendix — What's already scaffolded
+## 14. Hardening backlog (deferred to later phases)
+
+Several findings surfaced during adversarial review that are legitimate concerns
+against a **Byzantine-compromised registered device** but are outside Phase 1's
+threat model for pharmacy POS. A compromised POS at a pharmacy is already
+game-over in many other ways (physical cash drawer, physical inventory,
+on-site audit log). The Phase 1 design provides strong **detection** (device
+fingerprint mismatch alerts, audit log, Sentry reports, idempotency ledger
+forensics) and addresses most realistic adversaries (buggy software, fired
+employees still on-site, network retries causing duplicate submissions).
+
+When the product matures toward **regulated markets** (F3 — pharmacy
+compliance, controlled substances, insurance reimbursement) these hardening
+items become important and should be the first security work in that phase.
+
+### 14.1 Server-authoritative slot reservation for provisional sales
+
+**Gap:** `POST /pos/shifts/{id}/close`'s server-side check only catches
+provisional sales that already reached the server (`commit_confirmed_at IS NULL`
+on server rows). Orphan local queue rows that never left the terminal are
+not visible to the server. A compromised client that lies about
+`local_unresolved.count=0` can close the shift while local orphans exist.
+
+**Proposed hardening design:**
+
+- At `POST /pos/shifts/open` (online-only), the client requests `slot_count`
+  (e.g., 500 — an over-estimate of the shift's expected volume).
+- Server pre-allocates N rows in a new table:
+  ```
+  pos_txn_slots(slot_id UUID PK, grant_id, tenant_id, terminal_id, shift_id,
+                status ∈ {unused, reserved, committed, voided, lost},
+                client_txn_id, allocated_at, updated_at)
+  ```
+  Status begins `unused`.
+- The client's queued `client_txn_id` values MUST come from the allocated slot
+  set. The grant payload includes the full `slot_ids` list.
+- Every `POST /pos/transactions/commit` atomically moves the matching
+  `slot_id` from `unused/reserved` to `committed` in the same DB transaction.
+- At shift close, the server checks: every slot is either `committed`,
+  `voided`, or `lost` (explicitly flagged by reconciliation). Any `reserved`
+  or `unused-with-client-txn-id-assigned-but-not-committed` state blocks close.
+- Benefit: the server has authoritative knowledge of the slot space. A
+  compromised client cannot invent slot UUIDs out of thin air.
+
+**Cost:** ~2-3 days of schema + endpoint + client changes + migration for
+existing shifts. Will be resolved in F3 or earlier if a specific compliance
+requirement demands it.
+
+### 14.2 Proof-of-code for override authorization
+
+**Gap:** §8.8.6's `X-Override-Token` proves *the registered device* signed
+the claim, but does not prove *a human entered the correct code*. A
+compromised client on the registered device can skip the local `scrypt`
+verification and mint a first-use token using any unused `code_id` from the
+grant. The `pos_override_consumptions` PK prevents replay but not the
+original unauthorized use.
+
+**Proposed hardening design:**
+
+- Server generates each plaintext override code, keeps it in
+  `pos_grants_issued.override_plaintexts` (encrypted at rest with a server
+  KMS key), and distributes to supervisors via an authenticated channel
+  (push notification to an authenticator app, or admin-printed code card).
+  The client receives only hashes for local UX-level verification.
+- Each privileged request carries `X-Override-Code-Sealed`:
+  ```
+  sealed = AEAD_encrypt(server_tenant_pubkey,
+                        nonce,
+                        plaintext = entered_code,
+                        aad = canonicalize({ idempotency_key, terminal_id,
+                                              action, action_subject_id }))
+  ```
+  where `server_tenant_pubkey` is an X25519 key per tenant (separate from the
+  grant-signing Ed25519 key), fetched at `GET /pos/tenant-key`.
+- Server-side `override_token_verifier` additionally decrypts the AEAD sealed
+  value, verifies the AAD binds the request, constant-time compares the
+  decrypted plaintext to the grant's stored plaintext for the claimed
+  `code_id`, then atomically inserts into `pos_override_consumptions` and
+  processes the business write.
+- A compromised client without the plaintext code cannot produce the AEAD
+  seal (AEAD is non-malleable and requires the plaintext as input).
+
+**Cost:** ~1-2 days of crypto plumbing + key rotation infrastructure + UX
+for code distribution. Supervisor code-entry UX stays the same (they still
+type the code); client just encrypts it rather than only hashing it.
+
+### 14.3 Summary
+
+| Finding | Threat model | Current mitigation | Hardening path |
+|---|---|---|---|
+| Shift-close with local-only orphans | Malicious compromised client | Signed claim + forensic audit log + server-side check of known rows | §14.1 Slot reservation |
+| Override mint without code knowledge | Malicious compromised client | Device key proves "this machine"; reconciliation audit trail flags anomalies post-hoc | §14.2 AEAD-sealed plaintext proof |
+
+Both hardening items are tracked as first-class tickets for F3 (or earlier,
+if a specific customer requires it).
+
+## 15. Appendix — What's already scaffolded
 
 Partial credit from prior work (branch `feat/pos-electron-desktop` / PR #393):
 
