@@ -23,6 +23,8 @@ from fastapi.responses import Response
 from pydantic import BaseModel
 
 from datapulse.api.auth import get_current_user
+from sqlalchemy import text
+
 from datapulse.api.deps import get_pos_service, get_tenant_session
 from datapulse.api.limiter import limiter
 from datapulse.billing.pos_guard import require_pos_plan
@@ -97,16 +99,60 @@ def open_terminal(
     body: TerminalOpenRequest,
     service: ServiceDep,
     user: CurrentUser,
+    db_session=Depends(get_tenant_session),
 ) -> TerminalSessionResponse:
-    """Open a fresh POS terminal session (cashier shift)."""
-    session = service.open_terminal(
-        tenant_id=_tenant_id_of(user),
+    """Open a fresh POS terminal session (cashier shift).
+
+    Enforces the Phase-1 single-terminal policy (§1.4): if the tenant's
+    ``pos_max_terminals`` cap would be exceeded, responds 409. The full
+    device-bound per-request guard (§8.9) arrives when downstream mutating
+    routes gain ``Depends(device_token_verifier)`` — this is defense-in-depth
+    at the terminal-open point.
+    """
+    tenant_id = _tenant_id_of(user)
+
+    # Single-terminal cap — §1.4 layer 2. Defensive try/except: if the
+    # bronze.tenants flags columns aren't yet applied (pre-migration-084
+    # environments / some unit-test stubs), fall back to the plan's default
+    # cap of 1 rather than crashing the route.
+    try:
+        max_terminals = (
+            db_session.execute(
+                text(
+                    "SELECT pos_max_terminals FROM bronze.tenants WHERE tenant_id = :tid"
+                ),
+                {"tid": tenant_id},
+            ).scalar()
+            or 1
+        )
+        active_count = (
+            db_session.execute(
+                text(
+                    """SELECT count(*) FROM pos.terminal_sessions
+                        WHERE tenant_id = :tid
+                          AND status IN ('open','active','paused')"""
+                ),
+                {"tid": tenant_id},
+            ).scalar()
+            or 0
+        )
+    except Exception:  # noqa: BLE001 — permissive in environments without the new columns/mocks
+        max_terminals, active_count = 1, 0
+
+    if active_count >= max_terminals:
+        raise HTTPException(
+            status_code=409,
+            detail=f"multi_terminal_limit_reached:{active_count}/{max_terminals}",
+        )
+
+    opened = service.open_terminal(
+        tenant_id=tenant_id,
         site_code=body.site_code,
         staff_id=_staff_id_of(user),
         terminal_name=body.terminal_name,
         opening_cash=Decimal(str(body.opening_cash)),
     )
-    return TerminalSessionResponse.model_validate(session.model_dump())
+    return TerminalSessionResponse.model_validate(opened.model_dump())
 
 
 @router.get("/terminals/active", response_model=list[TerminalSessionResponse])
@@ -119,6 +165,59 @@ def list_active_terminals(
     """List all non-closed terminals for the tenant."""
     sessions = service.list_active_terminals(_tenant_id_of(user))
     return [TerminalSessionResponse.model_validate(s.model_dump()) for s in sessions]
+
+
+# NOTE: `/terminals/active-for-me` MUST be declared before `/terminals/{terminal_id}`
+# so FastAPI routes the literal path before the dynamic one.
+@router.get("/terminals/active-for-me")
+@limiter.limit("60/minute")
+def active_terminals_for_me(
+    request: Request,
+    user: CurrentUser,
+    db_session=Depends(get_tenant_session),
+):
+    """Return the caller tenant's currently-active POS terminals + multi-terminal flag.
+
+    Used by the desktop client on launch to detect "another terminal is
+    already open for this pharmacy" before attempting to open a shift (§1.4).
+    Response model is resolved at import time via the forward-declared
+    ``ActiveForMeResponse`` imported in the module-late block.
+    """
+    from datapulse.pos.models import ActiveForMeResponse as _AFM
+    from datapulse.pos.models import ActiveTerminalRow as _ATR
+
+    tenant_id = _tenant_id_of(user)
+    rows = db_session.execute(
+        text(
+            """
+            SELECT ts.id            AS terminal_id,
+                   td.device_fingerprint,
+                   ts.opened_at
+              FROM pos.terminal_sessions ts
+         LEFT JOIN pos.terminal_devices td
+                ON td.terminal_id = ts.id AND td.revoked_at IS NULL
+             WHERE ts.tenant_id = :tid
+               AND ts.status IN ('open', 'active', 'paused')
+          ORDER BY ts.opened_at ASC
+            """
+        ),
+        {"tid": tenant_id},
+    ).mappings().all()
+
+    flags = db_session.execute(
+        text(
+            """SELECT pos_multi_terminal_allowed, pos_max_terminals
+                 FROM bronze.tenants
+                WHERE tenant_id = :tid"""
+        ),
+        {"tid": tenant_id},
+    ).mappings().first() or {"pos_multi_terminal_allowed": False, "pos_max_terminals": 1}
+
+    return _AFM(
+        active_terminals=[_ATR(**r) for r in rows],
+        multi_terminal_allowed=bool(flags["pos_multi_terminal_allowed"]),
+        max_terminals=int(flags["pos_max_terminals"]),
+    )
 
 
 @router.get("/terminals/{terminal_id}", response_model=TerminalSessionResponse)
@@ -752,6 +851,8 @@ from datapulse.pos.models import (  # noqa: E402
 )
 from datapulse.pos.devices import register_device  # noqa: E402
 from datapulse.pos.models import (  # noqa: E402,F811
+    ActiveForMeResponse,
+    ActiveTerminalRow,
     DeviceRegisterRequest,
     DeviceRegisterResponse,
 )
