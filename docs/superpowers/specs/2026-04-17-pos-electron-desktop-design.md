@@ -11,11 +11,16 @@
 
 ### 1.1 Goal
 
-Ship a production-ready Windows desktop POS that pharmacies can install, use offline
-for half a day, and trust with real transactions. The desktop app wraps the existing
-DataPulse Next.js frontend in an Electron shell and adds hardware integration, local
-persistence, an offline sync engine, a signed auto-updating installer, and a professional
-UI/UX layer designed for cashier speed.
+Ship a production-ready Windows desktop POS **for single-terminal pharmacy sites**
+that owners can install, use offline for half a day, and trust with real transactions.
+The desktop app wraps the existing DataPulse Next.js frontend in an Electron shell
+and adds hardware integration, local persistence, an offline sync engine, a signed
+auto-updating installer, and a professional UI/UX layer designed for cashier speed.
+
+**Deployment envelope — Phase 1 is restricted to single-terminal sites.** Multi-till
+pharmacies are out of scope until F1 ships, because two terminals operating from
+independent local stock snapshots can oversell, select conflicting batches, and drift
+reconciliation during even brief sync lag. See §1.4 for enforcement.
 
 ### 1.2 Non-goals for this phase
 
@@ -24,38 +29,62 @@ Phase 1 scope. They are sized separately and will each get their own design + pl
 
 | Phase | Theme | Why deferred |
 |-------|-------|--------------|
-| F1 | Multi-terminal LAN coordination | Requires Phase 1's sync engine to be hardened first |
+| F1 | Multi-terminal LAN coordination | **Hard prerequisite for multi-till sites** — Phase 1 hard-refuses to activate on tenants with >1 registered terminal |
 | F2 | Live analytics ribbon + drill-through panel | Value multiplier — needs Phase 1 baseline |
 | F3 | Prescription intake + controlled-substance logbook + FIFO | Regulatory workflow, sized separately |
 | F4 | Customer-facing dual-display | Hardware dependency, small but isolated |
 | F5 | Voice + AI assist | Not in roadmap for this cycle |
 
+### 1.4 Single-terminal enforcement
+
+Multi-terminal sites are not supported in Phase 1. The restriction is enforced at
+**three layers** so it cannot be bypassed by configuration error:
+
+1. **Tenant flag** — `tenants.pos_multi_terminal_allowed BOOLEAN NOT NULL DEFAULT false`.
+   Toggling to `true` is a manual DBA operation reserved for F1.
+2. **Server guard** — `POST /pos/terminals` (open a new terminal) fails with 409
+   when the tenant already has an `open` or `active` terminal and `pos_multi_terminal_allowed=false`.
+3. **Client guard** — on launch, the client calls `GET /pos/capabilities`; if the
+   server reports `multi_terminal: false` and another terminal is already open for
+   the tenant, this terminal refuses to open a shift and shows
+   `⛔ Another terminal is already active for this pharmacy — close it first`.
+
+This makes "two tills during an outage" structurally impossible: the second terminal
+cannot even open a shift, online or offline.
+
 ### 1.3 Definition of done
 
-A pharmacist can:
+A pharmacist at a **single-terminal pharmacy** can:
 
 1. Install the signed `DataPulse-POS-1.0.0-Setup.exe` without SmartScreen warnings
-2. Open a shift with opening cash on a terminal
+2. Open a shift with opening cash on a terminal (server rejects a second concurrent terminal)
 3. Scan 10 items with a USB barcode scanner → cart populates, total updates
-4. Complete a cash transaction → receipt prints on 80mm thermal printer, cash
+4. Complete a cash transaction → receipt prints on 80mm thermal printer marked
+   `✓ CONFIRMED` (server accepted sync within the checkout round-trip), cash
    drawer opens, change due is shown
 5. **Unplug the network**, ring up 5 more transactions → all still succeed, receipts
-   still print, UI shows offline banner
-6. Plug the network back in → queued transactions sync within 30s, banner flips to
-   "synced" briefly, all transactions appear in the DataPulse analytics dashboard
-7. Close the shift with closing cash → variance is calculated, shift summary prints
-8. Restart the machine → app auto-launches to tray, app auto-updates when a new
-   release is published
+   still print but marked `⏳ PROVISIONAL — awaiting confirmation`, UI shows offline banner
+6. Plug the network back in → queued transactions sync within 30s, banner flashes
+   "synced", all transactions appear in the DataPulse analytics dashboard, and the
+   history row flips from `provisional` → `confirmed`
+7. If a queued transaction is rejected by the server (stock, auth, shift-state
+   mismatch) → it surfaces in `/settings → Sync Issues` with a **reconciliation
+   workflow** (retry, override, or record-as-loss) and **shift close is blocked
+   until every queued mutation is either `synced` or `reconciled`**
+8. Close the shift with closing cash → variance is calculated, shift summary prints
+9. Restart the machine → app auto-launches to tray, app auto-updates **only when
+   server capability check and schema compatibility check both pass**; a new release
+   requiring a non-downgradeable schema change waits until the queue is drained
 
 ---
 
 ## 2. Five Pillars
 
 1. **Hardware integration** — keyboard-emulation barcode scanner, ESC/POS thermal printer, cash drawer kick
-2. **Half-day offline mode** — local SQLite catalog + transaction queue; survives 4-8 hour ISP outages
-3. **Sync infrastructure** — `Idempotency-Key` header contract, retry with exponential backoff, separate push + pull workers
-4. **Packaging & updater** — signed NSIS installer, auto-update via GitHub Releases, Sentry crash reporting
-5. **Professional UI/UX** — dark-first cart-dominant terminal, keyboard + touch dual-primary, Arabic + English, accessibility-first
+2. **Half-day offline mode with provisional semantics** — local SQLite catalog + transaction queue; offline sales are *provisional* until server-confirmed; explicit reconciliation workflow for rejected queue items; shift close blocked while unreconciled items exist
+3. **Sync infrastructure + capability negotiation** — required `Idempotency-Key` contract (non-optional on server), `GET /pos/capabilities` version/feature negotiation, retry with exponential backoff, separate push + pull workers
+4. **Packaging, updater, security** — signed NSIS installer, auto-update via GitHub Releases with server-capability + schema-compatibility gating, Windows DPAPI-backed offline auth with terminal-scoped grants, Sentry crash reporting
+5. **Professional UI/UX** — dark-first cart-dominant terminal, keyboard + touch dual-primary, Arabic + English, accessibility-first, clear provisional/confirmed visual distinction
 
 ---
 
@@ -161,28 +190,63 @@ frontend/src/
 | Verify / add `GET /pos/catalog/stock?site=&since=` | Client-pulled stock snapshot |
 | Nightly cleanup task in `src/datapulse/tasks/` | Delete expired idempotency keys |
 
-### 3.5 Data flow — checkout (online)
+### 3.5 Data flow — checkout (online, server-confirmed path)
 
 1. Cashier presses **F2** → renderer navigates to `/checkout`
 2. Cashier enters payment method + tendered → submit
 3. Renderer generates `client_txn_id` (UUID v4)
-4. Renderer writes to local `transactions_queue` (status=`pending`)
-5. Renderer calls `ipcRenderer.invoke('sync:push-one', local_id)`
+4. Renderer writes to local `transactions_queue` (status=`pending`, `confirmation=provisional`)
+5. Renderer calls `ipcRenderer.invoke('sync:push-one', local_id)` with a **3s timeout**
 6. Main sends `POST /pos/transactions` with `Idempotency-Key: <client_txn_id>`
-7. On 2xx → main updates row to `synced`, persists server `id` + `receipt_number`
-8. Renderer receives success → calls `ipcRenderer.invoke('printer:print', payload)`
+7. On 2xx within the timeout → main updates row to `synced` + `confirmation=confirmed`,
+   persists server `id` + `receipt_number`
+8. Renderer receives success → receipt payload marked **`✓ CONFIRMED`** →
+   `ipcRenderer.invoke('printer:print', payload)`
 9. For cash/mixed payments → `ipcRenderer.invoke('drawer:open')`
 10. Renderer shows change-due modal, returns to `/terminal` on dismiss
 
-### 3.6 Data flow — checkout (offline)
+### 3.6 Data flow — checkout (offline / timeout, provisional path)
 
-- Steps 1–4 identical
-- Step 5 fails (network error) → queue row stays `pending`, background worker keeps retrying
-- Step 8 (receipt print) **still runs** — payload is local-only
-- Step 9 (drawer open) still runs
-- UI shows toast: **"Saved locally — will sync when online"**
-- Top banner already reflects offline state
-- When connectivity returns, worker drains queue, UI shows brief green sync confirmation
+**Provisional semantics:** the physical sale (cash taken, receipt printed, drawer
+opened) is allowed to complete even when the server hasn't confirmed, but the sale
+is marked **provisional** on every surface until confirmation lands. The design
+makes it impossible to end a shift while any provisional sale is unresolved.
+
+- Steps 1–4 identical to online flow
+- Step 5 fails (network error **or** timeout > 3s) → queue row stays
+  `pending`, `confirmation=provisional`; background worker keeps retrying
+- Step 8 runs, but receipt payload includes a **`⏳ PROVISIONAL — pending confirmation`**
+  banner at the top and a line at the bottom: *"This receipt is pending server
+  confirmation. If any item is rejected, a corrective receipt will be issued."*
+- Step 9 (drawer open) runs for cash payments
+- UI toast: **"Provisional sale — awaiting server confirmation"**
+- Top offline banner reflects count: `⚠ Offline — 3 provisional · Last sync 2 min ago`
+
+**Resolution states — after sync attempt:**
+
+| Server response | Local state transition | User surface |
+|---|---|---|
+| 2xx | `provisional → confirmed` | history row updates, green toast: "3 sales confirmed" |
+| 409 (idempotency replay) | Treated as 2xx — server already has this transaction | same as 2xx |
+| 4xx (stock/auth/shift mismatch) | `provisional → rejected` | **appears in `/settings → Sync Issues` with reconciliation workflow**; cashier sees red chip in top banner |
+| 5xx / network | Stays `provisional`, retry with backoff | no UI change |
+
+**Reconciliation workflow for rejected items** (`/settings → Sync Issues`):
+
+Each rejected provisional sale offers three resolution paths:
+1. **Retry with override** — supervisor PIN + reason (e.g., "physical stock
+   confirmed, server stock was stale"), resubmits with `X-Override-Reason` header
+2. **Record as loss / no-sale adjustment** — records the physical cash-out in
+   `audit_log` as `provisional_loss`, credits the cash drawer expected total
+   downward by that amount, prints a reconciliation slip for the pharmacist
+3. **Issue corrective void** — prints a void receipt for the customer to return;
+   reopens the original receipt reference number as void
+
+**Shift-close guard:** `POST /pos/shifts/{id}/close` refuses on the client side if
+any queue row has `status in (pending, failed) AND confirmation=provisional`. The
+UI shows a blocking modal: `Cannot close shift — 2 provisional sales unresolved.
+Resolve them in Sync Issues first.` This makes it structurally impossible to bank
+cash for an unconfirmed sale and move on.
 
 ---
 
@@ -250,8 +314,15 @@ CREATE TABLE transactions_queue (
   client_txn_id        TEXT NOT NULL UNIQUE,   -- Idempotency-Key header
   endpoint             TEXT NOT NULL,          -- 'POST /pos/transactions' etc.
   payload              TEXT NOT NULL,          -- JSON
-  status               TEXT NOT NULL           -- pending | syncing | synced | failed
-    CHECK (status IN ('pending','syncing','synced','failed')),
+  status               TEXT NOT NULL           -- pending | syncing | synced | rejected | reconciled
+    CHECK (status IN ('pending','syncing','synced','rejected','reconciled')),
+  confirmation         TEXT NOT NULL DEFAULT 'provisional'
+    CHECK (confirmation IN ('provisional','confirmed','reconciled')),
+  reconciliation_kind  TEXT                    -- 'retry_override' | 'record_loss' | 'corrective_void' | NULL
+    CHECK (reconciliation_kind IN ('retry_override','record_loss','corrective_void') OR reconciliation_kind IS NULL),
+  reconciliation_note  TEXT,                   -- supervisor reason
+  reconciliation_by    TEXT,                   -- staff_id who resolved
+  reconciled_at        TEXT,
   server_id            INTEGER,                -- filled on 2xx
   server_response      TEXT,                   -- JSON, for receipts/audit
   retry_count          INTEGER NOT NULL DEFAULT 0,
@@ -261,6 +332,10 @@ CREATE TABLE transactions_queue (
   updated_at           TEXT NOT NULL
 );
 CREATE INDEX ix_queue_status_attempt ON transactions_queue(status, next_attempt_at);
+CREATE INDEX ix_queue_confirmation  ON transactions_queue(confirmation);
+-- Used by shift-close guard: "any unresolved provisional work blocks close"
+CREATE INDEX ix_queue_open_work     ON transactions_queue(status)
+  WHERE status IN ('pending','rejected');
 
 -- Sync cursors per entity
 CREATE TABLE sync_state (
@@ -283,8 +358,9 @@ CREATE TABLE audit_log (
   created_at           TEXT NOT NULL
 );
 
--- Schema versioning
+-- Schema versioning (see §4.5 for compatibility + rollback handling)
 INSERT INTO settings(key,value) VALUES('schema_version','1');
+INSERT INTO settings(key,value) VALUES('min_compatible_app_version','1.0.0');
 ```
 
 ### 4.3 IPC surface
@@ -299,7 +375,18 @@ db.stock.forDrug(drugCode, siteCode)   → PosStockInfo
 
 db.queue.enqueue(transaction)          → { local_id, client_txn_id }
 db.queue.pending()                     → QueueRow[]
-db.queue.stats()                       → { pending, failed, last_sync_at }
+db.queue.rejected()                    → QueueRow[]
+db.queue.stats()                       → { pending, rejected, provisional, last_sync_at }
+db.queue.reconcile(local_id, kind, note, supervisorPin)
+                                       → { status, confirmation, reconciled_at }
+
+authz.currentGrant()                   → OfflineGrant | null
+authz.grantState()                     → 'online' | 'offline_valid' | 'offline_expired' | 'revoked'
+authz.refreshGrant()                   → OfflineGrant   // requires online
+authz.verifySupervisorPin(pin)         → { ok, staff_id } | { ok: false, reason }
+authz.capabilities()                   → CapabilitiesDoc   // cached
+
+shift.canClose()                       → { ok, blockers: [{ local_id, reason }] }
 
 db.shifts.current()                    → ShiftRecord | null
 db.shifts.open(payload)                → ShiftRecord
@@ -328,6 +415,72 @@ Every financial value is a string representation of a `Decimal` throughout the
 entire stack — SQLite storage, IPC payloads, and the backend's existing `JsonDecimal`.
 Never `number` / `REAL`. Comparisons and arithmetic in the main process use
 `decimal.js` (tiny, MIT). Rendering to the UI formats via `Intl.NumberFormat`.
+
+### 4.5 Schema compatibility, backup, and downgrade safety
+
+Forward-only migrations are convenient but dangerous when paired with auto-updates
+and a preserved local DB. The following safeguards make bad releases recoverable.
+
+**1. Pre-migration backup (required).** On every app launch, *before* running any
+pending migration, the connection layer copies `pos.db` + `pos.db-wal` + `pos.db-shm`
+to `pos.db.pre-v{current_version}.bak` (replacing any existing backup for that
+version). If the migration fails or the resulting schema is detected as incompatible,
+the app restores from the backup and surfaces a clear error.
+
+**2. Bi-directional version check on startup.** Every build declares two constants:
+
+```
+APP_SCHEMA_VERSION         = N       // what this build expects
+APP_MIN_COMPATIBLE_SCHEMA  = N-k     // lowest schema version this build can read
+```
+
+On startup, main reads `schema_version` from the DB and refuses to boot when the
+DB is **newer** than the build (`db.schema_version > APP_SCHEMA_VERSION`). This
+happens if a user downgrades after an auto-update. The UI shows:
+
+```
+⛔ Database schema is newer than this version.
+Install DataPulse POS v{db.min_compatible_app_version} or later.
+Your local data is preserved at: {userData}/pos.db
+```
+
+The app never opens or modifies the DB in this state.
+
+**3. Auto-update gating on non-downgradeable schemas.** Each release's update
+manifest declares:
+
+```
+{
+  version: "1.4.0",
+  schema_version: 4,
+  requires_queue_drained: true          // set when migration is non-reversible
+}
+```
+
+The updater refuses to install a version where `requires_queue_drained=true` while
+any `transactions_queue` row has `status in (pending, rejected)`. UI message:
+`Update postponed: 3 provisional sales must sync first.` This prevents a bad
+release from stranding queued cash transactions.
+
+**4. Reversible-by-default migrations.** Every migration ships with a `down.sql`
+sibling unless explicitly marked `requires_queue_drained`. The migration runner
+records both `up` and `down` SQL alongside the version in a `schema_history` table
+for forensic support.
+
+**5. Migration test suite.** CI runs, for each migration:
+  - Fresh DB → apply all migrations in order → smoke-test IPC reads
+  - Previous-version DB + new migration → read + write + restore backup
+  - Corrupted DB file → app fails with a recoverable error, not a crash
+
+```sql
+CREATE TABLE schema_history (
+  version       INTEGER PRIMARY KEY,
+  applied_at    TEXT NOT NULL,
+  up_sql_sha    TEXT NOT NULL,
+  down_sql_sha  TEXT,                     -- NULL for requires_queue_drained
+  app_version   TEXT NOT NULL
+);
+```
 
 ---
 
@@ -410,7 +563,15 @@ Combine `navigator.onLine` with a periodic `HEAD /health` ping (every 30s). Stat
 machine: `online → degraded (ping fails once) → offline (3 pings fail) → online
 (1 ping succeeds)`. Prevents flapping.
 
-### 6.4 Server — idempotency contract
+### 6.4 Server — idempotency contract (required capability, not optional)
+
+**Idempotency is a hard backend prerequisite for this POS client — not an
+additive convenience.** The client refuses to sync against any server that does
+not advertise `idempotency: "v1"` in its capability response (see §6.6). This
+prevents the rollback scenario where removing the idempotency migration allows
+duplicate financial mutations: the client will simply stop syncing instead of
+silently regressing to non-idempotent retries. Treat the idempotency migration
+as an ADDITIVE, NEVER-REVERTED backend capability.
 
 **New table:**
 
@@ -463,6 +624,57 @@ DELETE FROM pos_idempotency_keys WHERE expires_at < now();
 ```
 
 Schedule via existing task scheduler.
+
+### 6.6 Capability negotiation — `GET /pos/capabilities`
+
+The client cannot make safety assumptions about the server. On launch and on every
+network reconnect, the client fetches `GET /pos/capabilities` and caches the
+response. The client refuses to push mutations if any required capability is
+missing or has rolled back.
+
+**Endpoint (unauthenticated, tenant-agnostic — advertises server features only):**
+
+```
+GET /pos/capabilities
+
+200 OK
+{
+  "server_version":        "1.14.0",
+  "min_client_version":    "1.0.0",
+  "max_client_version":    null,             // null = no upper bound
+  "idempotency":           "v1",              // required — client refuses if missing
+  "capabilities": {
+    "idempotency_key_header":    true,        // required
+    "pos_catalog_stream":        true,        // GET /pos/catalog/*
+    "pos_shift_close":           true,
+    "pos_corrective_void":       true,
+    "override_reason_header":    true,        // X-Override-Reason for reconciliation
+    "multi_terminal":            false        // §1.4 enforcement
+  },
+  "enforced_policies": {
+    "idempotency_ttl_hours":     24,
+    "provisional_ttl_hours":     72           // server-side cap on how long a provisional can stay unconfirmed
+  }
+}
+```
+
+**Client behaviour:**
+
+| Condition | Client action |
+|---|---|
+| `idempotency != "v1"` OR `capabilities.idempotency_key_header != true` | **Hard stop all sync.** Banner: `⛔ Server incompatible — contact support.` No retries until operator action. Existing provisional sales held. |
+| `client_version < min_client_version` | Force auto-update check; if a compatible version is available, install at end-of-shift; if not, stop mutations (reads still work). |
+| `client_version > max_client_version` (if set) | Block mutations, prompt for server upgrade. |
+| `capabilities.multi_terminal=false` AND another terminal open for tenant | §1.4 enforcement — shift cannot open |
+| Any required capability flips from `true` → missing between polls | Treat as incompatible server, stop mutations, surface banner |
+
+**Polling:** on launch, on reconnect, and every 10 min when online. Response
+cached in `settings` with a `capabilities_fetched_at` timestamp.
+
+**Rollback posture.** Once a capability is published and clients depend on it,
+removing it is a **breaking change requiring a client update**. The capabilities
+doc in `docs/pos/capabilities.md` tracks every flag, when it shipped, and its
+deprecation policy.
 
 ---
 
@@ -639,6 +851,108 @@ Set via Next.js `headers()` config + Electron `session.defaultSession.webRequest
 - Hidden log viewer via `Ctrl+Shift+L` for support
 - Never log prices, drug codes, or customer PII
 
+### 8.8 Offline authorization model
+
+The terminal is a shared physical workstation. "Cache JWT + extend TTL" is not an
+auth model on shared hardware — a revoked or fired staff account can keep selling
+until the terminal reconnects. The offline auth model below treats the terminal
+itself as the primary security boundary, independent of which staff member is
+active.
+
+#### 8.8.1 Secret storage — Windows DPAPI
+
+All secrets (Auth0 tokens, staff role snapshots, terminal offline-grant) are
+encrypted with **Windows DPAPI** (`CurrentUser` scope) before being written to
+`pos.db`. A user on the same machine under a different Windows account cannot
+read them; a stolen drive cannot be decrypted on another machine.
+
+Implementation: `hardware/dpapi.ts` wraps Node's `crypto.protectData()` /
+`unprotectData()` via `node-dpapi-prebuilt`. The IPC surface exposes only
+opaque cipher blobs; plaintext tokens never leave the main process.
+
+#### 8.8.2 Terminal-scoped offline grant
+
+When a shift opens **while online**, the server issues a signed **Offline Grant**:
+
+```
+POST /pos/shifts/open
+→ { shift: {...}, offline_grant: {jwt_blob} }
+
+jwt_blob (HS256, issued by API, keyed to tenant):
+{
+  "iss":            "datapulse-pos",
+  "terminal_id":    42,
+  "tenant_id":      7,
+  "staff_id":       "s-123",
+  "shift_id":       1001,
+  "issued_at":      "2026-04-17T06:00:00Z",
+  "offline_expires_at":  "2026-04-17T18:00:00Z",    // issued_at + 12h (configurable per tenant)
+  "role_snapshot": {
+    "can_checkout":          true,
+    "can_void":              false,
+    "can_override_price":    false,
+    "can_apply_discount":    true,
+    "max_discount_pct":      15,
+    "can_process_returns":   false,
+    "can_open_drawer_no_sale": false,
+    "can_close_shift":       true
+  }
+}
+```
+
+The grant is stored DPAPI-encrypted in `settings.offline_grant`. Its signature is
+verified on every privileged action in the main process using the tenant's HS256
+key (fetched at shift-open and rotated daily by the server).
+
+#### 8.8.3 Degradation policy
+
+| State | Allowed actions |
+|---|---|
+| **Online + valid JWT** | All role-appropriate actions |
+| **Offline + valid grant + not expired** | Actions per `role_snapshot` — cashier can ring up sales, apply discounts ≤15%, close shift. Void/return/price-override blocked. |
+| **Offline + grant expired (past `offline_expires_at`)** | **Read-only mode.** No new sales, no checkout, no shift close, no drawer. UI banner: `⛔ Offline authorization expired — reconnect to continue selling.` Existing cart can still be reviewed and voided locally. |
+| **Offline + no grant** (app launched offline, no shift ever opened while online) | Read-only, no shift-open. |
+| **Online + JWT refresh fails (auth revoked server-side)** | Immediate lock: banner `⛔ Session revoked — contact administrator.` Current cart preserved for 24h so supervisor can complete or void it. |
+
+Critical rule: **`role_snapshot` is the ceiling offline, never a floor.** If the
+server would have denied an action online, the offline grant must deny it too.
+The shift-open grant is the only source of offline authorization — mid-shift
+role changes on the server take effect on next reconnect only.
+
+#### 8.8.4 Privileged action enforcement
+
+Every privileged IPC handler in `main` re-verifies the grant before executing:
+
+```ts
+// Example: printer.openDrawerNoSale
+ipcMain.handle('drawer:open-no-sale', async (_evt, { supervisorPin }) => {
+  const grant = await authz.currentGrant();
+  if (!grant || authz.isGrantExpired(grant)) {
+    throw new AuthzError('offline_expired');
+  }
+  if (!grant.role_snapshot.can_open_drawer_no_sale) {
+    throw new AuthzError('insufficient_role');
+  }
+  const supervisor = await authz.verifySupervisorPin(supervisorPin);
+  if (!supervisor) throw new AuthzError('supervisor_invalid');
+  // ... proceed
+});
+```
+
+Supervisor PINs are cached at shift-open in the grant's `supervisor_pin_hashes`
+field (scrypt-hashed, pepper from tenant key). Up to 5 supervisor PINs cached
+per grant. A PIN rotation on the server takes effect at the next shift-open.
+
+#### 8.8.5 Grant rotation + reconnect
+
+On every reconnect:
+- Fetch fresh grant via `POST /pos/shifts/{id}/refresh-grant`
+- Replace DPAPI blob atomically
+- Apply any role-snapshot changes (e.g., `can_void` flipped off → UI hides void)
+
+If the refresh call returns 401/403 → session was revoked server-side → enter
+"revoked" state (see table above), preserve cart, lock further mutations.
+
 ---
 
 ## 9. Testing
@@ -660,15 +974,42 @@ Set via Next.js `headers()` config + Electron `session.defaultSession.webRequest
 - `HARDWARE_MODE=mock` — printer/drawer fakes record calls
 - Scenarios:
   - Open shift → scan 5 items → cash checkout → mock printer called → mock drawer opened → close shift
-  - Same flow with `navigator.onLine=false` → verify offline banner + queue row + receipt still prints
+  - Same flow with `navigator.onLine=false` → verify offline banner + queue row + receipt
+    printed with `PROVISIONAL` marker; flip online → verify banner sync flash +
+    history row `provisional → confirmed`
   - Return flow: complete sale, then refund, verify refund receipt
   - Offline → online reconnect mid-queue → verify all drain
+  - **Rejected-provisional reconciliation:** offline checkout → mock server returns
+    4xx on reconnect for that row → verify row shows in Sync Issues → apply
+    `retry_override` with supervisor PIN → verify `status=reconciled` + audit log
+  - **Shift-close guard:** provisional pending → attempt close → verify modal
+    blocks with blocker list; reconcile → attempt close → verify close succeeds
+  - **Single-terminal enforcement:** seed two open terminals for tenant → launch
+    client → verify `Another terminal active` banner + shift cannot open
+  - **Capability incompatibility:** mock server returns `idempotency: null` → verify
+    client hard-stops sync + banner; flip to `"v1"` → verify sync resumes
+  - **Offline grant expiry:** advance mock clock past `offline_expires_at` → verify
+    read-only mode + all mutating IPC calls reject with `offline_expired`
+  - **Grant revocation:** online refresh returns 401 → verify locked state + cart
+    preserved + banner `Session revoked`
+  - **Schema downgrade refusal:** inject DB with `schema_version=99` → launch app
+    → verify refuses to boot with correct "install v… or later" message
+  - **Pre-migration backup:** advance schema, corrupt migration → verify restore
+    from `.bak` file and app recovers
 
 ### 9.4 Backend
 
 - pytest for `idempotency_handler`: fresh key, replay, hash-mismatch 409, TTL expiry, concurrent double-submit
 - pytest for cleanup task
 - Existing POS endpoint tests stay green — only change is the added header
+- pytest for `GET /pos/capabilities`: returns required flags, serializes cleanly,
+  is unauthenticated but rate-limited
+- pytest for single-terminal guard on `POST /pos/terminals`: second concurrent
+  terminal rejected with 409 when tenant flag is false; allowed when true
+- pytest for offline-grant issuance on `POST /pos/shifts/open`: grant embeds
+  correct role snapshot, signature verifies, `offline_expires_at` respects tenant setting
+- pytest for override reconciliation path (`X-Override-Reason` header on retry)
+  requiring supervisor credential and recording in audit log
 
 ### 9.5 Manual hardware smoke (pre-release checklist)
 
@@ -709,11 +1050,38 @@ Local SQLite is created on first launch.
 
 ### 10.4 Rollback
 
-- Installer's uninstaller cleanly removes the app
-- Local `pos.db` is preserved on uninstall (can be manually deleted at `%APPDATA%/datapulse-pos/`)
-- Server-side: the idempotency migration is additive; reverting it just means
-  clients resend transactions as non-idempotent — server dedupe via natural key
-  must still catch them during the brief rollback window
+**Client rollback (app uninstall or downgrade):**
+- Installer's uninstaller cleanly removes the app binaries
+- Local `pos.db` is preserved on uninstall (available at `%APPDATA%/datapulse-pos/`)
+- A downgrade install that opens a newer-version DB refuses to boot per §4.5
+  bi-directional version check; the user is told which version to install
+- Pre-migration backups at `pos.db.pre-v{N}.bak` allow a support tech to manually
+  restore a prior schema if needed
+
+**Server rollback — idempotency migration is NOT revertible:**
+- The idempotency migration (`pos_idempotency_keys` table + `Depends(idempotency_handler)`)
+  is an **advertised capability** (§6.6 `capabilities.idempotency_key_header`).
+  Once published, it must remain. Reverting it causes all connected POS clients
+  to refuse to sync (§6.6 client behaviour table) — by design. This is safer than
+  the alternative of silently regressing to non-idempotent retries and duplicating
+  financial mutations.
+- If a server defect **specifically in the idempotency handler** must be rolled
+  back, the path is: ship a server hotfix that restores handler behaviour while
+  keeping the capability flag `true`. Never flip the capability `false`.
+- Other POS server changes (new routes, new fields) follow the normal additive
+  migration pattern and can be reverted without breaking the client.
+
+**Catalog endpoint rollback:**
+- If `pos_catalog_stream` capability must be withdrawn, clients fall back to
+  read-only mode (existing catalog snapshot stays usable) and stop pulling
+  updates — they do not silently fail to an older unsafe path.
+
+**Update manifest rollback:**
+- Publishing a bad release to `stable` channel: yank the release from GitHub
+  Releases, clients on older versions continue working; clients that already
+  upgraded stay on the bad release until the next `stable` publish.
+- Never rollback a release that introduced a non-downgradeable schema migration
+  (§4.5) without a dedicated forward-fix release that can open the newer schema.
 
 ---
 
@@ -727,9 +1095,13 @@ Local SQLite is created on first launch.
 | Catalog endpoints may not exist in current form | Verify against `src/datapulse/pos/repository.py` during plan phase; add endpoints if needed |
 | Thermal printer drivers vary by vendor | Ship test-print + "printer profile" selector (Epson, Star, Xprinter presets) |
 | Offline → online catalog drift | Show `Catalog last updated: 27 min ago` chip; force-refresh button |
-| Auth0 session expires offline | Cache JWT + refresh token; extend cache TTL; "Session expired — reconnect" banner if past refresh window |
 | Keyboard shortcuts collide with Arabic IME | Test with Windows Arabic keyboard layout; fall back to Ctrl+shortcut alternates |
 | Power loss mid-transaction | WAL journal + queue row written before API call — resumes on next launch |
+| Provisional sale takes cash for a transaction the server rejects | §3.6 reconciliation workflow (retry-override / record-loss / corrective-void) + §1.3 shift-close guard blocks banking the cash until resolved |
+| Terminal used while offline by revoked staff | §8.8 terminal-scoped offline grant with 12h max age, DPAPI-protected; revocation takes effect at next reconnect; read-only mode after grant expiry |
+| Bad release ships non-downgradeable schema | §4.5 pre-migration backups, bi-directional version check refuses to boot on newer schema, update manifest gates incompatible releases until queue is drained |
+| Server idempotency accidentally disabled in an incident | §6.6 capability negotiation — clients stop syncing instead of silently retrying non-idempotently; §10.4 designates idempotency as non-revertible capability |
+| Two tills accidentally activated at a single-terminal pharmacy | §1.4 three-layer enforcement (tenant flag + server guard + client guard); second terminal cannot open a shift |
 
 ---
 
