@@ -38,7 +38,7 @@ class TenantKey:
     key_id: str
     tenant_id: int
     private_key: bytes  # raw 32-byte Ed25519 private scalar
-    public_key: bytes   # raw 32-byte Ed25519 public key
+    public_key: bytes  # raw 32-byte Ed25519 public key
     valid_from: datetime
     valid_until: datetime
 
@@ -89,9 +89,10 @@ def active_private_key(session: Session, tenant_id: int) -> TenantKey:
 
     If the tenant has no current key, mints a fresh one.
     """
-    row = session.execute(
-        text(
-            """
+    row = (
+        session.execute(
+            text(
+                """
             SELECT key_id, tenant_id, private_key, public_key, valid_from, valid_until
               FROM pos.tenant_keys
              WHERE tenant_id = :tid
@@ -100,9 +101,12 @@ def active_private_key(session: Session, tenant_id: int) -> TenantKey:
           ORDER BY valid_from DESC
              LIMIT 1
             """
-        ),
-        {"tid": tenant_id, "now": _now()},
-    ).mappings().first()
+            ),
+            {"tid": tenant_id, "now": _now()},
+        )
+        .mappings()
+        .first()
+    )
     if not row:
         return rotate_tenant_key(session, tenant_id)
     return TenantKey(**row)
@@ -115,9 +119,10 @@ def list_public_keys(session: Session, tenant_id: int) -> list[TenantKey]:
     should read ``.public_key`` and discard the rest. The struct is reused to
     avoid two data classes.
     """
-    rows = session.execute(
-        text(
-            """
+    rows = (
+        session.execute(
+            text(
+                """
             SELECT key_id, tenant_id, private_key, public_key, valid_from, valid_until
               FROM pos.tenant_keys
              WHERE tenant_id = :tid
@@ -125,7 +130,10 @@ def list_public_keys(session: Session, tenant_id: int) -> list[TenantKey]:
                AND valid_until > :now
           ORDER BY valid_from DESC
             """
-        ),
-        {"tid": tenant_id, "now": _now()},
-    ).mappings().all()
+            ),
+            {"tid": tenant_id, "now": _now()},
+        )
+        .mappings()
+        .all()
+    )
     return [TenantKey(**r) for r in rows]

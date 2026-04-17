@@ -119,9 +119,7 @@ def open_terminal(
     try:
         max_terminals = (
             db_session.execute(
-                text(
-                    "SELECT pos_max_terminals FROM bronze.tenants WHERE tenant_id = :tid"
-                ),
+                text("SELECT pos_max_terminals FROM bronze.tenants WHERE tenant_id = :tid"),
                 {"tid": tenant_id},
             ).scalar()
             or 1
@@ -190,9 +188,10 @@ def active_terminals_for_me(
     )
 
     tenant_id = _tenant_id_of(user)
-    rows = db_session.execute(
-        text(
-            """
+    rows = (
+        db_session.execute(
+            text(
+                """
             SELECT ts.id            AS terminal_id,
                    td.device_fingerprint,
                    ts.opened_at
@@ -203,9 +202,12 @@ def active_terminals_for_me(
                AND ts.status IN ('open', 'active', 'paused')
           ORDER BY ts.opened_at ASC
             """
-        ),
-        {"tid": tenant_id},
-    ).mappings().all()
+            ),
+            {"tid": tenant_id},
+        )
+        .mappings()
+        .all()
+    )
 
     flags = db_session.execute(
         text(

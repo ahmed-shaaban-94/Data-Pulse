@@ -56,16 +56,20 @@ def check_and_claim(
     same hash exists. Raises HTTPException(409) on hash mismatch. Treats an
     expired row as absent (deletes + re-claims).
     """
-    row = session.execute(
-        text(
-            """
+    row = (
+        session.execute(
+            text(
+                """
             SELECT request_hash, response_status, response_body, expires_at
               FROM pos.idempotency_keys
              WHERE key = :key AND tenant_id = :tenant_id
             """
-        ),
-        {"key": key, "tenant_id": tenant_id},
-    ).mappings().first()
+            ),
+            {"key": key, "tenant_id": tenant_id},
+        )
+        .mappings()
+        .first()
+    )
 
     if row:
         if row["expires_at"] < _now():

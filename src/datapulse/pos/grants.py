@@ -57,9 +57,7 @@ def _hash_code(plaintext: str, salt: bytes) -> bytes:
 
 
 def _generate_code() -> str:
-    return "".join(
-        secrets.choice(OVERRIDE_CODE_ALPHABET) for _ in range(OVERRIDE_CODE_LENGTH)
-    )
+    return "".join(secrets.choice(OVERRIDE_CODE_ALPHABET) for _ in range(OVERRIDE_CODE_LENGTH))
 
 
 def issue_grant_for_shift(
@@ -119,7 +117,7 @@ def issue_grant_for_shift_with_plaintexts(
     codes: list[OverrideCodeEntry] = []
     plaintexts: dict[str, str] = {}
     for i in range(override_code_count):
-        code_id = f"c-{i+1:02d}"
+        code_id = f"c-{i + 1:02d}"
         plain = _generate_code()
         salt = secrets.token_bytes(16)
         digest = _hash_code(plain, salt)

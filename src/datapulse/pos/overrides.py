@@ -67,13 +67,17 @@ def override_token_verifier(expected_action: str):
         if not verify_signature(proof.device.public_key, msg, sig):
             raise HTTPException(status_code=401, detail="override signature invalid")
 
-        row = session.execute(
-            text(
-                """SELECT code_ids, offline_expires_at
+        row = (
+            session.execute(
+                text(
+                    """SELECT code_ids, offline_expires_at
                      FROM pos.grants_issued WHERE grant_id = :g"""
-            ),
-            {"g": claim.grant_id},
-        ).mappings().first()
+                ),
+                {"g": claim.grant_id},
+            )
+            .mappings()
+            .first()
+        )
         if not row:
             raise HTTPException(status_code=401, detail="invalid grant_id")
         if claim.code_id not in row["code_ids"]:
@@ -105,9 +109,7 @@ def override_token_verifier(expected_action: str):
             )
         except IntegrityError as e:
             session.rollback()
-            raise HTTPException(
-                status_code=409, detail="override_already_consumed"
-            ) from e
+            raise HTTPException(status_code=409, detail="override_already_consumed") from e
 
         return env
 

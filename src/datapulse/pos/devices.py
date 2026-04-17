@@ -97,21 +97,23 @@ def register_device(
     return int(row[0])
 
 
-def load_active_device(
-    session: Session, terminal_id: int, tenant_id: int
-) -> TerminalDevice | None:
-    row = session.execute(
-        text(
-            """
+def load_active_device(session: Session, terminal_id: int, tenant_id: int) -> TerminalDevice | None:
+    row = (
+        session.execute(
+            text(
+                """
             SELECT id, tenant_id, terminal_id, public_key, device_fingerprint, revoked_at
               FROM pos.terminal_devices
              WHERE terminal_id = :tid
                AND tenant_id   = :tenant
                AND revoked_at IS NULL
             """
-        ),
-        {"tid": terminal_id, "tenant": tenant_id},
-    ).mappings().first()
+            ),
+            {"tid": terminal_id, "tenant": tenant_id},
+        )
+        .mappings()
+        .first()
+    )
     return TerminalDevice(**row) if row else None
 
 

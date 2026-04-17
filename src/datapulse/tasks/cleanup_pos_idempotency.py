@@ -15,9 +15,7 @@ from sqlalchemy.orm import Session
 
 def run(session: Session) -> int:
     """Delete every row whose ``expires_at`` is in the past. Returns the count."""
-    result = session.execute(
-        text("DELETE FROM pos.idempotency_keys WHERE expires_at < now()")
-    )
+    result = session.execute(text("DELETE FROM pos.idempotency_keys WHERE expires_at < now()"))
     # ``rowcount`` is SQLAlchemy Core and typed as ``int | None``; the mypy
     # stubs for Result[Any] omit it. We access it dynamically with getattr.
     rowcount = getattr(result, "rowcount", 0) or 0

@@ -25,13 +25,13 @@ PROVISIONAL_TTL_HOURS: int = 72
 OFFLINE_GRANT_MAX_AGE_HOURS: int = 12
 
 CAPABILITIES: dict[str, bool] = {
-    "idempotency_key_header":   True,
-    "pos_commit_endpoint":      True,
-    "pos_catalog_stream":       False,   # deferred to M2
-    "pos_shift_close":          True,
-    "pos_corrective_void":      True,
-    "override_reason_header":   True,
-    "terminal_device_token":    True,
+    "idempotency_key_header": True,
+    "pos_commit_endpoint": True,
+    "pos_catalog_stream": False,  # deferred to M2
+    "pos_shift_close": True,
+    "pos_corrective_void": True,
+    "override_reason_header": True,
+    "terminal_device_token": True,
     "offline_grant_asymmetric": True,
     "multi_terminal_supported": False,
 }

@@ -61,6 +61,7 @@ def _make_app(register_stub) -> FastAPI:
     )
 
     import datapulse.api.routes.pos as pos_routes
+
     pos_routes.register_device = register_stub  # type: ignore[assignment]
     return app
 

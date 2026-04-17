@@ -46,12 +46,17 @@ def _make_app(fake_keys: list[TenantKey]) -> FastAPI:
     app.dependency_overrides[get_pos_service] = lambda: MagicMock()
     app.dependency_overrides[get_tenant_plan_limits] = lambda: PLAN_LIMITS["platform"]
     app.dependency_overrides[get_access_context] = lambda: AccessContext(
-        member_id=1, tenant_id=1, user_id="test-user", role_key="admin",
-        permissions=set(), is_admin=True,
+        member_id=1,
+        tenant_id=1,
+        user_id="test-user",
+        role_key="admin",
+        permissions=set(),
+        is_admin=True,
     )
 
     # Patch list_public_keys to return our fake keys regardless of session
     import datapulse.api.routes.pos as pos_routes
+
     pos_routes.list_public_keys = lambda _sess, _tid: fake_keys  # type: ignore[assignment]
 
     return app
