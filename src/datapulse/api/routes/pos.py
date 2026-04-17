@@ -23,7 +23,7 @@ from fastapi.responses import Response
 from pydantic import BaseModel
 
 from datapulse.api.auth import get_current_user
-from datapulse.api.deps import get_pos_service
+from datapulse.api.deps import get_pos_service, get_tenant_session
 from datapulse.api.limiter import limiter
 from datapulse.billing.pos_guard import require_pos_plan
 from datapulse.logging import get_logger
@@ -733,6 +733,8 @@ def verify_pharmacist(
 # capabilities endpoint must be reachable by the desktop client before it
 # has authenticated, so it can decide whether to even attempt login.
 
+from base64 import urlsafe_b64encode  # noqa: E402
+
 from datapulse.pos.capabilities import (  # noqa: E402
     CAPABILITIES,
     IDEMPOTENCY_PROTOCOL_VERSION,
@@ -743,7 +745,12 @@ from datapulse.pos.capabilities import (  # noqa: E402
     POS_SERVER_VERSION,
     PROVISIONAL_TTL_HOURS,
 )
-from datapulse.pos.models import CapabilitiesDoc  # noqa: E402
+from datapulse.pos.models import (  # noqa: E402
+    CapabilitiesDoc,
+    TenantKeysResponse,
+    TenantPublicKey,
+)
+from datapulse.pos.tenant_keys import list_public_keys  # noqa: E402
 
 capabilities_router = APIRouter(prefix="/pos", tags=["pos"])
 
@@ -765,4 +772,36 @@ def capabilities(request: Request) -> CapabilitiesDoc:
         },
         tenant_key_endpoint="/api/v1/pos/tenant-key",
         device_registration_endpoint="/api/v1/pos/terminals/register-device",
+    )
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# M1 — Tenant signing public keys (§8.8.2)
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+@router.get("/tenant-key", response_model=TenantKeysResponse)
+@limiter.limit("30/minute")
+def tenant_key(
+    request: Request,
+    user: CurrentUser,
+    session=Depends(get_tenant_session),
+) -> TenantKeysResponse:
+    """Return the tenant's currently-valid POS signing public keys.
+
+    Clients use these keys to verify offline grants (§8.8.2). Private keys
+    never leave the server; only public material is returned here.
+    """
+    tenant_id = _tenant_id_of(user)
+    keys = list_public_keys(session, tenant_id)
+    return TenantKeysResponse(
+        keys=[
+            TenantPublicKey(
+                key_id=k.key_id,
+                public_key=urlsafe_b64encode(k.public_key).decode().rstrip("="),
+                valid_from=k.valid_from,
+                valid_until=k.valid_until,
+            )
+            for k in keys
+        ]
     )
