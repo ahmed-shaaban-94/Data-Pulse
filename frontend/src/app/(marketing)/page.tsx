@@ -1,13 +1,14 @@
-import { HeroSection }    from "@/components/marketing/hero-section";
-import { TrustBar }       from "@/components/marketing/trust-bar";
-import { FeaturesGrid }   from "@/components/marketing/features-grid";
-import { HowItWorks }     from "@/components/marketing/how-it-works";
-import { StatsBanner }    from "@/components/marketing/stats-banner";
-import { PricingSection } from "@/components/marketing/pricing-section";
-import { FAQSection }     from "@/components/marketing/faq-section";
-import { CTASection }     from "@/components/marketing/cta-section";
-import { JsonLd }         from "@/components/marketing/json-ld";
-import type { Metadata }  from "next";
+import { HeroSection }     from "@/components/marketing/hero-section";
+import { TrustBar }        from "@/components/marketing/trust-bar";
+import { FeaturesGrid }    from "@/components/marketing/features-grid";
+import { HowItWorks }      from "@/components/marketing/how-it-works";
+import { StatsBanner }     from "@/components/marketing/stats-banner";
+import { UseCasesSection } from "@/components/marketing/use-cases-section";
+import { PricingSection }  from "@/components/marketing/pricing-section";
+import { FAQSection }      from "@/components/marketing/faq-section";
+import { CTASection }      from "@/components/marketing/cta-section";
+import { JsonLd }          from "@/components/marketing/json-ld";
+import type { Metadata }   from "next";
 
 export const metadata: Metadata = {
   title: "DataPulse — Pharma Sales and Operations Intelligence",
@@ -27,10 +28,9 @@ export default function LandingPage() {
       <FeaturesGrid />
       <HowItWorks />
       <StatsBanner />
-      {/* PHASE 4: Add <UseCasesSection /> here before PricingSection */}
+      <UseCasesSection />
       <PricingSection />
       <FAQSection />
-      {/* PHASE 4: LeadCaptureModal is wired in CTASection and PricingSection */}
       <CTASection />
     </>
   );
