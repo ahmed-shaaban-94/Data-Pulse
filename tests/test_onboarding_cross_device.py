@@ -13,7 +13,7 @@ Covers:
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from unittest.mock import MagicMock, call
+from unittest.mock import MagicMock
 
 import pytest
 from fastapi.testclient import TestClient
@@ -24,7 +24,6 @@ from datapulse.api.routes.onboarding import get_onboarding_service
 from datapulse.onboarding.models import OnboardingStatus
 from datapulse.onboarding.repository import OnboardingRepository
 from datapulse.onboarding.service import OnboardingService
-
 
 # ---------------------------------------------------------------------------
 # Shared fixtures
