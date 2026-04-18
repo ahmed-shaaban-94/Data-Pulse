@@ -185,9 +185,16 @@ export function registerIpcHandlers(
   ipcMain.handle("authz.isDeviceRegistered", () => isDeviceRegistered(db));
 
   // ── updater ────────────────────────────────────────────────
-  ipcMain.handle("updater.check", () => ({ available: false }));
+  ipcMain.handle("updater.isReady", () => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { isUpdateReady } = require("../updater/index") as typeof import("../updater/index");
+    return { ready: isUpdateReady() };
+  });
 
-  ipcMain.handle("updater.install", () => {
-    throw new Error("updater.install not yet implemented");
+  ipcMain.handle("updater.quitAndInstall", () => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { isUpdateReady, quitAndInstall } = require("../updater/index") as typeof import("../updater/index");
+    if (!isUpdateReady()) throw new Error("No update downloaded yet");
+    quitAndInstall();
   });
 }
