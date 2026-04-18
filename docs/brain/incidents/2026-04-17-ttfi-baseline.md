@@ -60,6 +60,28 @@ Run **5 consecutive times** and record the median + p95 in the table below.
 - **Before Phase 2 ships (now):** `first_insight_seen` will **not fire** — there is no first-insight card yet (Task 3 / #402). Expect `ttfi_ms` in the JSON to be `null`. The deltas we can measure are `upload_started → upload_completed` and `upload_completed → first_dashboard_view`. That is still the baseline we must beat.
 - **Expected range for today's UX** (educated guess, to be replaced with real numbers): 90–240 s for upload+pipeline with a 5 k-row file; 1–3 s for dashboard first paint. Phase 2 target: < 5 min end-to-end including a first-insight card.
 
+## Measured Results — real-backend (Follow-up 1b / #421)
+
+Spec: `frontend/e2e/golden-path-real-backend.spec.ts`  
+Runbook: `frontend/e2e/README.md §"Real-backend TTFI runbook"`  
+Report artifact: `playwright-report/ttfi-real.json`
+
+> **Status:** spec shipped; run `RUN_TTFI_REAL=1 TTFI_PASSES=5` against the droplet to fill in the table.
+
+| Pass | `upload_started → upload_completed` | `upload_completed → first_insight_seen` | Full TTFI | Gate (< 5 min) |
+|------|-------------------------------------|------------------------------------------|-----------|----------------|
+| 1 | — | — | — | — |
+| 2 | — | — | — | — |
+| 3 | — | — | — | — |
+| 4 | — | — | — | — |
+| 5 | — | — | — | — |
+| **Median** | — | — | — | — |
+| **p95** | — | — | — | — |
+
+Copy numbers from `playwright-report/ttfi-real.json → passes[].events` deltas.
+
+---
+
 ## Why this matters
 
 TTFI is the one number that says whether a first-time pharma operator can go from "I have a spreadsheet" to "I see a decision" without help. The whole Phase 2 plan ([docs/superpowers/plans/2026-04-17-phase2-golden-path.md](../../superpowers/plans/2026-04-17-phase2-golden-path.md)) optimizes it. Without a baseline recorded _before_ the wizard + first-insight card ship, "we improved the flow" becomes a feeling instead of a number.
