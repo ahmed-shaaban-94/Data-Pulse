@@ -7,19 +7,29 @@
   "license": "UNLICENSED",
   "private": true,
   "scripts": {
-    "dev": "tsc -p tsconfig.json && electron .",
-    "build": "tsc -p tsconfig.json",
+    "dev": "tsc -p tsconfig.json && node scripts/copy-assets.js && electron .",
+    "build": "tsc -p tsconfig.json && node scripts/copy-assets.js",
     "start": "npm run build && electron .",
     "package": "npm run build && electron-builder --win",
     "package:dir": "npm run build && electron-builder --win --dir",
-    "test": "echo \"tests land with M2 proper (jest + ts-jest)\" && exit 0"
+    "test": "jest --coverage",
+    "test:watch": "jest --watchAll"
   },
   "dependencies": {
-    "electron-store": "^10.0.0"
+    "better-sqlite3": "^12.9.0",
+    "electron-store": "^10.0.0",
+    "electron-updater": "^6.8.3",
+    "node-thermal-printer": "^4.6.0"
   },
   "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/jest": "^30.0.0",
+    "@types/node": "^25.6.0",
     "electron": "^33.0.0",
     "electron-builder": "^25.1.0",
+    "electron-rebuild": "^3.2.9",
+    "jest": "^30.3.0",
+    "ts-jest": "^29.4.9",
     "typescript": "^5.6.0"
   },
   "_m2Notes": {

@@ -188,23 +188,23 @@ def _make_guard_app(plan_key: str) -> FastAPI:
 
 
 def test_pos_guard_passes_for_platform_plan() -> None:
-    client = TestClient(_make_guard_app("platform"))
-    assert client.get("/probe").status_code == 200
+    with TestClient(_make_guard_app("platform")) as client:
+        assert client.get("/probe").status_code == 200
 
 
 def test_pos_guard_passes_for_enterprise_plan() -> None:
-    client = TestClient(_make_guard_app("enterprise"))
-    assert client.get("/probe").status_code == 200
+    with TestClient(_make_guard_app("enterprise")) as client:
+        assert client.get("/probe").status_code == 200
 
 
 def test_pos_guard_raises_402_for_starter_plan() -> None:
-    client = TestClient(_make_guard_app("starter"))
-    assert client.get("/probe").status_code == 402
+    with TestClient(_make_guard_app("starter")) as client:
+        assert client.get("/probe").status_code == 402
 
 
 def test_pos_guard_raises_402_for_pro_plan() -> None:
-    client = TestClient(_make_guard_app("pro"))
-    assert client.get("/probe").status_code == 402
+    with TestClient(_make_guard_app("pro")) as client:
+        assert client.get("/probe").status_code == 402
 
 
 # ────────────────────────────────────────────────────────────────────────────
@@ -249,15 +249,19 @@ def _mock_verify_service() -> MagicMock:
 
 
 def test_verify_endpoint_happy_path(_mock_verify_service: MagicMock) -> None:
-    client = TestClient(_make_verify_app(_mock_verify_service))
-    resp = client.post(
-        "/api/v1/pos/controlled/verify",
-        json={"pharmacist_id": PHARMACIST_ID, "credential": VALID_PIN, "drug_code": DRUG_CODE},
-    )
-    assert resp.status_code == 200
-    data = resp.json()
-    assert data["token"] == "fake-token-xyz"
-    assert data["pharmacist_id"] == PHARMACIST_ID
+    with TestClient(_make_verify_app(_mock_verify_service)) as client:
+        resp = client.post(
+            "/api/v1/pos/controlled/verify",
+            json={
+                "pharmacist_id": PHARMACIST_ID,
+                "credential": VALID_PIN,
+                "drug_code": DRUG_CODE,
+            },
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["token"] == "fake-token-xyz"
+        assert data["pharmacist_id"] == PHARMACIST_ID
     _mock_verify_service.verify_pharmacist_pin.assert_called_once_with(
         pharmacist_id=PHARMACIST_ID,
         credential=VALID_PIN,
@@ -270,22 +274,22 @@ def test_verify_endpoint_wrong_pin_returns_403(_mock_verify_service: MagicMock) 
         drug_code=DRUG_CODE,
         message="Pharmacist PIN is incorrect.",
     )
-    client = TestClient(_make_verify_app(_mock_verify_service))
-    resp = client.post(
-        "/api/v1/pos/controlled/verify",
-        json={"pharmacist_id": PHARMACIST_ID, "credential": "wrong", "drug_code": DRUG_CODE},
-    )
-    assert resp.status_code == 403
+    with TestClient(_make_verify_app(_mock_verify_service)) as client:
+        resp = client.post(
+            "/api/v1/pos/controlled/verify",
+            json={"pharmacist_id": PHARMACIST_ID, "credential": "wrong", "drug_code": DRUG_CODE},
+        )
+        assert resp.status_code == 403
 
 
 def test_verify_endpoint_short_credential_rejected(_mock_verify_service: MagicMock) -> None:
     """Pydantic min_length=4 on credential must reject a 3-char PIN."""
-    client = TestClient(_make_verify_app(_mock_verify_service))
-    resp = client.post(
-        "/api/v1/pos/controlled/verify",
-        json={"pharmacist_id": PHARMACIST_ID, "credential": "12", "drug_code": DRUG_CODE},
-    )
-    assert resp.status_code == 422
+    with TestClient(_make_verify_app(_mock_verify_service)) as client:
+        resp = client.post(
+            "/api/v1/pos/controlled/verify",
+            json={"pharmacist_id": PHARMACIST_ID, "credential": "12", "drug_code": DRUG_CODE},
+        )
+        assert resp.status_code == 422
 
 
 # ────────────────────────────────────────────────────────────────────────────

@@ -26,6 +26,8 @@ import { cn } from "@/lib/utils";
 const STATE_KEY = "ttfi_onboarding_strip_v1";
 const AUTO_HIDE_DAYS = 14;
 
+// "upload_data" is intentionally distinct from the OnboardingWizard's "connect_data" step.
+// The wizard tracks account setup; this strip tracks TTFI milestones. See ADR 006.
 type StepId = "upload_data" | "validate" | "first_insight" | "share";
 
 interface StepDef {
