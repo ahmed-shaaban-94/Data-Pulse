@@ -193,3 +193,13 @@ CREATE TABLE IF NOT EXISTS secrets_dpapi (
     ciphertext  BLOB NOT NULL,
     updated_at  TEXT NOT NULL
 );
+
+-- ─────────────────────────────────────────────────────────────
+-- Override-code ledger (prevents double-spend of scrypt codes)
+-- ─────────────────────────────────────────────────────────────
+
+CREATE TABLE IF NOT EXISTS consumed_override_codes (
+    grant_id    TEXT NOT NULL,
+    code_id     TEXT NOT NULL,
+    PRIMARY KEY (grant_id, code_id)
+);

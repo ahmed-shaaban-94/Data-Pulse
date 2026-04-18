@@ -22,6 +22,7 @@ import {
 import { getCurrentShift, openShift, closeShift } from "../db/shifts";
 import { getSetting, setSetting } from "../db/settings";
 import { drainQueue, buildEnqueueSignature, getBaseUrl } from "../sync/push";
+import { pullCatalog } from "../sync/pull";
 import { isOnline } from "../sync/online";
 import { isDeviceRegistered, registerDevice } from "../authz/device";
 import { currentGrant, grantState, consumeOverrideCode } from "../authz/grants";
@@ -139,10 +140,9 @@ export function registerIpcHandlers(
   // ── sync ───────────────────────────────────────────────────
   ipcMain.handle("sync.pushNow", async () => drainQueue(db));
 
-  ipcMain.handle("sync.pullNow", () => {
-    // M3b: catalog pull endpoints not yet implemented on server.
-    return { pulled: 0 };
-  });
+  ipcMain.handle("sync.pullNow", async (_e, entity?: "products" | "stock") =>
+    pullCatalog(db, entity),
+  );
 
   ipcMain.handle("sync.state", async () => {
     const online = isOnline();
