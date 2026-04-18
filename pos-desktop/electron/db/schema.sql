@@ -154,6 +154,8 @@ INSERT OR IGNORE INTO settings(key, value) VALUES
     ('schema_version',           '1'),
     ('min_compatible_app_version','1.0.0'),
     ('hardware_mode',            'mock'),
+    ('printer_interface',        'tcp://192.168.1.100:9100'),
+    ('printer_type',             'EPSON'),
     ('language',                 'ar-EG'),
     ('numeric_style',            'latin'),
     ('density',                  'compact');
