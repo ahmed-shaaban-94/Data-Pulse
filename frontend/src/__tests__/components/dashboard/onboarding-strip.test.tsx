@@ -46,7 +46,7 @@ describe("OnboardingStrip", () => {
 
   it("renders four step labels on first mount", () => {
     render(<OnboardingStrip />);
-    expect(screen.getByText(/connect data/i)).toBeInTheDocument();
+    expect(screen.getByText(/upload data/i)).toBeInTheDocument();
     expect(screen.getByText(/validate/i)).toBeInTheDocument();
     expect(screen.getByText(/see first insight/i)).toBeInTheDocument();
     expect(screen.getByText(/share with teammate/i)).toBeInTheDocument();
@@ -94,7 +94,7 @@ describe("OnboardingStrip", () => {
     const { container } = render(<OnboardingStrip />);
     expect(
       container.querySelector(
-        '[data-step="connect_data"][data-step-state="complete"]',
+        '[data-step="upload_data"][data-step-state="complete"]',
       ),
     ).toBeTruthy();
   });
@@ -169,19 +169,19 @@ describe("OnboardingStrip", () => {
     const calls = updateGoldenPathProgress.mock.calls as [Record<string, string | null>][];
     // Use the last call: earlier calls (if any) may be empty-progress guards.
     const [progress] = calls[calls.length - 1];
-    expect(progress.connect_data).toMatch(/\d{4}-\d{2}-\d{2}T/);
+    expect(progress.upload_data).toMatch(/\d{4}-\d{2}-\d{2}T/);
   });
 
   it("merges backend golden_path_progress into local state on mount", async () => {
     const backendTs = "2026-04-18T08:00:00.000Z";
-    mockOnboarding({ connect_data: backendTs });
+    mockOnboarding({ upload_data: backendTs });
 
     const { container } = render(<OnboardingStrip />);
 
     await waitFor(() =>
       expect(
         container.querySelector(
-          '[data-step="connect_data"][data-step-state="complete"]',
+          '[data-step="upload_data"][data-step-state="complete"]',
         ),
       ).toBeTruthy(),
     );
@@ -192,17 +192,17 @@ describe("OnboardingStrip", () => {
     const localTs = new Date().toISOString();
     localStorage.setItem(
       STATE_KEY,
-      JSON.stringify({ completed: { connect_data: localTs } }),
+      JSON.stringify({ completed: { upload_data: localTs } }),
     );
-    // Backend has connect_data as null (not yet synced).
-    mockOnboarding({ connect_data: null });
+    // Backend has upload_data as null (not yet synced).
+    mockOnboarding({ upload_data: null });
 
     const { container } = render(<OnboardingStrip />);
 
     // Local value should be preserved.
     expect(
       container.querySelector(
-        '[data-step="connect_data"][data-step-state="complete"]',
+        '[data-step="upload_data"][data-step-state="complete"]',
       ),
     ).toBeTruthy();
   });

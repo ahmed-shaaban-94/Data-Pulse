@@ -26,7 +26,7 @@ import { cn } from "@/lib/utils";
 const STATE_KEY = "ttfi_onboarding_strip_v1";
 const AUTO_HIDE_DAYS = 14;
 
-type StepId = "connect_data" | "validate" | "first_insight" | "share";
+type StepId = "upload_data" | "validate" | "first_insight" | "share";
 
 interface StepDef {
   id: StepId;
@@ -36,7 +36,7 @@ interface StepDef {
 }
 
 const STEPS: readonly StepDef[] = [
-  { id: "connect_data", label: "Connect data", trigger: "upload_started" },
+  { id: "upload_data", label: "Upload data", trigger: "upload_started" },
   { id: "validate", label: "Validate", trigger: "upload_completed" },
   { id: "first_insight", label: "See first insight", trigger: "first_insight_seen" },
   { id: "share", label: "Share with teammate" /* manual */ },
