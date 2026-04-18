@@ -3,6 +3,7 @@
 import { Header } from "@/components/layout/header";
 import { Breadcrumbs } from "@/components/layout/breadcrumbs";
 import { PageTransition } from "@/components/layout/page-transition";
+import { OpsSuiteNav } from "@/components/shared/ops-suite-nav";
 import { AnalyticsSectionHeader } from "@/components/layout/analytics-section-header";
 import { DispenseRateCards } from "@/components/dispensing/dispense-rate-cards";
 import { DaysOfStockChart } from "@/components/dispensing/days-of-stock-chart";
@@ -19,6 +20,7 @@ export default function DispensingPage() {
         title="Dispensing Analytics"
         description="Dispense velocity, stock coverage, and reconciliation"
       />
+      <OpsSuiteNav />
 
       {/* Top movers */}
       <div className="mt-6">

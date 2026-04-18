@@ -3,6 +3,7 @@
 import { Header } from "@/components/layout/header";
 import { Breadcrumbs } from "@/components/layout/breadcrumbs";
 import { PageTransition } from "@/components/layout/page-transition";
+import { OpsSuiteNav } from "@/components/shared/ops-suite-nav";
 import { AnalyticsSectionHeader } from "@/components/layout/analytics-section-header";
 import { SupplierTable } from "@/components/suppliers/supplier-table";
 import { SupplierPerformanceChart } from "@/components/suppliers/supplier-performance-chart";
@@ -23,6 +24,7 @@ export default function SuppliersPage() {
         title="Suppliers"
         description={`${data.length} suppliers · ${activeCount} active`}
       />
+      <OpsSuiteNav />
 
       {/* Supplier directory */}
       <div className="mt-6">
