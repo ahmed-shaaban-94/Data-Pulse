@@ -149,7 +149,20 @@ export function PosCartProvider({ children }: { children: ReactNode }) {
     [state.items],
   );
 
-  const voucherDiscount = state.voucher?.discount ?? 0;
+  // Recompute the voucher discount from the current subtotal-after-item-
+  // discounts on every render. Pinning the value at apply time means that
+  // scanning another item after the voucher was applied would leave the
+  // displayed discount stale. Server re-validates at checkout so the
+  // final charge is authoritative; this just keeps the UI honest.
+  const voucherDiscount = useMemo(() => {
+    if (!state.voucher) return 0;
+    const base = Math.max(0, subtotal - itemDiscountTotal);
+    return computeVoucherDiscount(
+      state.voucher.discount_type,
+      state.voucher.value,
+      base,
+    );
+  }, [state.voucher, subtotal, itemDiscountTotal]);
 
   const discountTotal = useMemo(
     () => itemDiscountTotal + voucherDiscount,

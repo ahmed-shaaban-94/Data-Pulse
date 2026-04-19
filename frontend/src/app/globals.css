@@ -1052,7 +1052,7 @@ html {
 
 /* Giant italic display total — Terminal v2 Totals Hero */
 .pos-display {
-  font-family: 'Fraunces', ui-serif, Georgia, 'Times New Roman', serif;
+  font-family: var(--font-fraunces), 'Fraunces', ui-serif, Georgia, 'Times New Roman', serif;
   font-style: italic;
   font-weight: 500;
   letter-spacing: -0.02em;
