@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Fraunces, JetBrains_Mono, IBM_Plex_Sans_Arabic } from "next/font/google";
 import { NextIntlClientProvider } from "next-intl";
 import { getLocale, getMessages } from "next-intl/server";
 import { isRtl } from "@/i18n/config";
@@ -6,6 +7,31 @@ import type { Locale } from "@/i18n/config";
 import { PWARegister } from "@/components/pwa-register";
 import "@fontsource-variable/inter";
 import "./globals.css";
+
+// POS design fonts — loaded at the root so every surface can opt-in via
+// `--font-fraunces` / `--font-mono` / `--font-arabic`. Inter is kept on
+// @fontsource-variable/inter (existing marketing + dashboard usage).
+const fraunces = Fraunces({
+  subsets: ["latin"],
+  style: "italic",
+  weight: ["400", "500", "600"],
+  variable: "--font-fraunces",
+  display: "swap",
+});
+
+const jetBrainsMono = JetBrains_Mono({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-mono",
+  display: "swap",
+});
+
+const plexArabic = IBM_Plex_Sans_Arabic({
+  subsets: ["arabic"],
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-arabic",
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "https://datapulse.dev"),
@@ -59,8 +85,10 @@ export default async function RootLayout({
   const messages = await getMessages();
   const dir = isRtl(locale) ? "rtl" : "ltr";
 
+  const fontVars = `${fraunces.variable} ${jetBrainsMono.variable} ${plexArabic.variable}`;
+
   return (
-    <html lang={locale} dir={dir} suppressHydrationWarning>
+    <html lang={locale} dir={dir} className={fontVars} suppressHydrationWarning>
       <body className="bg-page font-sans text-text-primary antialiased">
         <a href="#main-content" className="skip-to-content">
           Skip to main content
