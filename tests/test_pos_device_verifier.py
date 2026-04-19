@@ -74,9 +74,7 @@ def _make_app(
     monkeypatch: pytest.MonkeyPatch,
 ) -> FastAPI:
     monkeypatch.setattr(devices_mod, "load_active_device", lambda *_a, **_k: device)
-    monkeypatch.setattr(
-        devices_mod, "is_v1_deprecated_for_tenant", lambda *_a, **_k: v1_deprecated
-    )
+    monkeypatch.setattr(devices_mod, "is_v1_deprecated_for_tenant", lambda *_a, **_k: v1_deprecated)
 
     app = FastAPI()
     app.dependency_overrides[get_tenant_session] = lambda: MagicMock()
