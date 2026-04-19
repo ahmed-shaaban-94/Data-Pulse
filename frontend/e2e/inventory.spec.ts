@@ -85,6 +85,38 @@ test.describe("/inventory-v2 redirect", () => {
   });
 });
 
+test.describe("/inventory/[drug_code] drill-down (focus mode)", () => {
+  test.beforeEach(async ({ page }) => {
+    // Any drug code works for structural assertions — the page renders
+    // FocusShell even when backend data is absent (loading / error /
+    // empty states are all wrapped in the shell).
+    await page.goto("/inventory/PARA500");
+  });
+
+  test("focus shell renders with pulse-bar (no sidebar)", async ({ page }) => {
+    await expect(page.locator(".dashboard-v2 .pulse-bar")).toBeVisible();
+    // Focus mode drops the sidebar — this assertion guards the core
+    // difference between DashboardShell and FocusShell.
+    await expect(page.locator(".dashboard-v2 aside.side")).toHaveCount(0);
+  });
+
+  test("back-link returns to /inventory", async ({ page }) => {
+    const back = page.locator(".dashboard-v2 .back-link");
+    await expect(back).toBeVisible();
+    await expect(back).toHaveAttribute("href", "/inventory");
+    await expect(back).toContainText(/Inventory/i);
+  });
+
+  test("breadcrumb trail includes Inventory parent link", async ({ page }) => {
+    const crumbs = page.locator(".dashboard-v2 .focus-header .crumbs");
+    await expect(crumbs).toBeVisible();
+    await expect(crumbs.getByRole("link", { name: "Inventory" })).toHaveAttribute(
+      "href",
+      "/inventory",
+    );
+  });
+});
+
 // ─── Data-level tests (staging-only, skipped in CI) ────────────────────
 
 test.describe("Inventory data surfacing", () => {
