@@ -144,6 +144,29 @@
 .dashboard-v2 .crumbs b { color: var(--ink); font-weight: 600; }
 
 .dashboard-v2 .page { padding: 28px; display: flex; flex-direction: column; gap: 24px; }
+
+/* Focus-mode chrome — used for drill-down / detail pages (no sidebar).
+   Keeps pulse-bar + a first-class back button + breadcrumb row. */
+.dashboard-v2 .focus { display: flex; flex-direction: column; min-height: 100vh; }
+.dashboard-v2 .focus-header {
+  display: flex; align-items: center; gap: 20px;
+  padding: 12px 28px;
+  border-bottom: 1px solid var(--line);
+  flex-wrap: wrap;
+}
+.dashboard-v2 .back-link {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 10px; border-radius: 8px;
+  color: var(--ink-2); font-size: 13px; font-weight: 500;
+  transition: background 0.15s, color 0.15s;
+}
+.dashboard-v2 .back-link:hover { background: rgba(255, 255, 255, 0.04); color: var(--ink); }
+.dashboard-v2 .back-link svg { opacity: 0.75; }
+.dashboard-v2 .focus-content {
+  padding: 28px;
+  display: flex; flex-direction: column; gap: 24px;
+  max-width: 1400px; margin: 0 auto; width: 100%;
+}
 .dashboard-v2 .page-title {
   font-family: var(--font-fraunces), Fraunces, serif; font-weight: 500;
   font-size: 32px; letter-spacing: -0.02em; margin: 0 0 4px;

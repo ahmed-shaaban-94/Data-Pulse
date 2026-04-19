@@ -25,6 +25,7 @@ import {
   ShoppingCart,
   Activity,
   Target,
+  ArrowLeft,
 } from "lucide-react";
 import "./dashboard-v2.css";
 
@@ -252,6 +253,79 @@ export function DashboardShell({
           )}
           {children}
         </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── FocusShell — drill-down chrome ────────────────────────────────
+
+interface FocusShellProps {
+  /**
+   * Where the back-button links — typically the parent list page.
+   * e.g. `/inventory` for `/inventory/[drug_code]`.
+   */
+  backHref: string;
+  /** Human-readable label for the back button, e.g. "Inventory". */
+  backLabel: string;
+  /**
+   * Breadcrumb trail. The last entry is usually the record id (without
+   * an href). Example:
+   *   [
+   *     { label: "DataPulse", href: "/dashboard" },
+   *     { label: "Operations" },
+   *     { label: "Inventory", href: "/inventory" },
+   *     { label: "PARA500" },
+   *   ]
+   */
+  breadcrumbs?: Array<{ label: string; href?: string }>;
+  pulseStats?: PulseStat[];
+  children: React.ReactNode;
+}
+
+/**
+ * FocusShell — chrome for drill-down / detail pages.
+ *
+ * Intent: when a user clicks into a single record, they want to focus
+ * on that record, not the sidebar nav telling them "go elsewhere."
+ * This shell drops the left sidebar, keeps the pulse-bar for continuity,
+ * and adds a first-class back button + breadcrumb row.
+ *
+ * Matches patterns in Linear / Notion / Stripe / Figma where detail
+ * views de-chrome to maximize reading space.
+ */
+export function FocusShell({
+  backHref,
+  backLabel,
+  breadcrumbs,
+  pulseStats = DEFAULT_STATS,
+  children,
+}: FocusShellProps) {
+  return (
+    <div className="dashboard-v2">
+      <div className="focus">
+        <PulseBar stats={pulseStats} />
+        <div className="focus-header">
+          <Link href={backHref} className="back-link">
+            <ArrowLeft size={14} />
+            {backLabel}
+          </Link>
+          {breadcrumbs && breadcrumbs.length > 0 && (
+            <div className="crumbs">
+              {breadcrumbs.map((bc, i) => (
+                <span key={i} style={{ display: "contents" }}>
+                  {i > 0 && <span className="sep">/</span>}
+                  {bc.href ? (
+                    <Link href={bc.href}>{bc.label}</Link>
+                  ) : (
+                    <b>{bc.label}</b>
+                  )}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+        <div className="focus-content">{children}</div>
       </div>
     </div>
   );
