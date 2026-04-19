@@ -23,7 +23,7 @@ interface PendingCheckout {
 
 export default function CheckoutPage() {
   const router = useRouter();
-  const { grandTotal, clearCart } = usePosCart();
+  const { grandTotal, voucher, clearCart } = usePosCart();
   const checkout = usePosCheckout();
 
   const [pending, setPending] = useState<PendingCheckout | null>(null);
@@ -59,6 +59,10 @@ export default function CheckoutPage() {
     try {
       const checkoutResult = await checkout.checkout(pending.transactionId, {
         payment_method: method,
+        // When a voucher is attached to the cart, thread its code into the
+        // commit payload. The server atomically redeems the voucher inside
+        // the same SQL transaction as the checkout (see pos/commit.py).
+        ...(voucher?.code ? { voucher_code: voucher.code } : {}),
       });
 
       // Fetch full transaction with items for receipt
@@ -145,6 +149,11 @@ export default function CheckoutPage() {
           <ReceiptPreview
             transaction={txnDetail}
             checkoutResult={result}
+            voucher={
+              voucher
+                ? { code: voucher.code, discount_amount: voucher.discount_amount }
+                : null
+            }
             onEmail={handleEmail}
             onClose={handleNewSale}
           />
