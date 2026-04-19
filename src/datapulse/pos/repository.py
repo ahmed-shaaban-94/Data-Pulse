@@ -210,8 +210,15 @@ class PosRepository:
         grand_total: Decimal | None = None,
         pharmacist_id: str | None = None,
         customer_id: str | None = None,
+        expected_status: str | None = None,
     ) -> dict[str, Any] | None:
-        """Update transaction status and optionally recalculate financial totals."""
+        """Update transaction status and optionally recalculate financial totals.
+
+        ``expected_status`` adds a compare-and-swap filter so the caller can
+        atomically transition a row only if its current status matches. Returns
+        ``None`` when the row does not exist *or* the expected-status check
+        fails — both map to "race / wrong state" at the caller.
+        """
         row = (
             self._session.execute(
                 text("""
@@ -226,6 +233,7 @@ class PosRepository:
                            pharmacist_id  = COALESCE(:pharmacist_id,  pharmacist_id),
                            customer_id    = COALESCE(:customer_id,    customer_id)
                     WHERE  id = :txn_id
+                    AND    (:expected_status IS NULL OR status = :expected_status)
                     RETURNING
                         id, tenant_id, terminal_id, staff_id, pharmacist_id,
                         customer_id, site_code, subtotal, discount_total,
@@ -243,6 +251,7 @@ class PosRepository:
                     "grand_total": grand_total,
                     "pharmacist_id": pharmacist_id,
                     "customer_id": customer_id,
+                    "expected_status": expected_status,
                 },
             )
             .mappings()
@@ -872,6 +881,36 @@ class PosRepository:
                     FROM   pos.returns
                     WHERE  original_transaction_id = :original_txn_id
                     ORDER  BY created_at ASC
+                """),
+                {"original_txn_id": original_transaction_id},
+            )
+            .mappings()
+            .all()
+        )
+        return [dict(r) for r in rows]
+
+    def get_returned_quantities_for_transaction(
+        self,
+        original_transaction_id: int,
+    ) -> list[dict[str, Any]]:
+        """Sum already-returned quantities by ``(drug_code, batch_number)``.
+
+        Joins :code:`pos.returns` -> :code:`pos.transaction_items` via
+        ``return_transaction_id`` so the service can enforce that the sum of
+        all prior returns + the current request does not exceed the original
+        sold quantity per line. Prevents the unlimited-refund path.
+        """
+        rows = (
+            self._session.execute(
+                text("""
+                    SELECT ti.drug_code,
+                           ti.batch_number,
+                           SUM(ti.quantity) AS returned_qty
+                    FROM   pos.returns r
+                    JOIN   pos.transaction_items ti
+                       ON  ti.transaction_id = r.return_transaction_id
+                    WHERE  r.original_transaction_id = :original_txn_id
+                    GROUP  BY ti.drug_code, ti.batch_number
                 """),
                 {"original_txn_id": original_transaction_id},
             )

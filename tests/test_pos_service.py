@@ -917,6 +917,54 @@ class TestCheckout:
             )
 
     @pytest.mark.asyncio
+    async def test_checkout_cas_conflict_raises_and_skips_inventory(
+        self,
+        service: PosService,
+        mock_repo: MagicMock,
+        mock_inventory: AsyncMock,
+        three_item_setup: dict,
+    ):
+        """Simulate a concurrent checkout winning the race: the pre-check sees
+        draft but the CAS update returns None because another request already
+        flipped the row to completed. No inventory movements may fire."""
+        mock_repo.update_transaction_status.return_value = None
+
+        with pytest.raises(PosError, match="another request"):
+            await service.checkout(
+                transaction_id=100,
+                tenant_id=1,
+                request=CheckoutRequest(
+                    payment_method=PaymentMethod.cash,
+                    cash_tendered=Decimal("100"),
+                ),
+            )
+
+        # The CAS loser must not have recorded any stock movement — otherwise
+        # concurrent retries would double-deduct stock.
+        mock_inventory.record_movement.assert_not_awaited()
+        mock_repo.insert_bronze_pos_transaction.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_checkout_passes_expected_status_to_repository(
+        self,
+        service: PosService,
+        mock_repo: MagicMock,
+        three_item_setup: dict,
+    ):
+        """Regression: the CAS filter must actually be sent to the repo so the
+        UPDATE WHERE clause enforces ``status = 'draft'`` atomically."""
+        await service.checkout(
+            transaction_id=100,
+            tenant_id=1,
+            request=CheckoutRequest(
+                payment_method=PaymentMethod.cash,
+                cash_tendered=Decimal("100"),
+            ),
+        )
+        call_kwargs = mock_repo.update_transaction_status.call_args.kwargs
+        assert call_kwargs["expected_status"] == TransactionStatus.draft.value
+
+    @pytest.mark.asyncio
     async def test_checkout_unknown_transaction_raises(
         self,
         service: PosService,

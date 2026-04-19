@@ -226,14 +226,17 @@ def return_item() -> PosCartItem:
     )
 
 
-@pytest.mark.asyncio
-async def test_process_return_success(
-    service: PosService,
+def _setup_return_mocks(
     mock_repo: MagicMock,
-    mock_inventory: AsyncMock,
-    return_item: PosCartItem,
+    *,
+    original_items: list[dict] | None = None,
+    prior_returns: list[dict] | None = None,
+    refund_amount: Decimal = Decimal("50"),
 ) -> None:
+    """Common mock wiring for process_return happy-path tests."""
     mock_repo.get_transaction.return_value = _completed_txn()
+    mock_repo.get_transaction_items.return_value = original_items or [_item_row()]
+    mock_repo.get_returned_quantities_for_transaction.return_value = prior_returns or []
     mock_repo.create_transaction.return_value = {
         "id": 20,
         "tenant_id": 1,
@@ -261,11 +264,21 @@ async def test_process_return_success(
         "return_transaction_id": 20,
         "staff_id": "staff-1",
         "reason": ReturnReason.wrong_drug.value,
-        "refund_amount": Decimal("50"),
+        "refund_amount": refund_amount,
         "refund_method": "cash",
         "notes": None,
         "created_at": datetime(2026, 4, 15, 12, 0, 0, tzinfo=UTC),
     }
+
+
+@pytest.mark.asyncio
+async def test_process_return_success(
+    service: PosService,
+    mock_repo: MagicMock,
+    mock_inventory: AsyncMock,
+    return_item: PosCartItem,
+) -> None:
+    _setup_return_mocks(mock_repo)
 
     result = await service.process_return(
         original_transaction_id=1,
@@ -291,6 +304,177 @@ async def test_process_return_success(
     mock_repo.insert_bronze_pos_transaction.assert_called_once()
     call_kwargs = mock_repo.insert_bronze_pos_transaction.call_args.kwargs
     assert call_kwargs["is_return"] is True
+
+
+@pytest.mark.asyncio
+async def test_process_return_item_not_on_original_raises(
+    service: PosService,
+    mock_repo: MagicMock,
+    return_item: PosCartItem,
+) -> None:
+    """A return item whose drug_code / batch was never on the original must
+    be rejected rather than silently refunded."""
+    _setup_return_mocks(mock_repo)
+    rogue = PosCartItem(
+        drug_code="NEVER-SOLD",
+        drug_name="Spurious",
+        batch_number="BATCH-1",
+        expiry_date=date(2027, 12, 31),
+        quantity=Decimal("1"),
+        unit_price=Decimal("1000"),
+        line_total=Decimal("1000"),
+        discount=Decimal("0"),
+        is_controlled=False,
+    )
+    with pytest.raises(PosError, match="not on the original"):
+        await service.process_return(
+            original_transaction_id=1,
+            tenant_id=1,
+            staff_id="staff-1",
+            items=[rogue],
+            reason=ReturnReason.wrong_drug,
+            refund_method="cash",
+        )
+
+
+@pytest.mark.asyncio
+async def test_process_return_quantity_exceeds_original_raises(
+    service: PosService,
+    mock_repo: MagicMock,
+    return_item: PosCartItem,
+) -> None:
+    """Requesting more units than were originally sold must be rejected."""
+    _setup_return_mocks(mock_repo)
+    over = PosCartItem(
+        drug_code="DRUG001",
+        drug_name="Test Drug",
+        batch_number="BATCH-1",
+        expiry_date=date(2027, 12, 31),
+        quantity=Decimal("99"),  # original qty is 2
+        unit_price=Decimal("50"),
+        line_total=Decimal("4950"),
+        discount=Decimal("0"),
+        is_controlled=False,
+    )
+    with pytest.raises(PosError, match="exceeds returnable"):
+        await service.process_return(
+            original_transaction_id=1,
+            tenant_id=1,
+            staff_id="staff-1",
+            items=[over],
+            reason=ReturnReason.defective,
+            refund_method="cash",
+        )
+
+
+@pytest.mark.asyncio
+async def test_process_return_blocks_cumulative_over_return(
+    service: PosService,
+    mock_repo: MagicMock,
+    return_item: PosCartItem,
+) -> None:
+    """If prior returns already refunded 1 of 2 units, a second request for
+    2 more units must fail because remaining = 1."""
+    _setup_return_mocks(
+        mock_repo,
+        prior_returns=[
+            {
+                "drug_code": "DRUG001",
+                "batch_number": "BATCH-1",
+                "returned_qty": Decimal("1"),
+            }
+        ],
+    )
+    over = PosCartItem(
+        drug_code="DRUG001",
+        drug_name="Test Drug",
+        batch_number="BATCH-1",
+        expiry_date=date(2027, 12, 31),
+        quantity=Decimal("2"),  # 1 already returned + 2 more > 2 sold
+        unit_price=Decimal("50"),
+        line_total=Decimal("100"),
+        discount=Decimal("0"),
+        is_controlled=False,
+    )
+    with pytest.raises(PosError, match="exceeds returnable"):
+        await service.process_return(
+            original_transaction_id=1,
+            tenant_id=1,
+            staff_id="staff-1",
+            items=[over],
+            reason=ReturnReason.defective,
+            refund_method="cash",
+        )
+
+
+@pytest.mark.asyncio
+async def test_process_return_ignores_inflated_client_line_total(
+    service: PosService,
+    mock_repo: MagicMock,
+    mock_inventory: AsyncMock,
+) -> None:
+    """Client sends line_total=9999 but server recomputes from original's
+    unit_price × return_qty. Refund must match server-side computation."""
+    _setup_return_mocks(mock_repo)
+    inflated = PosCartItem(
+        drug_code="DRUG001",
+        drug_name="Test Drug",
+        batch_number="BATCH-1",
+        expiry_date=date(2027, 12, 31),
+        quantity=Decimal("1"),
+        unit_price=Decimal("9999"),  # attacker-controlled
+        line_total=Decimal("9999"),  # attacker-controlled
+        discount=Decimal("0"),
+        is_controlled=False,
+    )
+
+    await service.process_return(
+        original_transaction_id=1,
+        tenant_id=1,
+        staff_id="staff-1",
+        items=[inflated],
+        reason=ReturnReason.wrong_drug,
+        refund_method="cash",
+    )
+
+    # Server must have written the authoritative unit_price (50) and
+    # line_total (50), NOT the client's inflated numbers.
+    add_item_kwargs = mock_repo.add_transaction_item.call_args.kwargs
+    assert add_item_kwargs["unit_price"] == Decimal("50")
+    assert add_item_kwargs["line_total"] == Decimal("50.0000")
+    create_return_kwargs = mock_repo.create_return.call_args.kwargs
+    assert create_return_kwargs["refund_amount"] == Decimal("50.0000")
+
+
+@pytest.mark.asyncio
+async def test_process_return_duplicate_items_checked_cumulatively(
+    service: PosService,
+    mock_repo: MagicMock,
+) -> None:
+    """Submitting the same drug+batch twice in one request must sum
+    quantities before the over-return check."""
+    _setup_return_mocks(mock_repo)
+    half = PosCartItem(
+        drug_code="DRUG001",
+        drug_name="Test Drug",
+        batch_number="BATCH-1",
+        expiry_date=date(2027, 12, 31),
+        quantity=Decimal("2"),  # original qty = 2
+        unit_price=Decimal("50"),
+        line_total=Decimal("100"),
+        discount=Decimal("0"),
+        is_controlled=False,
+    )
+    # Two copies = 4 total, original sold 2 → must fail
+    with pytest.raises(PosError, match="exceeds returnable"):
+        await service.process_return(
+            original_transaction_id=1,
+            tenant_id=1,
+            staff_id="staff-1",
+            items=[half, half],
+            reason=ReturnReason.defective,
+            refund_method="cash",
+        )
 
 
 @pytest.mark.asyncio
