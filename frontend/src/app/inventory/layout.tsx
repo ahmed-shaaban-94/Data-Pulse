@@ -1,16 +1,18 @@
 "use client";
 
 /**
- * /inventory-v2 layout — mirrors /dashboard/layout.tsx.
+ * /inventory layout — v2 shell wrapper.
  *
- * Real inventory widgets (InventoryOverview, StockLevelTable, etc.) depend
- * on the full app provider stack: FilterProvider (date filters drive the
- * queries), SWRConfig (data fetching), AuthProvider/SessionGuard (auth),
- * BrandProvider (theming), ToastProvider (error surfacing). Without these,
- * the page throws during hydration and never renders h1.page-title.
+ * Mirrors /dashboard/layout.tsx's provider stack so session, brand, toast,
+ * SWR, filters, analytics, notifications, command palette, and keyboard
+ * shortcuts all work after the v2 cutover. The v1 Sidebar and main-content
+ * wrapper from (app)'s AppShell are intentionally omitted — v2 pages
+ * render their own chrome via <DashboardShell>.
  *
- * This route is a preview; once /inventory migrates in place, delete the
- * entire inventory-v2 folder.
+ * The /inventory/[drug_code]/ detail page stays inside the (app) route
+ * group (it is a drill-down, not an overview surface, and keeping it on
+ * v1 chrome is acceptable as a follow-up). Different URL leaves so no
+ * Next.js route conflict.
  */
 
 import { useEffect, useState } from "react";
@@ -83,7 +85,7 @@ function V2Shell({ children }: { children: React.ReactNode }) {
   );
 }
 
-export default function InventoryV2Layout({
+export default function InventoryLayout({
   children,
 }: {
   children: React.ReactNode;
