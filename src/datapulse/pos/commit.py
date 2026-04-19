@@ -5,15 +5,25 @@ in one SQL transaction. Designed for offline queue replay so a retried push
 idempotently lands a single atomic financial write rather than the legacy
 3-step draft → items → checkout flow.
 
-When ``payload.voucher_code`` is provided, the voucher is atomically
-redeemed inside the same transaction via ``SELECT ... FOR UPDATE``:
+Security hardening (H2):
+* ``subtotal``, ``grand_total`` and every item's ``line_total`` are
+  recomputed server-side from ``unit_price * quantity - discount``. Client
+  totals are rejected if they disagree beyond a rounding epsilon, so a
+  compromised client can not fake lower books or inflate refunds.
+* The receipt number is derived deterministically from the auto-increment
+  ``transaction_id`` (``R{YYYYMMDD}-{tenant}-{transaction_id}``) rather than
+  ``count(*) + 1``; migration 088 adds a unique partial index so duplicates
+  are rejected by the DB as a defence-in-depth backstop.
 
-* The voucher discount is added to ``discount_total`` before computing the
-  effective ``grand_total`` (so cash sufficiency is checked against the
-  post-voucher total).
-* ``lock_and_redeem`` sets ``redeemed_txn_id`` to the new transaction id and
-  increments ``uses``; if that was the last allowed use the voucher moves to
-  ``status='redeemed'``.
+Voucher redemption:
+* When ``payload.voucher_code`` is provided, the voucher is atomically
+  redeemed inside the same transaction via ``SELECT ... FOR UPDATE``.
+* The voucher discount is added on top of the (already-validated) client
+  discount before the effective grand_total is computed, so cash
+  sufficiency is checked against the post-voucher total.
+* ``lock_and_redeem`` sets ``redeemed_txn_id`` to the new transaction id
+  and increments ``uses``; if that was the last allowed use the voucher
+  moves to ``status='redeemed'``.
 * Any voucher validation failure raises ``HTTPException(400)`` with a
   ``voucher_*`` detail string, rolling back the entire commit.
 
@@ -33,22 +43,25 @@ from datapulse.pos.models import CommitRequest, CommitResponse
 from datapulse.pos.voucher_repository import VoucherRepository
 from datapulse.pos.voucher_service import VoucherService
 
+# Rounding tolerance when comparing client-declared totals to server recomputed
+# totals. Gives the desktop client ~0.01 EGP of rounding headroom.
+_TOTAL_EPSILON = Decimal("0.01")
 
-def _next_receipt_number(session: Session, tenant_id: int) -> str:
-    """Generate a receipt number of the form ``R-YYYYMMDD-NNNNNN`` per-tenant per-day."""
-    now = datetime.now(UTC)
-    seq = (
-        session.execute(
-            text(
-                """SELECT count(*) + 1 FROM pos.transactions
-                    WHERE tenant_id = :tid
-                      AND created_at >= date_trunc('day', now())"""
-            ),
-            {"tid": tenant_id},
-        ).scalar()
-        or 1
-    )
-    return f"R-{now.strftime('%Y%m%d')}-{int(seq):06d}"
+
+def _build_receipt_number(tenant_id: int, transaction_id: int, now: datetime) -> str:
+    """Deterministic receipt number — same format as service._build_receipt_number.
+
+    Uniqueness is guaranteed by the auto-increment ``transaction_id``, so we
+    never rely on ``count(*) + 1`` (which races under concurrent commits).
+    Migration 088 adds a unique partial index on (tenant_id, receipt_number)
+    as an additional DB-level backstop.
+    """
+    return f"R{now.strftime('%Y%m%d')}-{tenant_id}-{transaction_id}"
+
+
+def _recompute_line_total(unit_price: Decimal, quantity: Decimal, discount: Decimal) -> Decimal:
+    """Authoritative server-side line total = unit_price * qty - discount."""
+    return (unit_price * quantity - discount).quantize(Decimal("0.0001"))
 
 
 def atomic_commit(
@@ -59,13 +72,15 @@ def atomic_commit(
 ) -> CommitResponse:
     """Insert the transaction + items + set ``commit_confirmed_at`` atomically.
 
-    Raises ``HTTPException(400)`` if a cash payment tenders less than the
-    effective grand total, or if a supplied voucher code cannot be redeemed.
+    Raises ``HTTPException(400)`` when:
+    - the declared grand_total (pre-voucher) disagrees with server-
+      recomputed totals beyond ``_TOTAL_EPSILON``
+    - a cash payment tenders less than the effective (post-voucher)
+      grand total
+    - a supplied voucher code cannot be found or redeemed
     """
-    # ------------------------------------------------------------------
-    # Voucher pre-flight — read without locking. We re-select with
+    # ── Voucher pre-flight — read without locking. We re-select with ──────
     # FOR UPDATE inside lock_and_redeem once we have a transaction_id.
-    # ------------------------------------------------------------------
     voucher_repo = VoucherRepository(session) if payload.voucher_code else None
     voucher_discount = Decimal("0")
     if payload.voucher_code:
@@ -79,15 +94,41 @@ def atomic_commit(
             Decimal(str(payload.subtotal)),
         )
 
-    # Apply voucher discount on top of the client-declared discount_total.
+    # ── Server-side total recomputation (pre-voucher) ─────────────────────
+    # Recompute subtotal from item unit_price × qty - discount so a client
+    # sending fake line_totals or a fake subtotal can not corrupt the books.
+    computed_subtotal = Decimal("0")
+    for item in payload.items:
+        computed_subtotal += _recompute_line_total(item.unit_price, item.quantity, item.discount)
+    computed_subtotal = computed_subtotal.quantize(Decimal("0.0001"))
+
     base_discount = Decimal(str(payload.discount_total))
+    tax_total = Decimal(str(payload.tax_total))
+
+    # Pre-voucher grand_total — this is what the client sees before any voucher
+    # is applied. We compare against the client's declared grand_total here.
+    computed_pre_voucher_grand = (computed_subtotal - base_discount + tax_total).quantize(
+        Decimal("0.0001")
+    )
+
+    if abs(computed_pre_voucher_grand - Decimal(str(payload.grand_total))) > _TOTAL_EPSILON:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"grand_total mismatch: client={payload.grand_total} "
+                f"server={computed_pre_voucher_grand}"
+            ),
+        )
+
+    # ── Apply voucher discount → effective grand_total ────────────────────
     effective_discount = base_discount + voucher_discount
-    effective_grand = (
-        Decimal(str(payload.subtotal)) - effective_discount + Decimal(str(payload.tax_total))
+    effective_grand = (computed_subtotal - effective_discount + tax_total).quantize(
+        Decimal("0.0001")
     )
     if effective_grand < Decimal("0"):
         effective_grand = Decimal("0")
 
+    # ── Cash tender validation against the effective (post-voucher) total ──
     if payload.payment_method.value == "cash":
         tendered = payload.cash_tendered or Decimal("0")
         if tendered < effective_grand:
@@ -96,9 +137,9 @@ def atomic_commit(
     else:
         change_due = Decimal("0")
 
-    receipt = _next_receipt_number(session, tenant_id)
     now = datetime.now(UTC)
 
+    # ── Insert the transaction header (receipt NULL until we have the id) ──
     txn_row = session.execute(
         text(
             """
@@ -110,7 +151,7 @@ def atomic_commit(
             VALUES
                 (:tid, :term, :staff, :cust, :site,
                  :sub, :disc, :tax, :grand,
-                 :pm, 'completed', :rec, :shift, :now, :now)
+                 :pm, 'completed', NULL, :shift, :now, :now)
             RETURNING id
             """
         ),
@@ -120,12 +161,11 @@ def atomic_commit(
             "staff": payload.staff_id,
             "cust": payload.customer_id,
             "site": payload.site_code,
-            "sub": payload.subtotal,
+            "sub": computed_subtotal,
             "disc": effective_discount,
-            "tax": payload.tax_total,
+            "tax": tax_total,
             "grand": effective_grand,
             "pm": payload.payment_method.value,
-            "rec": receipt,
             "shift": payload.shift_id,
             "now": now,
         },
@@ -134,7 +174,15 @@ def atomic_commit(
         raise HTTPException(status_code=500, detail="commit_insert_no_rowid")
     transaction_id = int(txn_row[0])
 
+    # Deterministic receipt number derived from the id we just reserved.
+    receipt = _build_receipt_number(tenant_id, transaction_id, now)
+    session.execute(
+        text("UPDATE pos.transactions SET receipt_number = :rec WHERE id = :txn"),
+        {"rec": receipt, "txn": transaction_id},
+    )
+
     for item in payload.items:
+        server_line_total = _recompute_line_total(item.unit_price, item.quantity, item.discount)
         session.execute(
             text(
                 """
@@ -156,17 +204,14 @@ def atomic_commit(
                 "qty": item.quantity,
                 "up": item.unit_price,
                 "disc": item.discount,
-                "lt": item.line_total,
+                "lt": server_line_total,
                 "ic": item.is_controlled,
                 "ph": item.pharmacist_id,
             },
         )
 
-    # ------------------------------------------------------------------
-    # Redeem voucher now that we have a transaction_id. Any validation
-    # failure here raises HTTPException(400) which the FastAPI handler
-    # turns into a rollback of the entire session.
-    # ------------------------------------------------------------------
+    # ── Redeem voucher now that we have a transaction_id. Any failure ──────
+    # here raises HTTPException(400) which rolls back the entire commit.
     if payload.voucher_code:
         assert voucher_repo is not None
         voucher_repo.lock_and_redeem(

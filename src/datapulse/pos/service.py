@@ -321,11 +321,24 @@ class PosService:
             )
 
         is_controlled = _is_controlled(product.get("drug_category"))
-        if is_controlled and not pharmacist_id:
-            raise PharmacistVerificationRequiredError(
-                drug_code=drug_code,
-                drug_category=product.get("drug_category"),
-            )
+        resolved_pharmacist_id: str | None = None
+        if is_controlled:
+            if not pharmacist_id:
+                raise PharmacistVerificationRequiredError(
+                    drug_code=drug_code,
+                    drug_category=product.get("drug_category"),
+                )
+            if self._verifier is None:
+                # Defense in depth: a controlled item must never be dispensed
+                # without a server-side verifier to validate the token signature.
+                raise PharmacistVerificationRequiredError(
+                    drug_code=drug_code,
+                    message="Pharmacist verification is not configured on this server.",
+                )
+            # The ``pharmacist_id`` parameter carries the signed token issued by
+            # POST /pos/controlled/verify, not a raw user id. Validate signature,
+            # drug-code binding, and TTL; returns the real pharmacist user id.
+            resolved_pharmacist_id = self._verifier.validate_token(pharmacist_id, drug_code)
 
         # Inventory: stock check
         stock = await self._inventory.get_stock_level(drug_code, site_code)
@@ -362,7 +375,7 @@ class PosService:
             batch_number=batch_number,
             expiry_date=expiry_date,
             is_controlled=is_controlled,
-            pharmacist_id=pharmacist_id if is_controlled else None,
+            pharmacist_id=resolved_pharmacist_id,
         )
         return PosCartItem.model_validate(row)
 
@@ -460,6 +473,11 @@ class PosService:
 
         receipt_number = _build_receipt_number(tenant_id, transaction_id)
 
+        # Compare-and-swap: only claim the draft if nobody else has already
+        # finalised it. Closes the race between the pre-check above and this
+        # UPDATE — two concurrent /checkout calls against the same draft
+        # will have exactly one succeed; the loser gets a PosError and no
+        # inventory movements fire.
         updated = self._repo.update_transaction_status(
             transaction_id,
             status=TransactionStatus.completed.value,
@@ -470,11 +488,15 @@ class PosService:
             tax_total=tax_total,
             grand_total=grand_total,
             customer_id=request.customer_id,
+            expected_status=TransactionStatus.draft.value,
         )
         if updated is None:
             raise PosError(
-                message=f"Failed to finalise transaction {transaction_id}",
-                detail=f"transaction_id={transaction_id}",
+                message=(
+                    f"Transaction {transaction_id} could not be finalised — "
+                    "another request may have completed it first."
+                ),
+                detail=f"transaction_id={transaction_id} cas_failed=true",
             )
 
         # ── Inventory movements + bronze write ──────────────────────
@@ -801,17 +823,15 @@ class PosService:
     ) -> ReturnResponse:
         """Process a drug return — creates return transaction, restocks inventory.
 
-        Steps
-        -----
-        1. Verify original transaction is completed.
-        2. Compute refund amount from returned items.
-        3. Create a ``returned``-status transaction (links back to original terminal).
-        4. Insert return items into ``pos.transaction_items``.
-        5. Create a ``pos.returns`` audit record.
-        6. Record positive inventory movements (restock).
-        7. Write bronze entries with ``is_return=True``.
+        Client-supplied items carry only ``(drug_code, batch_number, quantity)``
+        as trusted input. Everything else — ``unit_price``, ``line_total``,
+        ``discount`` — is recomputed from the original transaction so the
+        refund amount can not be inflated. The sum of all prior returns plus
+        this one must not exceed the originally-sold quantity per line,
+        closing the double-refund path.
 
-        Raises :class:`PosError` for not-found, wrong-state, or empty items.
+        Raises :class:`PosError` for not-found, wrong-state, empty items,
+        non-matching lines, or quantity over-return.
         """
         original = self._repo.get_transaction(original_transaction_id)
         if original is None:
@@ -835,12 +855,70 @@ class PosService:
                 detail=f"original_transaction_id={original_transaction_id}",
             )
 
-        refund_amount = sum(
-            (_to_decimal(item.line_total) for item in items),
-            start=Decimal("0"),
-        ).quantize(Decimal("0.0001"))
+        # ── Authoritative original lines, keyed by (drug_code, batch_number) ──
+        original_items = self._repo.get_transaction_items(original_transaction_id)
+        orig_index: dict[tuple[str, str], dict[str, Any]] = {
+            (oi["drug_code"], oi.get("batch_number") or ""): oi for oi in original_items
+        }
 
-        # Create a return transaction on the same terminal
+        # ── Sum of already-returned quantities per line ───────────────────────
+        prior_returns = self._repo.get_returned_quantities_for_transaction(original_transaction_id)
+        returned_index: dict[tuple[str, str], Decimal] = {
+            (r["drug_code"], r.get("batch_number") or ""): _to_decimal(r["returned_qty"])
+            for r in prior_returns
+        }
+
+        # ── Validate each request line + accumulate same-request deltas ───────
+        in_this_request: dict[tuple[str, str], Decimal] = {}
+        for item in items:
+            key = (item.drug_code, item.batch_number or "")
+            if key not in orig_index:
+                raise PosError(
+                    message=(
+                        f"Return item {item.drug_code!r} "
+                        f"(batch {item.batch_number!r}) is not on the original transaction."
+                    ),
+                    detail=f"original_transaction_id={original_transaction_id}",
+                )
+            requested_cumulative = in_this_request.get(key, Decimal("0")) + _to_decimal(
+                item.quantity
+            )
+            already = returned_index.get(key, Decimal("0"))
+            original_qty = _to_decimal(orig_index[key]["quantity"])
+            remaining = original_qty - already
+            if requested_cumulative > remaining:
+                raise PosError(
+                    message=(
+                        f"Return quantity {requested_cumulative} for drug "
+                        f"{item.drug_code!r} exceeds returnable {remaining} "
+                        f"(sold: {original_qty}, already returned: {already})."
+                    ),
+                    detail=(
+                        f"original_transaction_id={original_transaction_id} "
+                        f"drug_code={item.drug_code} batch_number={item.batch_number}"
+                    ),
+                )
+            in_this_request[key] = requested_cumulative
+
+        # ── Server-side refund computation ─────────────────────────────────────
+        # Pro-rate the original line's discount by returned fraction so the
+        # refund never exceeds what the customer actually paid for the units.
+        def _compute_line(
+            orig: dict[str, Any], return_qty: Decimal
+        ) -> tuple[Decimal, Decimal, Decimal]:
+            unit_price = _to_decimal(orig["unit_price"])
+            original_discount = _to_decimal(orig.get("discount", 0))
+            original_qty = _to_decimal(orig["quantity"])
+            if original_qty > 0:
+                discount_portion = (original_discount * return_qty / original_qty).quantize(
+                    Decimal("0.0001")
+                )
+            else:
+                discount_portion = Decimal("0")
+            line_total = (unit_price * return_qty - discount_portion).quantize(Decimal("0.0001"))
+            return unit_price, line_total, discount_portion
+
+        # ── Create the return transaction skeleton ─────────────────────────────
         terminal_id = int(original["terminal_id"])
         site_code = str(original["site_code"])
         return_txn = self._repo.create_transaction(
@@ -853,36 +931,41 @@ class PosService:
 
         now = datetime.now(tz=UTC)
         bronze_return_id = f"POS-RET-{original_transaction_id}"
+        refund_amount = Decimal("0")
 
         for item in items:
+            key = (item.drug_code, item.batch_number or "")
+            orig = orig_index[key]
+            return_qty = _to_decimal(item.quantity)
+            unit_price, line_total, discount_portion = _compute_line(orig, return_qty)
+            refund_amount += line_total
+
             self._repo.add_transaction_item(
                 transaction_id=return_txn_id,
                 tenant_id=tenant_id,
                 drug_code=item.drug_code,
-                drug_name=item.drug_name,
-                quantity=_to_decimal(item.quantity),
-                unit_price=_to_decimal(item.unit_price),
-                line_total=_to_decimal(item.line_total),
-                discount=_to_decimal(item.discount),
-                batch_number=item.batch_number,
-                expiry_date=item.expiry_date,
-                is_controlled=item.is_controlled,
-                pharmacist_id=item.pharmacist_id,
+                drug_name=orig["drug_name"],
+                quantity=return_qty,
+                unit_price=unit_price,
+                line_total=line_total,
+                discount=discount_portion,
+                batch_number=orig.get("batch_number"),
+                expiry_date=orig.get("expiry_date"),
+                is_controlled=bool(orig.get("is_controlled", False)),
+                pharmacist_id=orig.get("pharmacist_id"),
             )
 
-            # Positive delta = restock
             await self._inventory.record_movement(
                 StockMovement(
                     drug_code=item.drug_code,
                     site_code=site_code,
-                    quantity_delta=_to_decimal(item.quantity),
-                    batch_number=item.batch_number,
+                    quantity_delta=return_qty,  # positive = restock
+                    batch_number=orig.get("batch_number"),
                     reference_id=f"RET-{original_transaction_id}",
                     movement_type="return",
                 ),
             )
 
-            # Bronze row with is_return=True
             self._repo.insert_bronze_pos_transaction(
                 tenant_id=tenant_id,
                 transaction_id=bronze_return_id,
@@ -892,14 +975,16 @@ class PosService:
                 cashier_id=staff_id,
                 customer_id=original.get("customer_id"),
                 drug_code=item.drug_code,
-                batch_number=item.batch_number,
-                quantity=_to_decimal(item.quantity),
-                unit_price=_to_decimal(item.unit_price),
-                discount=_to_decimal(item.discount),
-                net_amount=_to_decimal(item.line_total),
+                batch_number=orig.get("batch_number"),
+                quantity=return_qty,
+                unit_price=unit_price,
+                discount=discount_portion,
+                net_amount=line_total,
                 payment_method=str(original.get("payment_method") or "cash"),
                 is_return=True,
             )
+
+        refund_amount = refund_amount.quantize(Decimal("0.0001"))
 
         self._repo.update_transaction_status(
             return_txn_id,
