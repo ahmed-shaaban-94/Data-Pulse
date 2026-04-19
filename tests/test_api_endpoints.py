@@ -13,7 +13,7 @@ from datapulse.analytics.models import (
     TimeSeriesPoint,
     TrendResult,
 )
-from datapulse.api.auth import get_optional_user, get_optional_user_for_health
+from datapulse.api.auth import get_optional_user_for_health
 
 _AUTHED_USER = {
     "sub": "test-user",
@@ -139,7 +139,7 @@ def test_health_endpoint_unauthenticated(api_client):
 def test_health_endpoint_degraded(api_client):
     """GET /health returns 503 when database is unreachable."""
     client, mock_repo, mock_detail_repo = api_client
-    client.app.dependency_overrides[get_optional_user] = lambda: _AUTHED_USER
+    client.app.dependency_overrides[get_optional_user_for_health] = lambda: _AUTHED_USER
     with (
         patch("datapulse.checks.get_engine") as mock_checks_engine,
         patch("datapulse.api.routes.health.get_engine") as mock_engine,
