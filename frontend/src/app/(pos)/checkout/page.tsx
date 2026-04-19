@@ -19,6 +19,8 @@ import type {
 interface PendingCheckout {
   transactionId: number;
   method: PaymentMethod;
+  /** Voucher code attached at the terminal (Phase 1b). */
+  voucher_code?: string;
 }
 
 export default function CheckoutPage() {
@@ -59,6 +61,7 @@ export default function CheckoutPage() {
     try {
       const checkoutResult = await checkout.checkout(pending.transactionId, {
         payment_method: method,
+        ...(pending.voucher_code ? { voucher_code: pending.voucher_code } : {}),
       });
 
       // Fetch full transaction with items for receipt
