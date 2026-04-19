@@ -117,14 +117,23 @@ test.describe("Marketing Landing Page — Editorial v2", () => {
     await expect(section.getByText(/Kubrā/i).first()).toBeVisible();
   });
 
-  test("no legacy pricing tier names", async ({ page }) => {
-    // Retired when the trilingual tier naming landed.
-    await expect(page.getByText(/^Starter$/)).toHaveCount(0);
-    await expect(page.getByText(/^Pro$/)).toHaveCount(0);
-    await expect(page.getByText(/Explorer Pilot/i)).toHaveCount(0);
-    await expect(page.getByText(/Operations Pilot/i)).toHaveCount(0);
-    await expect(page.getByText(/Enterprise Rollout/i)).toHaveCount(0);
-    // The #pilot-access section id replaced by #pricing.
+  test("no legacy pricing tier names inside the pricing section", async ({ page }) => {
+    // These anti-assertions are SCOPED to #pricing on purpose: several of
+    // these phrases (notably "Operations Pilot") are reused elsewhere on
+    // the landing as product-milestone copy ("v4.0 · the operations pilot
+    // is live", "Join the 14-day Operations Pilot"). What we're guarding
+    // against is their reintroduction *as pricing tier names* — not the
+    // words themselves disappearing from the page.
+    const pricing = page.locator("#pricing");
+    await expect(pricing.getByText(/^Starter$/)).toHaveCount(0);
+    await expect(pricing.getByText(/^Pro$/)).toHaveCount(0);
+    await expect(pricing.getByText(/Explorer Pilot/i)).toHaveCount(0);
+    await expect(pricing.getByText(/Operations Pilot/i)).toHaveCount(0);
+    await expect(pricing.getByText(/Enterprise Rollout/i)).toHaveCount(0);
+
+    // The #pilot-access section id was replaced by #pricing — this check
+    // stays at page scope because it's about the id itself not existing
+    // anywhere.
     await expect(page.locator("#pilot-access")).toHaveCount(0);
   });
 
