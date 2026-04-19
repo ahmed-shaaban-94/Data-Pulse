@@ -11,6 +11,7 @@ import { bootRecovery, startBackgroundSync } from "./sync/background";
 import { setupUpdater, checkForUpdates } from "./updater/index";
 import { upgradeSecretsToEncrypted } from "./authz/secure-store";
 import { createLogger } from "./logging/index";
+import { initCrashReporter } from "./crash-reporter/index";
 
 // ── Configuration ──────────────────────────────────────────
 const PORT = 3847;
@@ -296,6 +297,15 @@ app.whenReady().then(async () => {
   const db = openDb(dbPath);
   applySchema(db);
   log.info({ dbPath }, "SQLite database ready");
+
+  // Wire Sentry BEFORE the first BrowserWindow so renderer processes can
+  // inherit the configured state via the preload hook. Reads opt-in from
+  // the `sentry_enabled` setting (default: true) + `SENTRY_DSN` env var.
+  try {
+    initCrashReporter(db);
+  } catch (err) {
+    log.error({ err }, "crash reporter init failed (continuing boot)");
+  }
 
   // M3b hardening: upgrade any plaintext (v0 / legacy) secrets to DPAPI-wrapped
   // storage in-place. Idempotent — already-encrypted rows are skipped.

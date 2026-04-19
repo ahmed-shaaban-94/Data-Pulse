@@ -16,6 +16,7 @@
     "test:watch": "jest --watchAll"
   },
   "dependencies": {
+    "@sentry/electron": "^5.12.0",
     "better-sqlite3": "^12.9.0",
     "electron-store": "^10.0.0",
     "electron-updater": "^6.8.3",

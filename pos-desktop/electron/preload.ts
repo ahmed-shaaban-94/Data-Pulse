@@ -104,6 +104,15 @@ contextBridge.exposeInMainWorld("electronAPI", {
     isElectron: true as const,
   },
 
+  // ── crashReporter (Sentry opt-in toggle) ──────────────────
+  // Changing the flag requires an app restart to take effect — Sentry's
+  // SDK cannot be re-initialised in a running process.
+  crashReporter: {
+    isEnabled: () => ipcRenderer.invoke("crashReporter.isEnabled"),
+    setEnabled: (enabled: boolean) =>
+      ipcRenderer.invoke("crashReporter.setEnabled", enabled),
+  },
+
   // ── barcode scanner events ─────────────────────────────────
   onBarcodeScanned: (callback: (barcode: string) => void): (() => void) => {
     const listener = (_event: Electron.IpcRendererEvent, barcode: string) =>

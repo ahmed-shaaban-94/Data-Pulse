@@ -26,6 +26,10 @@ import { pullCatalog } from "../sync/pull";
 import { isOnline } from "../sync/online";
 import { isDeviceRegistered, registerDevice } from "../authz/device";
 import { currentGrant, grantState, consumeOverrideCode, refreshGrant } from "../authz/grants";
+import {
+  isCrashReportingEnabled,
+  setCrashReportingEnabled,
+} from "../crash-reporter/index";
 
 const COMMIT_PATH = "/api/v1/pos/transactions/commit";
 
@@ -136,6 +140,16 @@ export function registerIpcHandlers(
   ipcMain.handle("app.version", () => app.getVersion());
 
   ipcMain.handle("app.logsPath", () => app.getPath("logs"));
+
+  // ── crash reporting (Sentry opt-in toggle) ────────────────
+  // Reading reflects the current persisted preference; toggling requires
+  // a restart to take effect because Sentry's SDK cannot be re-initialised
+  // in a running process.
+  ipcMain.handle("crashReporter.isEnabled", () => isCrashReportingEnabled(db));
+
+  ipcMain.handle("crashReporter.setEnabled", (_e, enabled: boolean) => {
+    setCrashReportingEnabled(db, enabled);
+  });
 
   // ── sync ───────────────────────────────────────────────────
   ipcMain.handle("sync.pushNow", async () => drainQueue(db));

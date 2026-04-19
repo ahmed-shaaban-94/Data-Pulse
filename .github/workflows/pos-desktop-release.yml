@@ -117,6 +117,35 @@ jobs:
             exit 1
           fi
 
+      # Upload source maps to Sentry so stack traces in the crash dashboard
+      # are de-minified (#481). Requires the SENTRY_AUTH_TOKEN secret to be
+      # set in the repo; absent token = step is a no-op, so forked PRs do
+      # not fail.
+      - name: Upload source maps to Sentry
+        if: env.SENTRY_AUTH_TOKEN != ''
+        shell: bash
+        working-directory: pos-desktop
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
+          SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
+        run: |
+          # Release tag == package version. Tag builds use the git ref; other
+          # runs tag with a short SHA so staging crashes can still be mapped.
+          if [[ "${{ github.ref }}" == refs/tags/pos-desktop-v* ]]; then
+            RELEASE="${{ github.ref_name }}"
+          else
+            RELEASE="pos-desktop-${{ github.sha }}"
+          fi
+          npx --yes @sentry/cli releases new "$RELEASE"
+          # Compiled Electron TS + Next.js standalone both have source maps
+          # emitted next to the .js files — upload the whole tree in one pass.
+          npx --yes @sentry/cli releases files "$RELEASE" upload-sourcemaps \
+            dist/electron \
+            resources/nextjs \
+            --validate
+          npx --yes @sentry/cli releases finalize "$RELEASE"
+
       # Keep the artifact around for manual download even on non-release
       # runs. Retention is limited to save storage; tag builds also get
       # the file attached to the Release.
