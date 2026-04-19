@@ -34,8 +34,10 @@ test.describe("Navigation", () => {
 
   test("active nav item is highlighted", async ({ page }) => {
     await page.goto("/dashboard");
+    // v2 shell marks the current nav link with class "active" (see
+    // src/components/dashboard-v2/shell.tsx `.nav-link.active`).
     const overviewLink = page.getByRole("link", { name: "Overview" });
-    await expect(overviewLink).toHaveClass(/text-accent/);
+    await expect(overviewLink).toHaveClass(/active/);
   });
 
   test("root shows landing page", async ({ page }) => {

@@ -13,7 +13,8 @@ test.describe("Filters", () => {
     await expect(presetButton).toBeVisible({ timeout: 10000 });
     await presetButton.click();
     // After clicking, the page should still be functional (no crash)
-    await expect(page.locator("h1")).toContainText("Executive Overview");
+    // Post-v2 cutover: /dashboard h1 is "Good morning." (see dashboard.spec.ts).
+    await expect(page.locator("h1.page-title")).toContainText("Good morning");
   });
 
   test("clicking a date preset updates URL search params", async ({ page }) => {
