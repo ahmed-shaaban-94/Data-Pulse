@@ -1,22 +1,29 @@
 "use client";
 
 /**
- * Inventory v2 — preview of the hybrid operations inventory page.
+ * /inventory — operations inventory page on the v2 shell.
  *
- * Composition:
- *   - Shell (sidebar + pulse bar) shared with /dashboard — same chrome
- *   - Inventory overview KPIs
- *   - Stock-movement chart + reorder alerts (two-column)
- *   - Stock-level table (full width)
+ * This is the in-place cutover from v1 `(app)/inventory` + the
+ * `/inventory-v2` preview. The preview route is retired and redirected
+ * here by `next.config.mjs`.
  *
- * Proof-of-concept for the uniform-chrome promise: the same DashboardShell
- * wrapping a different page type renders consistently. Widgets are the real,
- * production-wired components from /(app)/inventory.
+ * Feature-parity audit vs v1 `(app)/inventory/page.tsx`:
+ *   - Breadcrumbs → replaced by <DashboardShell breadcrumbs={...}>
+ *   - Header → replaced by <h1 className="page-title"> + <p className="page-sub">
+ *   - PageTransition → v2 shell has its own entry feel
+ *   - FilterBar → PORTED (drives date-range filters via FilterProvider)
+ *   - OpsSuiteNav → DROPPED (v2 left sidebar already navigates between
+ *     ops pages; keeping a horizontal sub-nav would duplicate the UX)
+ *
+ * The /inventory/[drug_code] detail page stays on the (app) layout for
+ * now — it is a drill-down surface. Migrating it is a follow-up.
  */
 
 import dynamic from "next/dynamic";
+
 import { DashboardShell } from "@/components/dashboard-v2/shell";
 import { InventoryOverview } from "@/components/inventory/inventory-overview";
+import { FilterBar } from "@/components/filters/filter-bar";
 import { LoadingCard } from "@/components/loading-card";
 
 const StockLevelTable = dynamic(
@@ -43,7 +50,7 @@ const ReorderAlertsList = dynamic(
   { loading: () => <LoadingCard lines={4} />, ssr: false },
 );
 
-export default function InventoryV2Page() {
+export default function InventoryPage() {
   return (
     <DashboardShell
       activeHref="/inventory"
@@ -61,6 +68,8 @@ export default function InventoryV2Page() {
             branch — one surface, same chrome as the overview.
           </p>
         </div>
+
+        <FilterBar />
 
         <InventoryOverview />
 
