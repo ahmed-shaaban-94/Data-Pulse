@@ -272,9 +272,7 @@ def test_commit_with_voucher_increments_uses_and_sets_txn_id() -> None:
     voucher = _voucher_response(max_uses=5, uses=0, value=Decimal("1"))
     updated = _voucher_response(max_uses=5, uses=1, value=Decimal("1"))
     updated = updated.model_copy(update={"redeemed_txn_id": 42})
-    session = _stub_session_with_voucher(
-        returning_id=42, voucher=voucher, updated_voucher=updated
-    )
+    session = _stub_session_with_voucher(returning_id=42, voucher=voucher, updated_voucher=updated)
 
     payload = _payload(
         subtotal="50.00",
@@ -286,9 +284,7 @@ def test_commit_with_voucher_increments_uses_and_sets_txn_id() -> None:
 
     # Verify UPDATE pos.vouchers was invoked with txn id 42 + new_status
     update_calls = [
-        call
-        for call in session.execute.call_args_list
-        if "UPDATE pos.vouchers" in str(call[0][0])
+        call for call in session.execute.call_args_list if "UPDATE pos.vouchers" in str(call[0][0])
     ]
     assert len(update_calls) == 1
     update_params = update_calls[0][0][1]

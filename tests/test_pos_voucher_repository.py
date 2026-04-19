@@ -196,9 +196,7 @@ def test_lock_and_redeem_raises_on_min_purchase_unmet() -> None:
     session = _session_for_lock(_row(min_purchase=Decimal("100")), None)
     repo = VoucherRepository(session)
     with pytest.raises(HTTPException) as exc:
-        repo.lock_and_redeem(
-            1, "SAVE10", 10, datetime.now(UTC), cart_subtotal=Decimal("50")
-        )
+        repo.lock_and_redeem(1, "SAVE10", 10, datetime.now(UTC), cart_subtotal=Decimal("50"))
     assert exc.value.detail == "voucher_min_purchase_unmet"
 
 

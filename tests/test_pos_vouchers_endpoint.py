@@ -155,18 +155,14 @@ def test_post_create_invalid_code_pattern_returns_422(
 # ---------------------------------------------------------------------------
 
 
-def test_get_list_returns_tenant_vouchers(
-    client: TestClient, mock_service: MagicMock
-) -> None:
+def test_get_list_returns_tenant_vouchers(client: TestClient, mock_service: MagicMock) -> None:
     mock_service.list.return_value = [_voucher(id=1), _voucher(id=2, code="OTHER")]
     resp = client.get("/api/v1/pos/vouchers")
     assert resp.status_code == 200
     assert len(resp.json()) == 2
 
 
-def test_get_list_applies_status_filter(
-    client: TestClient, mock_service: MagicMock
-) -> None:
+def test_get_list_applies_status_filter(client: TestClient, mock_service: MagicMock) -> None:
     mock_service.list.return_value = []
     client.get("/api/v1/pos/vouchers?status=redeemed")
     _, kwargs = mock_service.list.call_args
@@ -178,9 +174,7 @@ def test_get_list_applies_status_filter(
 # ---------------------------------------------------------------------------
 
 
-def test_post_validate_active_code_returns_200(
-    client: TestClient, mock_service: MagicMock
-) -> None:
+def test_post_validate_active_code_returns_200(client: TestClient, mock_service: MagicMock) -> None:
     mock_service.validate.return_value = VoucherValidateResponse(
         code="SAVE10",
         discount_type=VoucherType.amount,
@@ -199,9 +193,7 @@ def test_post_validate_active_code_returns_200(
 def test_post_validate_unknown_code_returns_404(
     client: TestClient, mock_service: MagicMock
 ) -> None:
-    mock_service.validate.side_effect = HTTPException(
-        status_code=404, detail="voucher_not_found"
-    )
+    mock_service.validate.side_effect = HTTPException(status_code=404, detail="voucher_not_found")
     resp = client.post("/api/v1/pos/vouchers/validate", json={"code": "NOPE"})
     assert resp.status_code == 404
     assert resp.json()["detail"] == "voucher_not_found"

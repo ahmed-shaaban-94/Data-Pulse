@@ -82,9 +82,7 @@ def test_compute_discount_percent() -> None:
 
 def test_compute_discount_percent_rounds_half_up() -> None:
     # 33.33% of 100 = 33.33 exactly (4dp)
-    disc = VoucherService.compute_discount(
-        VoucherType.percent, Decimal("33.33"), Decimal("100")
-    )
+    disc = VoucherService.compute_discount(VoucherType.percent, Decimal("33.33"), Decimal("100"))
     assert disc == Decimal("33.3300")
 
 
