@@ -65,12 +65,12 @@ export default function PosTerminalPage() {
   const checkout = usePosCheckout();
   const offline = useOfflineState();
 
-  // Browse catalog for Quick Pick (top 9). Use an empty-string query which
-  // the hook skips (<2 chars); fall back to featured via a site-scoped peek.
-  // For now we use a broad two-letter seed so the search endpoint returns
-  // *some* products — when Favorites API lands we'll switch.
+  // Browse catalog for Quick Pick (top 9). usePosProducts only fires when
+  // query.length >= 2, so we use a broad two-letter seed ("ab") so the
+  // search endpoint returns *some* products — when a Favorites API lands
+  // this will switch to `/pos/terminals/{id}/favorites`.
   const { products: catalog } = usePosProducts({
-    query: terminal ? "a" : "",
+    query: terminal ? "ab" : "",
     siteCode: terminal?.site_code ?? "",
   });
   const quickPick = useMemo(() => catalog.slice(0, 9).map(productToQuickPick), [catalog]);
