@@ -5,10 +5,10 @@
  *
  * Composition:
  *   - Shell (sidebar + pulse bar) — conventional structure, editorial chrome
- *   - Header row: title + page-sub + compare toggle + print-report link
+ *   - Header row: title + page-sub + compare toggle + print-report link + horizon toggle
  *   - FilterBar (drives all dashboard data via FilterProvider context)
  *   - Onboarding strip + first-insight card (Phase 2 Golden Path, self-hide when done)
- *   - KPI row (4 stat cards wired to real summary + expiry data)
+ *   - KPI row (adapts to Horizon mode — today vs forecasted values)
  *   - Money Map + Burning Cash + Medallion strip (signature v2 widgets)
  *
  * Previously lived at /dashboard-v2. That URL now redirects here.
@@ -29,6 +29,8 @@ import { KpiRow } from "@/components/dashboard-v2/kpi-row";
 import { MoneyMap } from "@/components/dashboard-v2/money-map";
 import { BurningCash } from "@/components/dashboard-v2/burning-cash";
 import { MedallionStrip } from "@/components/dashboard-v2/medallion-strip";
+import { HorizonProvider } from "@/components/horizon/horizon-context";
+import { HorizonToggle } from "@/components/horizon/horizon-toggle";
 import { OnboardingStrip } from "@/components/dashboard/onboarding-strip";
 import { FirstInsightCard } from "@/components/dashboard/first-insight-card";
 import { FilterBar } from "@/components/filters/filter-bar";
@@ -45,51 +47,54 @@ export default function DashboardPage() {
   }, []);
 
   return (
-    <DashboardShell
-      activeHref="/dashboard"
-      breadcrumbs={[
-        { label: "DataPulse", href: "/dashboard" },
-        { label: "Overview" },
-      ]}
-    >
+    <HorizonProvider>
       <CompareProvider>
-        <div className="page">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-            <div>
-              <h1 className="page-title">Good morning.</h1>
-              <p className="page-sub">
-                Tomorrow is forecasted at EGP 152K revenue. Four decisions
-                worth reading before the 10am branch call.
-              </p>
+        <DashboardShell
+          activeHref="/dashboard"
+          breadcrumbs={[
+            { label: "DataPulse", href: "/dashboard" },
+            { label: "Overview" },
+          ]}
+        >
+          <div className="page">
+            <div className="page-header">
+              <div className="title-group">
+                <h1 className="page-title">Good morning.</h1>
+                <p className="page-sub">
+                  Tomorrow is forecasted at EGP 152K revenue. Four decisions
+                  worth reading before the 10am branch call.
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <CompareButton />
+                <Link
+                  href="/dashboard/report"
+                  className="flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-medium text-text-secondary transition-all hover:text-accent"
+                  style={{ background: "rgba(255, 255, 255, 0.04)" }}
+                >
+                  <Printer className="h-4 w-4" />
+                  <span className="hidden sm:inline">Print Report</span>
+                </Link>
+                <HorizonToggle />
+              </div>
             </div>
-            <div className="flex items-center gap-2">
-              <CompareButton />
-              <Link
-                href="/dashboard/report"
-                className="flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-medium text-text-secondary transition-all hover:text-accent"
-                style={{ background: "rgba(255, 255, 255, 0.04)" }}
-              >
-                <Printer className="h-4 w-4" />
-                <span className="hidden sm:inline">Print Report</span>
-              </Link>
+
+            <FilterBar />
+            <ComparePanel />
+
+            <OnboardingStrip />
+            <FirstInsightCard />
+
+            <KpiRow />
+
+            <div className="widget-grid">
+              <MoneyMap />
+              <BurningCash />
+              <MedallionStrip />
             </div>
           </div>
-
-          <FilterBar />
-          <ComparePanel />
-
-          <OnboardingStrip />
-          <FirstInsightCard />
-
-          <KpiRow />
-
-          <div className="widget-grid">
-            <MoneyMap />
-            <BurningCash />
-            <MedallionStrip />
-          </div>
-        </div>
+        </DashboardShell>
       </CompareProvider>
-    </DashboardShell>
+    </HorizonProvider>
   );
 }
