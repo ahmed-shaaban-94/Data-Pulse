@@ -269,10 +269,15 @@ class RankingRepository:
 
         rows = self._session.execute(stmt, params).fetchall()
         # build_ranking expects 3-tuples (key, name, value); we have a 4th
-        # column (staff_count). Build items inline to preserve the extra.
+        # column (staff_count). Tolerate 3-tuple rows from older mocks
+        # / test doubles — staff_count falls back to None.
         base = build_ranking([(r[0], r[1], r[2]) for r in rows])
         enriched = [
-            item.model_copy(update={"staff_count": int(rows[idx][3])})
+            item.model_copy(
+                update={
+                    "staff_count": int(rows[idx][3]) if len(rows[idx]) > 3 else None,
+                }
+            )
             for idx, item in enumerate(base.items)
         ]
         return RankingResult(
