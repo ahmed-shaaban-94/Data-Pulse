@@ -68,6 +68,18 @@ export interface LoggerDeps {
   pretty?: boolean;
   /** Inject a custom destination stream (tests). Skips rotation setup. */
   destination?: DestinationStream;
+  /** Force a fresh instance even if a cached one already exists.
+   *
+   * The singleton semantics of `createLogger` mean a subsequent call
+   * normally returns the first instance — useful so tests + app code
+   * share one configuration. The exception is the boot path in
+   * `main.ts`: the first call happens before `app.whenReady()` (so
+   * `app.getPath('logs')` is not yet resolvable) and the second call
+   * passes the real `logsDir`. Without `reinit: true`, that second
+   * call is silently ignored and production file logs end up under
+   * `process.cwd()` instead of the platform logs directory.
+   */
+  reinit?: boolean;
 }
 
 // Singleton — modules should `import { logger }` rather than call createLogger
@@ -80,7 +92,7 @@ let _logger: Logger | null = null;
  * a fresh destination is passed (used in tests to isolate writes).
  */
 export function createLogger(deps: LoggerDeps = {}): Logger {
-  if (_logger && !deps.destination) return _logger;
+  if (_logger && !deps.destination && !deps.reinit) return _logger;
 
   const level = deps.level ?? process.env.LOG_LEVEL ?? DEFAULT_LEVEL;
   const opts: LoggerOptions = {

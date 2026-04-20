@@ -288,8 +288,15 @@ function createTray(): void {
 // ── App Lifecycle ──────────────────────────────────────────
 app.whenReady().then(async () => {
   // Re-create the logger now that Electron's `app` is ready, so file output
-  // goes to the platform-correct logs path instead of cwd.
-  log = createLogger({ logsDir: app.getPath("logs"), pretty: !app.isPackaged });
+  // goes to the platform-correct logs path instead of cwd.  `reinit: true`
+  // replaces the pre-ready cached instance — without it the singleton guard
+  // in `createLogger` would silently hand back the first logger and `logsDir`
+  // would be ignored in production.
+  log = createLogger({
+    logsDir: app.getPath("logs"),
+    pretty: !app.isPackaged,
+    reinit: true,
+  });
   log.info({ version: app.getVersion() }, "DataPulse POS starting");
 
   // Initialise local SQLite database

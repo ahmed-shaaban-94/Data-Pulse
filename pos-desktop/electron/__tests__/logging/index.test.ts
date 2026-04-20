@@ -160,6 +160,47 @@ describe("PII redaction", () => {
   });
 });
 
+describe("singleton + reinit semantics", () => {
+  test("second call without reinit returns the cached instance", () => {
+    const first = createLogger({ level: "info" });
+    const second = createLogger({ level: "error" });
+    expect(second).toBe(first);
+    // Level override from the second call was ignored (proves caching).
+    expect(first.level).toBe("info");
+  });
+
+  test("reinit: true discards the cache and applies fresh deps", () => {
+    const first = createLogger({ level: "info" });
+    const reinited = createLogger({ level: "error", reinit: true });
+    expect(reinited).not.toBe(first);
+    expect(reinited.level).toBe("error");
+  });
+
+  test("reinit replaces the cached instance seen by subsequent callers", () => {
+    const first = createLogger({ level: "info" });
+    const reinited = createLogger({ level: "warn", reinit: true });
+    // A third call without reinit now hands back the reinited instance,
+    // not the original.
+    const third = createLogger();
+    expect(third).toBe(reinited);
+    expect(third).not.toBe(first);
+    expect(third.level).toBe("warn");
+  });
+
+  test("destination-injected loggers still bypass the cache entirely", () => {
+    // This is the pre-existing tests-only path — reinit should not change it.
+    createLogger({ level: "info" });
+    const dest = new CaptureStream();
+    const destLogger = createLogger({ destination: dest, level: "debug" });
+    destLogger.debug("x");
+    expect(dest.lines()).toHaveLength(1);
+    // And the singleton (created by the first call) is untouched by the
+    // destination-injected call.
+    const cached = createLogger();
+    expect(cached).not.toBe(destLogger);
+  });
+});
+
 describe("redact paths export", () => {
   test("export is frozen-ish: includes the must-have fields", () => {
     // If someone removes a field, this test yells. Paired with the assertion
