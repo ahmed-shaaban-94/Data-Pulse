@@ -298,17 +298,17 @@ function createTray(): void {
 // ── App Lifecycle ──────────────────────────────────────────
 app.whenReady().then(async () => {
   // Re-create the logger now that Electron's `app` is ready, so file output
-  // goes to the platform-correct logs path instead of cwd.
-  // Singleton returns the previously-created instance — `release` /
-  // `environment` were already stamped at module load. The `logsDir`
-  // argument is currently a latent no-op on the re-entry path (pre-existing
-  // behaviour, tracked separately); kept here so a future singleton reset
-  // picks up the real path.
+  // goes to the platform-correct logs path instead of cwd. `reinit: true`
+  // replaces the pre-ready cached instance — without it the singleton guard
+  // in `createLogger` would silently hand back the first logger and `logsDir`
+  // would be ignored in production. `release` + `environment` are stamped
+  // so every log line carries the same values as the matching Sentry event.
   log = createLogger({
     logsDir: app.getPath("logs"),
     pretty: !app.isPackaged,
     release: RESOLVED_RELEASE,
     environment: RESOLVED_ENVIRONMENT,
+    reinit: true,
   });
   log.info({ version: app.getVersion() }, "DataPulse POS starting");
 
