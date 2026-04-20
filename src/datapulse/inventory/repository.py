@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import UTC, date, datetime
+from decimal import Decimal
 
 from sqlalchemy import text
 from sqlalchemy.orm import Session
@@ -189,9 +190,35 @@ class InventoryRepository:
 
     # ── Reorder Alerts ────────────────────────────────────────────────────
 
+    # Design-handoff thresholds for reorder status (#507).
+    _CRITICAL_DAYS = Decimal("5")
+    _LOW_DAYS = Decimal("10")
+    _VELOCITY_WINDOW_DAYS = 30
+
+    @classmethod
+    def _derive_reorder_status(cls, days_of_stock: Decimal | None) -> str:
+        """Map days-of-stock to the design-handoff status enum.
+
+        ``None`` means zero velocity (no sales in the trailing window) —
+        treated as ``low`` because the alert was raised on reorder-point,
+        not on runout risk.
+        """
+        if days_of_stock is None:
+            return "low"
+        if days_of_stock < cls._CRITICAL_DAYS:
+            return "critical"
+        if days_of_stock < cls._LOW_DAYS:
+            return "low"
+        return "healthy"
+
     def get_reorder_alerts(self, filters: InventoryFilter) -> list[ReorderAlert]:
-        """Return products where current_quantity <= reorder_point."""
-        params: dict = {}
+        """Return products where current_quantity <= reorder_point.
+
+        Enriched with trailing-30d ``daily_velocity``, derived ``days_of_stock``,
+        and a ``status`` band (critical / low / healthy) for the dashboard
+        watchlist (#507).
+        """
+        params: dict = {"velocity_days": self._VELOCITY_WINDOW_DAYS}
         wheres = ["sl.current_quantity <= rc.reorder_point"]
 
         if filters.site_key is not None:
@@ -205,6 +232,17 @@ class InventoryRepository:
         params["limit"] = filters.limit
 
         stmt = text(f"""
+            WITH velocity AS (
+                SELECT
+                    f.product_key,
+                    f.site_key,
+                    SUM(f.quantity) / :velocity_days::NUMERIC AS daily_velocity
+                FROM public_marts.fct_sales f
+                INNER JOIN public_marts.dim_date d ON f.date_key = d.date_key
+                WHERE d.full_date >= CURRENT_DATE - (:velocity_days || ' days')::INTERVAL
+                  AND NOT f.is_return
+                GROUP BY f.product_key, f.site_key
+            )
             SELECT
                 sl.product_key,
                 sl.site_key,
@@ -213,19 +251,37 @@ class InventoryRepository:
                 sl.site_code,
                 sl.current_quantity,
                 rc.reorder_point,
-                rc.reorder_quantity
+                rc.reorder_quantity,
+                COALESCE(v.daily_velocity, 0) AS daily_velocity
             FROM {_SCHEMA}.agg_stock_levels sl
             INNER JOIN public.reorder_config rc
                 ON sl.drug_code = rc.drug_code
                AND sl.site_code = rc.site_code
                AND sl.tenant_id = rc.tenant_id
+            LEFT JOIN velocity v
+                ON sl.product_key = v.product_key
+               AND sl.site_key = v.site_key
             {where_clause}
             ORDER BY (sl.current_quantity - rc.reorder_point) ASC
             LIMIT :limit
         """)  # noqa: S608
 
         rows = self._session.execute(stmt, params).mappings().all()
-        return [ReorderAlert(**dict(r)) for r in rows]
+        alerts: list[ReorderAlert] = []
+        for row in rows:
+            data = dict(row)
+            velocity = Decimal(str(data["daily_velocity"] or 0))
+            if velocity > 0:
+                days_of_stock = (Decimal(str(data["current_quantity"])) / velocity).quantize(
+                    Decimal("0.1")
+                )
+            else:
+                days_of_stock = None
+            data["daily_velocity"] = velocity
+            data["days_of_stock"] = days_of_stock
+            data["status"] = self._derive_reorder_status(days_of_stock)
+            alerts.append(ReorderAlert(**data))
+        return alerts
 
     # ── Physical Counts ───────────────────────────────────────────────────
 

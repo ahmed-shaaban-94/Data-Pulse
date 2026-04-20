@@ -240,3 +240,61 @@ class RankingRepository:
             "site_name",
             filters,
         )
+
+    def get_site_performance_with_staff(self, filters: AnalyticsFilter) -> RankingResult:
+        """Site ranking enriched with staff head-count per branch (issue #507).
+
+        LEFT JOINs ``dim_staff`` so sites with zero staff still appear with
+        ``staff_count=0`` rather than disappearing. Otherwise mirrors
+        :meth:`get_site_performance`.
+        """
+        from datapulse.analytics.models.ranking import RankingItem
+
+        log.info("get_site_performance_with_staff", filters=filters.model_dump())
+        where, params = build_where(
+            filters,
+            date_column="date_key",
+            supported_fields=SITE_DATE_ONLY,
+        )
+        params["limit"] = filters.limit
+
+        stmt = text(f"""
+            SELECT
+                f.site_key,
+                s.site_name,
+                ROUND(SUM(f.sales), 2) AS value,
+                COALESCE(staff_agg.staff_count, 0) AS staff_count
+            FROM public_marts.fct_sales f
+            INNER JOIN public_marts.dim_site s
+                ON f.site_key = s.site_key AND f.tenant_id = s.tenant_id
+            LEFT JOIN (
+                SELECT site_key, tenant_id, COUNT(*) AS staff_count
+                FROM public_marts.dim_staff
+                WHERE staff_key != -1
+                GROUP BY site_key, tenant_id
+            ) staff_agg
+                ON staff_agg.site_key = s.site_key
+               AND staff_agg.tenant_id = s.tenant_id
+            WHERE {where} AND f.site_key != -1
+            GROUP BY f.site_key, s.site_name, staff_agg.staff_count
+            ORDER BY value DESC
+            LIMIT :limit
+        """)  # noqa: S608
+        rows = self._session.execute(stmt, params).fetchall()
+        if not rows:
+            return RankingResult(items=[], total=Decimal("0"))
+
+        raw = [(int(r[0]), str(r[1]), Decimal(str(r[2])), int(r[3])) for r in rows]
+        total = sum(v for _, _, v, _ in raw) or Decimal("1")
+        items = [
+            RankingItem(
+                rank=idx,
+                key=key,
+                name=name,
+                value=value,
+                pct_of_total=(value / total * Decimal(100)).quantize(Decimal("0.01")),
+                staff_count=staff_count,
+            )
+            for idx, (key, name, value, staff_count) in enumerate(raw, start=1)
+        ]
+        return RankingResult(items=items, total=total)

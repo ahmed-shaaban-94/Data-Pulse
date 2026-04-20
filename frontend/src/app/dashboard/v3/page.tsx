@@ -15,6 +15,8 @@
 import { Sidebar } from "@/components/dashboard/v3/sidebar";
 import { AlertBannerConnected } from "@/components/dashboard/v3/alert-banner-connected";
 import { AnomalyFeed } from "@/components/dashboard/v3/anomaly-feed";
+import { BranchList } from "@/components/dashboard/v3/branch-list";
+import { InventoryTable } from "@/components/dashboard/v3/inventory-table";
 import { KpiCard } from "@/components/dashboard/v3/kpi-card";
 import { PageActions } from "@/components/dashboard/v3/page-actions";
 import { PlaceholderCard } from "@/components/dashboard/v3/placeholder-card";
@@ -71,12 +73,9 @@ export default function DashboardV3Page() {
         </section>
 
         <section className="mt-5 grid grid-cols-1 gap-4 xl:grid-cols-3">
-          <PlaceholderCard
-            title="Reorder watchlist"
-            note="Low-stock SKUs with velocity and days-of-stock — wiring blocked on enriched /inventory/reorder-alerts."
-            issueNumber={507}
-            className="xl:col-span-2"
-          />
+          <div className="xl:col-span-2">
+            <InventoryTable />
+          </div>
           <PlaceholderCard
             title="Expiry exposure"
             note="14×7 heatmap + 30/60/90 tier summary (EGP) — wiring blocked on /expiry/exposure-summary."
@@ -85,11 +84,7 @@ export default function DashboardV3Page() {
         </section>
 
         <section className="mt-5 grid grid-cols-1 gap-4 xl:grid-cols-3">
-          <PlaceholderCard
-            title="Top branches"
-            note="Ranked branch list with staff count — wiring blocked on extended /analytics/sites."
-            issueNumber={507}
-          />
+          <BranchList />
           <AnomalyFeed />
           <PlaceholderCard
             title="Pipeline health"

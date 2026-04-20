@@ -55,6 +55,8 @@ export interface RankingItem {
   name: string;
   value: number;
   pct_of_total: number;
+  /** Populated only by /analytics/sites?include_staff=true (issue #507). */
+  staff_count?: number | null;
 }
 
 export interface RankingResult {
@@ -603,6 +605,21 @@ export interface AnomalyAlertItem {
   is_suppressed: boolean;
   suppression_reason: string | null;
   acknowledged: boolean;
+}
+
+/** Reorder watchlist row from /inventory/reorder-alerts (issue #507). */
+export interface ReorderAlertItem {
+  product_key: number;
+  site_key: number;
+  drug_code: string;
+  drug_name: string;
+  site_code: string;
+  current_quantity: number;
+  reorder_point: number;
+  reorder_quantity: number;
+  daily_velocity: number;
+  days_of_stock: number | null;
+  status: "critical" | "low" | "healthy";
 }
 
 /** Display projection of an anomaly for the dashboard feed — issue #508. */

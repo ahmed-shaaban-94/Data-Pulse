@@ -127,6 +127,15 @@ class RankingService:
         return self._repo.get_site_performance(f)
 
     @cached(ttl=300, prefix=_CACHE_PREFIX)
+    def get_site_comparison_with_staff(
+        self, filters: AnalyticsFilter | None = None
+    ) -> RankingResult:
+        """Site ranking enriched with staff head-count per branch (issue #507)."""
+        f = self._default_filter(filters)
+        log.info("site_comparison_with_staff", filters=f.model_dump())
+        return self._repo.get_site_performance_with_staff(f)
+
+    @cached(ttl=300, prefix=_CACHE_PREFIX)
     def get_staff_leaderboard(self, filters: AnalyticsFilter | None = None) -> RankingResult:
         """Staff ranking by net revenue (cached 300s)."""
         f = self._default_filter(filters)

@@ -86,10 +86,19 @@ def get_sites(
     response: Response,
     service: ServiceDep,
     params: Annotated[AnalyticsQueryParams, Depends()],
+    include_staff: Annotated[bool, Query(description="Include staff_count per branch")] = False,
 ) -> RankingResult:
-    """Site comparison ranked by net revenue."""
+    """Site comparison ranked by net revenue.
+
+    When ``include_staff=true`` each item is enriched with ``staff_count``
+    (LEFT JOIN over dim_staff, zero when no staff) — backs the design-handoff
+    Top Branches card on ``/dashboard/v3`` (issue #507).
+    """
     set_cache_headers(response, 300)
-    return service.get_site_comparison(to_filter(params))
+    f = to_filter(params)
+    if include_staff:
+        return service.get_site_comparison_with_staff(f)
+    return service.get_site_comparison(f)
 
 
 @router.get("/filters/options", response_model=FilterOptions)

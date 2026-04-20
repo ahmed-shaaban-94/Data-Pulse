@@ -143,6 +143,11 @@ class AnalyticsService:
     def get_site_comparison(self, filters: AnalyticsFilter | None = None) -> RankingResult:
         return self._ranking.get_site_comparison(filters)
 
+    def get_site_comparison_with_staff(
+        self, filters: AnalyticsFilter | None = None
+    ) -> RankingResult:
+        return self._ranking.get_site_comparison_with_staff(filters)
+
     def get_staff_leaderboard(self, filters: AnalyticsFilter | None = None) -> RankingResult:
         return self._ranking.get_staff_leaderboard(filters)
 

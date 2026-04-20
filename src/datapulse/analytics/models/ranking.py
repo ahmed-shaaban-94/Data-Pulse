@@ -13,7 +13,12 @@ from datapulse.types import JsonDecimal
 
 
 class RankingItem(BaseModel):
-    """Single item in a ranked list (product, customer, staff, site)."""
+    """Single item in a ranked list (product, customer, staff, site).
+
+    ``staff_count`` is populated only by the site ranking when
+    ``include_staff=true`` is passed (issue #507); all other ranking
+    endpoints leave it at ``None``.
+    """
 
     model_config = ConfigDict(frozen=True)
 
@@ -22,6 +27,7 @@ class RankingItem(BaseModel):
     name: str
     value: JsonDecimal
     pct_of_total: JsonDecimal
+    staff_count: int | None = None
 
 
 class RankingResult(BaseModel):

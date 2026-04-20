@@ -98,7 +98,12 @@ class StockReconciliation(BaseModel):
 
 
 class ReorderAlert(BaseModel):
-    """A product/site that has fallen at or below its reorder point."""
+    """A product/site that has fallen at or below its reorder point.
+
+    Enriched fields (``daily_velocity`` / ``days_of_stock`` / ``status``)
+    power the design-handoff reorder watchlist on ``/dashboard/v3``
+    (issue #507). All remain optional for backward compatibility.
+    """
 
     model_config = ConfigDict(frozen=True)
 
@@ -110,6 +115,10 @@ class ReorderAlert(BaseModel):
     current_quantity: JsonDecimal
     reorder_point: Decimal
     reorder_quantity: Decimal
+    # Enrichment fields (#507)
+    daily_velocity: JsonDecimal = Decimal("0")
+    days_of_stock: JsonDecimal | None = None
+    status: str = "low"  # "critical" | "low" | "healthy"
 
 
 class InventoryFilter(BaseModel):
