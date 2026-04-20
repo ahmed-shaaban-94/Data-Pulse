@@ -13,6 +13,60 @@ interface State {
   error: Error | null;
 }
 
+/**
+ * Route a caught React error to the right Sentry project.
+ *
+ * Inside the POS desktop app (Electron), `window.electronAPI.observability
+ * .captureError` forwards the event to the POS-scoped `@sentry/electron/main`
+ * SDK so pilot crashes show up in the POS dashboard with `process=renderer`.
+ *
+ * In the SaaS web build the bridge is undefined (`electronAPI` itself is
+ * undefined) and we fall back to `@sentry/nextjs`, which is the pre-existing
+ * behaviour and the right destination for SaaS users.
+ *
+ * Never throws — the capture path must not itself trigger another error.
+ */
+function reportComponentError(error: Error, componentStack: string | null | undefined): void {
+  // Narrow type — we intentionally use optional chaining + typeof checks
+  // instead of relying on a shared type import because this file is built
+  // for both the SaaS bundle and the POS desktop renderer.
+  const bridge =
+    typeof window !== "undefined"
+      ? (window as unknown as {
+          electronAPI?: {
+            observability?: {
+              captureError?: (p: {
+                message: string;
+                stack?: string;
+                source?: string;
+              }) => Promise<void>;
+            };
+          };
+        }).electronAPI?.observability?.captureError
+      : undefined;
+
+  if (bridge) {
+    try {
+      bridge({
+        message: error.message || "React ErrorBoundary caught an error",
+        stack: error.stack,
+        source: "error-boundary",
+      }).catch(() => {
+        // IPC failed — silent drop (see hook doc for rationale).
+      });
+    } catch {
+      // Defensive: never let the capture path itself throw.
+    }
+    return;
+  }
+
+  // SaaS fallback — same call shape as before, preserves the component
+  // stack under `extra` for `@sentry/nextjs`'s default grouping.
+  Sentry.captureException(error, {
+    extra: { componentStack: componentStack ?? null },
+  });
+}
+
 export class ErrorBoundary extends Component<Props, State> {
   constructor(props: Props) {
     super(props);
@@ -27,7 +81,7 @@ export class ErrorBoundary extends Component<Props, State> {
     if (process.env.NODE_ENV !== "production") {
       console.error("ErrorBoundary caught:", error, errorInfo);
     }
-    Sentry.captureException(error, { extra: { componentStack: errorInfo.componentStack } });
+    reportComponentError(error, errorInfo.componentStack);
   }
 
   render() {
