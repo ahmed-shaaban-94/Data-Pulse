@@ -8,7 +8,14 @@ from unittest.mock import MagicMock, patch
 import pytest
 from watchdog.events import FileCreatedEvent, FileMovedEvent
 
-from datapulse.watcher.handler import DEFAULT_DEBOUNCE_SECONDS, VALID_EXTENSIONS, DataFileHandler
+from datapulse.watcher.handler import (
+    DEFAULT_DEBOUNCE_SECONDS,
+    TEMP_FILE_PREFIXES,
+    TEMP_FILE_SUFFIXES,
+    VALID_EXTENSIONS,
+    DataFileHandler,
+    _is_temp_file,
+)
 from datapulse.watcher.service import FileWatcherService
 
 
@@ -259,6 +266,110 @@ class TestDataFileHandlerDebounce:
 
     def test_default_debounce_seconds(self):
         assert DEFAULT_DEBOUNCE_SECONDS == 10.0
+
+
+class TestIsTempFile:
+    """_is_temp_file must filter partial / lock / OS-managed sidecar files.
+
+    Without this, Excel's `~$*.xlsx` lock files would trigger the pipeline
+    on a 1-KB lock instead of the real workbook.
+    """
+
+    @pytest.mark.parametrize(
+        "path",
+        [
+            "/data/raw/~$Report.xlsx",
+            "/data/raw/~$quarterly.xls",
+            "/data/raw/._Report.xlsx",
+            "/data/raw/.~Report.xlsx",
+            "/data/raw/~backup.csv",
+            "/data/raw/upload.tmp",
+            "/data/raw/upload.Tmp",  # case-insensitive suffix
+            "/data/raw/big.crdownload",
+            "/data/raw/big.CRDOWNLOAD",
+            "/data/raw/part.part",
+            "/data/raw/sheet.lock",
+            "/data/raw/draft.filepart",
+            "/data/raw/.vimrc.swp",
+        ],
+    )
+    def test_temp_file_detected(self, path: str):
+        assert _is_temp_file(path) is True
+
+    @pytest.mark.parametrize(
+        "path",
+        [
+            "/data/raw/report.csv",
+            "/data/raw/Q1.xlsx",
+            "/data/raw/old.xls",
+            "/data/raw/PATIENT_data.csv",
+            "/data/raw/sales-2026-04-20.xlsx",
+            # Not a temp file even though it contains "$" mid-name
+            "/data/raw/cost$margins.xlsx",
+            # Empty / edge
+            "",
+            "/data/raw/",
+        ],
+    )
+    def test_real_file_passes(self, path: str):
+        assert _is_temp_file(path) is False
+
+    def test_constants_exported(self):
+        # Guard against accidental removal — downstream docs / monitoring rely
+        # on these sets staying populated.
+        assert "~$" in TEMP_FILE_PREFIXES
+        assert ".tmp" in TEMP_FILE_SUFFIXES
+        assert ".crdownload" in TEMP_FILE_SUFFIXES
+
+
+class TestTempFileSkipOnEvents:
+    """Handler must NOT schedule triggers for temp files, even if the
+    extension looks valid. Covers `on_created` + `on_moved`."""
+
+    def _make_handler(self, debounce: float = 0.05) -> tuple[DataFileHandler, MagicMock]:
+        callback = MagicMock()
+        handler = DataFileHandler(trigger_callback=callback, debounce_seconds=debounce)
+        return handler, callback
+
+    @pytest.mark.parametrize(
+        "path",
+        [
+            "/data/raw/~$Report.xlsx",
+            "/data/raw/._Quarterly.xlsx",
+            "/data/raw/upload.tmp",
+            "/data/raw/big.crdownload",
+            "/data/raw/part.part",
+        ],
+    )
+    def test_temp_file_not_scheduled_on_create(self, path: str):
+        handler, _ = self._make_handler()
+        event = FileCreatedEvent(path)
+        event.is_directory = False
+        handler.on_created(event)
+        assert len(handler._pending_files) == 0
+        handler.stop()
+
+    def test_temp_file_not_scheduled_on_move(self):
+        # A file renamed TO a temp name must still be skipped.
+        handler, _ = self._make_handler()
+        event = FileMovedEvent("/tmp/source.csv", "/data/raw/~$draft.xlsx")
+        event.is_directory = False
+        handler.on_moved(event)
+        assert len(handler._pending_files) == 0
+        handler.stop()
+
+    def test_real_file_after_temp_file_still_detected(self):
+        # A temp file event MUST NOT poison the handler for subsequent real events.
+        handler, _ = self._make_handler()
+        temp_event = FileCreatedEvent("/data/raw/~$lock.xlsx")
+        temp_event.is_directory = False
+        handler.on_created(temp_event)
+        real_event = FileCreatedEvent("/data/raw/report.csv")
+        real_event.is_directory = False
+        handler.on_created(real_event)
+        assert "/data/raw/report.csv" in handler._pending_files
+        assert "/data/raw/~$lock.xlsx" not in handler._pending_files
+        handler.stop()
 
 
 class TestDataFileHandlerHealthSnapshot:
