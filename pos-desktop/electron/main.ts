@@ -11,6 +11,7 @@ import { bootRecovery, startBackgroundSync } from "./sync/background";
 import { setupUpdater, checkForUpdates } from "./updater/index";
 import { upgradeSecretsToEncrypted } from "./authz/secure-store";
 import { createLogger } from "./logging/index";
+import { initSentry, isCrashReportingEnabled } from "./observability/sentry";
 
 // ── Configuration ──────────────────────────────────────────
 const PORT = 3847;
@@ -306,6 +307,28 @@ app.whenReady().then(async () => {
     }
   } catch (err) {
     log.error({ err }, "secure-store upgrade failed (continuing boot)");
+  }
+
+  // Crash reporting — opt-in only (issue #481). Scrub PII inside `initSentry`.
+  // The SDK is dynamically imported, so opted-out pilots never pay the cost.
+  try {
+    if (isCrashReportingEnabled(db)) {
+      const dsn = process.env.SENTRY_DSN;
+      if (dsn) {
+        await initSentry({
+          dsn,
+          release: app.getVersion(),
+          environment: process.env.DATAPULSE_ENV ?? (app.isPackaged ? "production" : "development"),
+        });
+        log.info({ release: app.getVersion() }, "crash reporting enabled");
+      } else {
+        log.warn(
+          "crash reporting requested but SENTRY_DSN is unset — skipping init",
+        );
+      }
+    }
+  } catch (err) {
+    log.error({ err }, "crash reporting init failed (continuing boot)");
   }
 
   // Initialise hardware adapters (mock or real based on settings)
