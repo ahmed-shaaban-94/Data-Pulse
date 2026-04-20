@@ -16,8 +16,33 @@ from datapulse.logging import get_logger
 log = get_logger(__name__)
 
 VALID_EXTENSIONS = frozenset({".csv", ".xlsx", ".xls"})
+
+# Filename suffixes / prefixes that indicate a partial or OS-managed temp file
+# we MUST skip — otherwise Excel's `~$*.xlsx` lock files, OneDrive's `.tmp`
+# uploads, and cloud-sync `.crdownload` / `.part` files would all trigger
+# spurious pipeline runs (and in the Excel case, pipeline on a 1-KB lock
+# file with no sales data).
+TEMP_FILE_PREFIXES = ("~$", "._", ".~", "~")
+TEMP_FILE_SUFFIXES = (".tmp", ".crdownload", ".part", ".lock", ".filepart", ".swp")
+
 # Seconds to wait after last file event before triggering (debounce).
 DEFAULT_DEBOUNCE_SECONDS = 10.0
+
+
+def _is_temp_file(path: str) -> bool:
+    """Return True for partial/lock/temp files that should never trigger the pipeline.
+
+    Checks the filename (not the full path) against known prefix and suffix
+    patterns used by Excel, OneDrive, Dropbox, browsers, and common editors.
+    Case-insensitive on suffixes to catch `.Tmp` / `.CRDOWNLOAD`.
+    """
+    name = Path(path).name
+    if not name:
+        return False
+    if name.startswith(TEMP_FILE_PREFIXES):
+        return True
+    lower = name.lower()
+    return lower.endswith(TEMP_FILE_SUFFIXES)
 
 
 class DataFileHandler(FileSystemEventHandler):
@@ -54,6 +79,9 @@ class DataFileHandler(FileSystemEventHandler):
     def on_created(self, event: FileSystemEvent) -> None:
         if event.is_directory:
             return
+        if _is_temp_file(event.src_path):
+            log.debug("file_ignored_temp", path=event.src_path, event_type="created")
+            return
         if self._is_data_file(event.src_path) and self._is_safe_path(event.src_path):
             log.info("file_detected", path=event.src_path, event_type="created")
             self._schedule_trigger(event.src_path)
@@ -62,6 +90,9 @@ class DataFileHandler(FileSystemEventHandler):
         if event.is_directory:
             return
         dest_path = getattr(event, "dest_path", event.src_path)
+        if _is_temp_file(dest_path):
+            log.debug("file_ignored_temp", path=dest_path, event_type="moved")
+            return
         if self._is_data_file(dest_path) and self._is_safe_path(dest_path):
             log.info("file_detected", path=dest_path, event_type="moved")
             self._schedule_trigger(dest_path)
