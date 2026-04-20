@@ -58,6 +58,12 @@ from datapulse.analytics.models.ranking import (
     StaffQuota,
     TopMovers,
 )
+from datapulse.analytics.models.revenue_forecast import (
+    ForecastBandPoint,
+    RevenueForecast,
+    RevenueForecastStats,
+    RevenueTarget,
+)
 from datapulse.analytics.models.shared import (
     AnalyticsFilter,
     DataDateRange,
@@ -116,6 +122,11 @@ __all__ = [
     "StaffPerformance",
     "StaffQuota",
     "TopMovers",
+    # revenue forecast
+    "ForecastBandPoint",
+    "RevenueForecast",
+    "RevenueForecastStats",
+    "RevenueTarget",
     # shared
     "AnalyticsFilter",
     "DataDateRange",
