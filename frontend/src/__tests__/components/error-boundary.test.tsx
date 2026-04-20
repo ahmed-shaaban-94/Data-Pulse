@@ -1,6 +1,12 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+
+const sentryCapture = vi.fn();
+vi.mock("@sentry/nextjs", () => ({
+  captureException: (err: unknown, ctx?: unknown) => sentryCapture(err, ctx),
+}));
+
 import { ErrorBoundary } from "@/components/error-boundary";
 
 function ProblemChild({ shouldThrow = true }: { shouldThrow?: boolean }) {
@@ -72,5 +78,115 @@ describe("ErrorBoundary", () => {
       </ErrorBoundary>,
     );
     expect(screen.getByText("An unexpected error occurred")).toBeInTheDocument();
+  });
+});
+
+describe("ErrorBoundary — crash-reporting routing", () => {
+  const originalError = console.error;
+  const bridgeCapture = vi.fn();
+  const originalElectronAPI = (window as unknown as { electronAPI?: unknown }).electronAPI;
+
+  beforeEach(() => {
+    console.error = vi.fn();
+    bridgeCapture.mockReset();
+    sentryCapture.mockReset();
+  });
+  afterEach(() => {
+    console.error = originalError;
+    (window as unknown as { electronAPI?: unknown }).electronAPI = originalElectronAPI;
+  });
+
+  function installBridge(): void {
+    (window as unknown as { electronAPI?: unknown }).electronAPI = {
+      app: { isElectron: true, platform: "win32" },
+      observability: {
+        captureError: (p: unknown) => {
+          bridgeCapture(p);
+          return Promise.resolve();
+        },
+      },
+    };
+  }
+
+  function removeBridge(): void {
+    delete (window as unknown as { electronAPI?: unknown }).electronAPI;
+  }
+
+  it("routes through the POS IPC bridge when it is available (Electron)", () => {
+    installBridge();
+    function Boom(): never {
+      throw new Error("component boom");
+    }
+    render(
+      <ErrorBoundary>
+        <Boom />
+      </ErrorBoundary>,
+    );
+    expect(bridgeCapture).toHaveBeenCalledTimes(1);
+    expect(bridgeCapture.mock.calls[0][0]).toMatchObject({
+      message: "component boom",
+      source: "error-boundary",
+    });
+    expect(typeof bridgeCapture.mock.calls[0][0].stack).toBe("string");
+    // SaaS Sentry is NOT invoked when the POS bridge is available.
+    expect(sentryCapture).not.toHaveBeenCalled();
+  });
+
+  it("falls back to @sentry/nextjs when the bridge is absent (SaaS)", () => {
+    removeBridge();
+    function Boom(): never {
+      throw new Error("saas boom");
+    }
+    render(
+      <ErrorBoundary>
+        <Boom />
+      </ErrorBoundary>,
+    );
+    expect(sentryCapture).toHaveBeenCalledTimes(1);
+    const [err, ctx] = sentryCapture.mock.calls[0];
+    expect(err).toBeInstanceOf(Error);
+    expect((err as Error).message).toBe("saas boom");
+    expect(ctx).toHaveProperty("extra");
+    expect(bridgeCapture).not.toHaveBeenCalled();
+  });
+
+  it("falls back to @sentry/nextjs when the bridge exists but .observability is missing", () => {
+    (window as unknown as { electronAPI?: unknown }).electronAPI = {
+      app: { isElectron: true, platform: "win32" },
+      // no observability — e.g. POS build earlier than #499
+    };
+    function Boom(): never {
+      throw new Error("legacy pos");
+    }
+    render(
+      <ErrorBoundary>
+        <Boom />
+      </ErrorBoundary>,
+    );
+    expect(sentryCapture).toHaveBeenCalledTimes(1);
+    expect(bridgeCapture).not.toHaveBeenCalled();
+  });
+
+  it("never throws when the bridge rejects the IPC call", () => {
+    (window as unknown as { electronAPI?: unknown }).electronAPI = {
+      app: { isElectron: true, platform: "win32" },
+      observability: {
+        captureError: () => Promise.reject(new Error("ipc down")),
+      },
+    };
+    function Boom(): never {
+      throw new Error("boom");
+    }
+    // Rendering must NOT rethrow despite the IPC rejection.
+    expect(() =>
+      render(
+        <ErrorBoundary>
+          <Boom />
+        </ErrorBoundary>,
+      ),
+    ).not.toThrow();
+    // Fallback Sentry is not invoked when the bridge accepted the call
+    // (it just rejected asynchronously — that's a silent-drop scenario).
+    expect(sentryCapture).not.toHaveBeenCalled();
   });
 });
