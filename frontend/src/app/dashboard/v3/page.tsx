@@ -13,11 +13,12 @@
  */
 
 import { Sidebar } from "@/components/dashboard/v3/sidebar";
-import { AlertBanner } from "@/components/dashboard/v3/alert-banner";
+import { AlertBannerConnected } from "@/components/dashboard/v3/alert-banner-connected";
+import { AnomalyFeed } from "@/components/dashboard/v3/anomaly-feed";
 import { KpiCard } from "@/components/dashboard/v3/kpi-card";
 import { PageActions } from "@/components/dashboard/v3/page-actions";
 import { PlaceholderCard } from "@/components/dashboard/v3/placeholder-card";
-import { alert, greeting, kpis } from "@/components/dashboard/v3/mock-fixtures";
+import { greeting, kpis } from "@/components/dashboard/v3/mock-fixtures";
 
 export const metadata = {
   title: "Daily operations overview",
@@ -43,7 +44,7 @@ export default function DashboardV3Page() {
           <PageActions />
         </header>
 
-        <AlertBanner data={alert} />
+        <AlertBannerConnected />
 
         <section
           aria-label="Key metrics"
@@ -89,11 +90,7 @@ export default function DashboardV3Page() {
             note="Ranked branch list with staff count — wiring blocked on extended /analytics/sites."
             issueNumber={507}
           />
-          <PlaceholderCard
-            title="Anomalies feed"
-            note="Up/down/info anomaly cards with confidence — wiring blocked on /anomalies/cards."
-            issueNumber={508}
-          />
+          <AnomalyFeed />
           <PlaceholderCard
             title="Pipeline health"
             note="Bronze/Silver/Gold nodes + gates + tests + 7-day history — wiring blocked on /pipeline/health."

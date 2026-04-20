@@ -604,3 +604,23 @@ export interface AnomalyAlertItem {
   suppression_reason: string | null;
   acknowledged: boolean;
 }
+
+/** Display projection of an anomaly for the dashboard feed — issue #508. */
+export interface AnomalyCard {
+  id: number;
+  kind: "up" | "down" | "info";
+  title: string;
+  body: string;
+  time_ago: string;
+  confidence: "high" | "medium" | "low" | "info";
+}
+
+/** Headline insight for the dashboard AI alert banner — issue #510. */
+export interface TopInsight {
+  title: string;
+  body: string;
+  action_label: string;
+  action_target: string | null;
+  confidence: "high" | "medium" | "low" | "info";
+  generated_at: string;
+}
