@@ -185,14 +185,22 @@ export default function PosDrugsPage() {
       )}
       data-testid="pos-drugs-page"
     >
-      <header className="flex h-14 items-center justify-between border-b border-border bg-surface px-4">
+      <header className="flex h-14 items-center justify-between border-b border-[var(--pos-line)] bg-[var(--pos-card)] px-4">
         <div className="flex items-center gap-3">
           <OfflineBadge />
-          <span className="text-sm font-semibold text-text-primary">DataPulse POS · Drugs</span>
+          <span
+            className="font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-cyan-300"
+            aria-hidden="true"
+          >
+            ● Drugs
+          </span>
+          <span className="font-[family-name:var(--font-fraunces)] text-sm italic text-text-primary">
+            Catalog &amp; inventory
+          </span>
         </div>
         <div className="flex items-center gap-3">
           {terminal && (
-            <div className="flex items-center gap-1.5 text-xs text-text-secondary">
+            <div className="flex items-center gap-1.5 font-mono text-xs text-text-secondary">
               <Clock className="h-3.5 w-3.5" />
               <span>{terminal.terminal_name}</span>
             </div>
@@ -202,8 +210,8 @@ export default function PosDrugsPage() {
             onClick={() => router.push("/terminal")}
             data-testid="drugs-close-button"
             className={cn(
-              "flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5",
-              "text-xs font-medium text-text-secondary hover:bg-surface-raised",
+              "flex items-center gap-1.5 rounded-lg border border-[var(--pos-line)] px-3 py-1.5",
+              "text-xs font-medium text-text-secondary hover:bg-[var(--pos-card)]",
             )}
           >
             <X className="h-3.5 w-3.5" />

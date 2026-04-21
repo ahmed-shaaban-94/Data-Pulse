@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
-import { ArrowLeft, FileText, Loader2 } from "lucide-react";
+import { ArrowLeft, FileText, Loader2, SkipForward } from "lucide-react";
 import { PaymentPanel } from "@/components/pos/PaymentPanel";
 import { ReceiptPreview } from "@/components/pos/ReceiptPreview";
 import { InvoiceModal } from "@/components/pos/InvoiceModal";
@@ -89,9 +89,12 @@ export default function CheckoutPage() {
 
       setResult(checkoutResult);
       setTxnDetail(detail);
-      // Auto-open the A4 invoice on successful commit (per design handoff).
-      // Cashier can Esc/close to return to the thermal receipt view.
-      setInvoiceOpen(true);
+      // Audit §8 item 9 — skip-receipt flow: the success surface now
+      // offers three choices (A4 invoice / thermal receipt preview /
+      // skip & new sale) instead of auto-opening the A4 modal, so a
+      // busy cashier can clear walk-ins without generating unused
+      // receipts. "A4 invoice" button below restores the old behavior
+      // on demand.
       localStorage.removeItem("pos:pending_checkout");
     } catch {
       // Error shown in UI
@@ -163,21 +166,46 @@ export default function CheckoutPage() {
     const discountSource = appliedDiscount?.source;
     return (
       <div className="pos-root flex min-h-screen flex-col">
-        <header className="flex h-14 items-center justify-between border-b border-border bg-surface px-4">
+        <header className="flex h-14 items-center justify-between border-b border-[var(--pos-line)] bg-[var(--pos-card)] px-4">
           <OfflineBadge />
-          <span className="text-sm font-semibold text-text-primary">Checkout Complete</span>
-          <button
-            type="button"
-            onClick={() => setInvoiceOpen(true)}
-            data-testid="pos-checkout-view-invoice"
-            className={cn(
-              "flex items-center gap-2 rounded-lg border border-border px-3 py-1.5",
-              "text-xs font-medium text-text-secondary hover:bg-surface-raised",
-            )}
-          >
-            <FileText className="h-3.5 w-3.5" />
-            A4 invoice
-          </button>
+          <div className="flex flex-col items-center">
+            <span
+              className="font-mono text-[10px] font-bold uppercase tracking-[0.22em] text-emerald-300"
+              aria-hidden="true"
+            >
+              ● Charged
+            </span>
+            <span className="font-[family-name:var(--font-fraunces)] text-sm italic text-text-primary">
+              Pick a receipt, or move on
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setInvoiceOpen(true)}
+              data-testid="pos-checkout-view-invoice"
+              className={cn(
+                "flex items-center gap-2 rounded-lg border border-[var(--pos-line)] px-3 py-1.5",
+                "text-xs font-medium text-text-secondary hover:border-cyan-400/40 hover:bg-cyan-400/5",
+              )}
+            >
+              <FileText className="h-3.5 w-3.5" />
+              A4 invoice
+            </button>
+            <button
+              type="button"
+              onClick={handleNewSale}
+              data-testid="pos-checkout-skip-receipt"
+              aria-label="Skip receipt and start a new sale"
+              className={cn(
+                "flex items-center gap-2 rounded-lg border border-amber-400/30 bg-amber-400/10 px-3 py-1.5",
+                "text-xs font-medium text-amber-300 hover:bg-amber-400/15",
+              )}
+            >
+              <SkipForward className="h-3.5 w-3.5" />
+              Skip &amp; new sale
+            </button>
+          </div>
         </header>
         <main className="flex flex-1 items-center justify-center p-4">
           <ReceiptPreview
