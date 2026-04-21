@@ -261,8 +261,12 @@ class PurchaseOrderRepository:
                     "po_number": po_number,
                     "line_number": idx,
                     "drug_code": line.drug_code,
-                    "ordered_quantity": float(line.quantity),
-                    "unit_price": float(line.unit_price),
+                    # Pass Decimal to NUMERIC(18,4) directly — float() here
+                    # silently loses precision (e.g. Decimal("12.3456") →
+                    # 12.345599999999998), and the drift compounds in
+                    # line_total = ordered_quantity * unit_price.
+                    "ordered_quantity": line.quantity,
+                    "unit_price": line.unit_price,
                 },
             )
 
@@ -337,7 +341,8 @@ class PurchaseOrderRepository:
                     "tenant_id": tenant_id,
                     "po_number": po_number,
                     "line_number": line.line_number,
-                    "delta": float(line.received_quantity),
+                    # Decimal straight to NUMERIC — no float() round-trip.
+                    "delta": line.received_quantity,
                 },
             )
 
@@ -356,11 +361,14 @@ class PurchaseOrderRepository:
         """
         rows_inserted = 0
         for line in lines:
-            if float(line.received_quantity) <= 0:
+            if line.received_quantity <= 0:
                 continue
             detail = line_details.get(line.line_number)
             drug_code = detail.drug_code if detail else None
-            unit_price = float(detail.unit_price) if detail else None
+            # Keep Decimal; bound directly into bronze.stock_receipts.unit_cost
+            # NUMERIC(18,4) below. float() here would erode precision before
+            # the bind adapter ever saw the value.
+            unit_price = detail.unit_price if detail else None
 
             self._session.execute(
                 text("""
@@ -383,7 +391,7 @@ class PurchaseOrderRepository:
                     "site_code": site_code,
                     "batch_number": line.batch_number,
                     "expiry_date": line.expiry_date,
-                    "quantity": float(line.received_quantity),
+                    "quantity": line.received_quantity,
                     "unit_cost": unit_price,
                     "po_reference": po_number,
                     "po_number": po_number,

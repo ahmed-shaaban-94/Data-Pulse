@@ -169,7 +169,10 @@ class ForecastingRepository:
         if not results:
             return 0
 
-        # Collect all rows into a flat list for batch insert
+        # Collect all rows into a flat list for batch insert.
+        # All point + accuracy fields arrive as Decimal and bind directly into
+        # NUMERIC(18,2)/NUMERIC(8,4) columns — do NOT cast via float(), which
+        # would erode precision before the adapter reaches the driver.
         rows: list[dict] = []
         for result in results:
             accuracy = result.accuracy_metrics
@@ -181,12 +184,12 @@ class ForecastingRepository:
                         "granularity": result.granularity,
                         "method": result.method,
                         "forecast_date": point.period,
-                        "point_forecast": float(point.value),
-                        "lower_bound": float(point.lower_bound),
-                        "upper_bound": float(point.upper_bound),
-                        "mape": float(accuracy.mape) if accuracy else None,
-                        "mae": float(accuracy.mae) if accuracy else None,
-                        "rmse": float(accuracy.rmse) if accuracy else None,
+                        "point_forecast": point.value,
+                        "lower_bound": point.lower_bound,
+                        "upper_bound": point.upper_bound,
+                        "mape": accuracy.mape if accuracy else None,
+                        "mae": accuracy.mae if accuracy else None,
+                        "rmse": accuracy.rmse if accuracy else None,
                         "run_at": run_at,
                     }
                 )
