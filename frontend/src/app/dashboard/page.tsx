@@ -15,7 +15,6 @@ import { Download, Plus } from "lucide-react";
 import { useSession } from "next-auth/react";
 
 import {
-  DashboardSidebar,
   AlertBanner,
   KpiCard,
   DEFAULT_KPI_ICONS,
@@ -27,6 +26,7 @@ import {
   AnomalyFeed,
   PipelineHealthCard,
 } from "@/components/dashboard/new";
+import { DashboardShell } from "@/components/dashboard-v2/shell";
 import { OnboardingStrip } from "@/components/dashboard/onboarding-strip";
 import { FirstInsightCard } from "@/components/dashboard/first-insight-card";
 import { useDashboard } from "@/hooks/use-dashboard";
@@ -199,10 +199,14 @@ export default function DashboardPage() {
   const sitesItems = sites?.items ?? [];
 
   return (
-    <div className="min-h-screen bg-page text-ink-primary font-sans grid grid-cols-1 xl:grid-cols-[248px_1fr]">
-      <DashboardSidebar activeHref="/dashboard" />
-
-      <main className="px-8 py-7 pb-16 max-w-[1600px]">
+    <DashboardShell
+      activeHref="/dashboard"
+      breadcrumbs={[
+        { label: "DataPulse", href: "/dashboard" },
+        { label: "Overview" },
+      ]}
+    >
+      <div className="page">
         <header className="flex flex-wrap items-end gap-5 mb-6">
           <div className="flex-1 min-w-[320px]">
             <div className="text-sm text-ink-secondary flex items-center gap-2 flex-wrap">
@@ -287,8 +291,8 @@ export default function DashboardPage() {
           <AnomalyFeed data={anomalies} loading={anomaliesLoading} />
           <PipelineHealthCard data={pipeline} loading={pipelineLoading} />
         </section>
-      </main>
-    </div>
+      </div>
+    </DashboardShell>
   );
 }
 
