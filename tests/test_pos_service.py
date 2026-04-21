@@ -848,6 +848,57 @@ class TestCheckout:
         assert mock_repo.insert_bronze_pos_transaction.call_count == 3
 
     @pytest.mark.asyncio
+    async def test_checkout_passes_decimal_not_float_to_receipt_generators(
+        self,
+        service: PosService,
+        mock_repo: MagicMock,
+        three_item_setup: dict,
+        monkeypatch: pytest.MonkeyPatch,
+    ):
+        """Regression guard: ``service.checkout`` must not cast Decimal money
+        values to ``float`` in the ``payment_info`` dict passed to receipt
+        generators.
+
+        Rationale: CLAUDE.md bans floating-point for financial data. Commit
+        5b58b594 (2026-04-21) removed float casts that were landing in
+        NUMERIC(18,4) columns; three sibling casts in the receipt-build path
+        survived. receipt.py does re-coerce via ``Decimal(str(...))``, so
+        this is a discipline regression rather than a user-visible defect
+        today — but float drift on 3-4dp amounts would land silently on
+        the thermal/PDF receipt if anything downstream stopped re-coercing.
+        """
+        captured: dict[str, dict] = {}
+
+        def spy_thermal(txn, items, payment, **kwargs):
+            captured["thermal"] = payment
+            return b"stub-thermal"
+
+        def spy_pdf(txn, items, payment, **kwargs):
+            captured["pdf"] = payment
+            return b"stub-pdf"
+
+        monkeypatch.setattr("datapulse.pos.service.generate_thermal_receipt", spy_thermal)
+        monkeypatch.setattr("datapulse.pos.service.generate_pdf_receipt", spy_pdf)
+
+        await service.checkout(
+            transaction_id=100,
+            tenant_id=1,
+            request=CheckoutRequest(
+                payment_method=PaymentMethod.cash,
+                cash_tendered=Decimal("100"),
+            ),
+        )
+
+        for label, payment in captured.items():
+            assert isinstance(payment["amount_charged"], Decimal), (
+                f"{label}.amount_charged is "
+                f"{type(payment['amount_charged']).__name__}, expected Decimal"
+            )
+            assert isinstance(payment["change_due"], Decimal), (
+                f"{label}.change_due is {type(payment['change_due']).__name__}, expected Decimal"
+            )
+
+    @pytest.mark.asyncio
     async def test_cash_underpayment_raises(
         self,
         service: PosService,

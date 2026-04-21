@@ -23,6 +23,7 @@ import {
 } from "@/components/pos/terminal/ActivePaymentStrip";
 import { ChargeButton } from "@/components/pos/terminal/ChargeButton";
 import { ScanToast } from "@/components/pos/terminal/ScanToast";
+import { ScanDisambigPicker } from "@/components/pos/terminal/ScanDisambigPicker";
 import { ProvisionalBanner } from "@/components/pos/terminal/ProvisionalBanner";
 import { productToQuickPick, type TilePaymentMethod } from "@/components/pos/terminal/types";
 import { usePosCart } from "@/hooks/use-pos-cart";
@@ -100,6 +101,11 @@ export default function PosTerminalPage() {
   const [lastKeypadKey, setLastKeypadKey] = useState<string | null>(null);
   const [unsyncedCodes, setUnsyncedCodes] = useState<Set<string>>(() => new Set());
   const [activeTransactionId, setActiveTransactionId] = useState<number | null>(null);
+  // When a scan query matches >1 product by substring, show a picker
+  // instead of silently landing on the first hit. Audit §4.2 click-path.
+  const [disambigCandidates, setDisambigCandidates] = useState<
+    ReturnType<typeof productToQuickPick>[] | null
+  >(null);
 
   const scanInputRef = useRef<HTMLInputElement>(null);
 
@@ -162,15 +168,45 @@ export default function PosTerminalPage() {
     (value: string) => {
       const q = value.trim();
       if (!q) return;
-      // Exact SKU match (product.drug_code) or name substring; fall back to first result.
-      let match = catalog.find((p) => p.drug_code.toUpperCase() === q.toUpperCase());
-      if (!match) match = catalog.find((p) => p.drug_name.toLowerCase().includes(q.toLowerCase()));
-      if (match) {
-        addQuickPick(productToQuickPick(match));
+      const qLower = q.toLowerCase();
+      const qUpper = q.toUpperCase();
+
+      // Exact SKU match always wins — no ambiguity possible, no picker.
+      const skuHit = catalog.find((p) => p.drug_code.toUpperCase() === qUpper);
+      if (skuHit) {
+        addQuickPick(productToQuickPick(skuHit));
         setScanQuery("");
+        return;
       }
+
+      // Substring match against drug_name OR drug_code (case-insensitive).
+      const nameHits = catalog.filter(
+        (p) =>
+          p.drug_name.toLowerCase().includes(qLower) ||
+          p.drug_code.toLowerCase().includes(qLower),
+      );
+      if (nameHits.length === 0) {
+        setScanToast(`No match for "${q}"`);
+        return;
+      }
+      if (nameHits.length === 1) {
+        addQuickPick(productToQuickPick(nameHits[0]));
+        setScanQuery("");
+        return;
+      }
+      // 2+ matches — let the cashier disambiguate instead of guessing.
+      setDisambigCandidates(nameHits.slice(0, 3).map(productToQuickPick));
     },
     [catalog, addQuickPick],
+  );
+
+  const handleDisambigPick = useCallback(
+    (tile: ReturnType<typeof productToQuickPick>) => {
+      setDisambigCandidates(null);
+      setScanQuery("");
+      addQuickPick(tile);
+    },
+    [addQuickPick],
   );
 
   const handleIncrement = useCallback(
@@ -308,11 +344,9 @@ export default function PosTerminalPage() {
         setActivePayment("insurance");
         return;
       }
-      if (e.key === "F12") {
-        e.preventDefault();
-        openVoucherModal();
-        return;
-      }
+      // F12 intentionally unbound — layout previously dispatched a dead
+      // pos:void-transaction event on F12 which collided with this
+      // handler. Voucher stays on F7.
       if (e.key === "Escape" && voucherOpen) {
         // VoucherCodeModal handles its own Escape
         return;
@@ -512,6 +546,11 @@ export default function PosTerminalPage() {
 
       {/* Toasts + modals */}
       <ScanToast message={scanToast} onDismiss={() => setScanToast(null)} />
+      <ScanDisambigPicker
+        candidates={disambigCandidates ?? []}
+        onPick={handleDisambigPick}
+        onCancel={() => setDisambigCandidates(null)}
+      />
       <VoucherCodeModal
         open={voucherOpen}
         cartSubtotal={subtotal}
