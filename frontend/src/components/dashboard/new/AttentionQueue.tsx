@@ -98,10 +98,15 @@ export function AttentionQueue({ inputs, loading, syncedLabel, maxVisible = 8 }:
         className="mt-3 overflow-y-auto"
         style={{ maxHeight: `${maxVisible * 40}px` }}
         onClickCapture={(e) => {
-          const target = (e.target as HTMLElement).closest("a[href]");
-          if (!target) return;
-          const href = target.getAttribute("href") ?? "";
-          const alert = filtered.find((a) => a.drillHref === href);
+          const anchor = (e.target as HTMLElement).closest("a[href]");
+          if (!anchor) return;
+          // Read alert-id from the enclosing <li data-alert-id>. Matching by
+          // href would be wrong because many alerts share the same drillHref
+          // (e.g. every stock row links to /inventory?filter=below-reorder).
+          const row = (e.target as HTMLElement).closest("[data-alert-id]");
+          const alertId = row?.getAttribute("data-alert-id");
+          if (!alertId) return;
+          const alert = filtered.find((a) => a.id === alertId);
           if (alert) {
             trackEvent("attention_queue_drill", {
               type: alert.type,

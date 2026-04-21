@@ -29,8 +29,11 @@ export function scoreAlert(a: AttentionAlert): number {
   const impact = Math.min(50, (a.impactEgp ?? 0) / 10_000);
   let recency = 0;
   if (a.detectedAt) {
-    const hoursSince = Math.max(0, (Date.now() - new Date(a.detectedAt).getTime()) / 3_600_000);
-    recency = Math.max(0, 30 - hoursSince) / 2;
+    const ms = new Date(a.detectedAt).getTime();
+    if (Number.isFinite(ms)) {
+      const hoursSince = Math.max(0, (Date.now() - ms) / 3_600_000);
+      recency = Math.max(0, 30 - hoursSince) / 2;
+    }
   }
   return sev + impact + recency;
 }
@@ -114,7 +117,14 @@ export function mergeAttentionAlerts(input: MergeInputs): AttentionAlert[] {
       rows,
       totalImpact: rows.reduce((s, r) => s + (r.margin_impact_egp ?? 0), 0),
     }))
-    .sort((a, b) => b.totalImpact - a.totalImpact)
+    .sort((a, b) => {
+      // Primary: EGP margin impact desc.
+      if (b.totalImpact !== a.totalImpact) return b.totalImpact - a.totalImpact;
+      // Tiebreaker: more affected branches = higher priority. Without this,
+      // when margin_impact_egp is unavailable (current hook shape), ranking
+      // would fall back to map-iteration order.
+      return b.rows.length - a.rows.length;
+    })
     .slice(0, 20);
 
   for (const g of stockGroups) {

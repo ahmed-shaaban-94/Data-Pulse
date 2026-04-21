@@ -49,7 +49,10 @@ export function AttentionRow({ alert }: { alert: AttentionAlert }) {
       : "";
 
   return (
-    <li className="flex items-center gap-3 px-4 py-2 hover:bg-elevated/40 rounded-md">
+    <li
+      data-alert-id={alert.id}
+      className="flex items-center gap-3 px-4 py-2 hover:bg-elevated/40 rounded-md"
+    >
       <span
         className={`w-2 h-2 rounded-full shrink-0 ${DOT_COLOR[alert.severity]}`}
         role="img"

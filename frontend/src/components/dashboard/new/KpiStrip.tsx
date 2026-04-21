@@ -23,7 +23,8 @@ function DeltaIcon({ dir }: { dir: KpiPill["deltaDir"] }) {
 }
 
 function Sparkline({ points }: { points: number[] }) {
-  if (!points.length) return null;
+  // A single point renders no stroke; require at least two to draw a line.
+  if (points.length < 2) return null;
   const w = 120;
   const h = 16;
   const step = w / Math.max(1, points.length - 1);

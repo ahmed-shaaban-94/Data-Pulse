@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { ChevronDown, Database, Activity, FileText } from "lucide-react";
 import type { ReactNode } from "react";
@@ -32,6 +32,24 @@ function relativeTime(iso?: string): string {
 
 export function DashboardFooterBar({ pipeline, channelsSlot }: Props) {
   const [channelsOpen, setChannelsOpen] = useState(false);
+  const channelsRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!channelsOpen) return;
+    const onMouseDown = (e: MouseEvent) => {
+      if (!channelsRef.current) return;
+      if (!channelsRef.current.contains(e.target as Node)) setChannelsOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setChannelsOpen(false);
+    };
+    document.addEventListener("mousedown", onMouseDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onMouseDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [channelsOpen]);
 
   const pipeColor =
     pipeline?.status === "success"
@@ -53,7 +71,7 @@ export function DashboardFooterBar({ pipeline, channelsSlot }: Props) {
         )}
       </span>
 
-      <div className="relative">
+      <div className="relative" ref={channelsRef}>
         <button
           type="button"
           className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md border border-border/40
@@ -68,6 +86,7 @@ export function DashboardFooterBar({ pipeline, channelsSlot }: Props) {
           <div
             id="channels-popover"
             role="dialog"
+            aria-label="Channels"
             className="absolute bottom-full mb-2 w-[360px] max-w-[90vw] rounded-xl border border-border/40
                        bg-card shadow-xl p-3 z-10"
           >

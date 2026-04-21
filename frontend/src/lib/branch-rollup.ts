@@ -1,7 +1,7 @@
 /**
  * Pure client-side per-site aggregation.
  * Joins useSites (RankingResult) with useReorderAlerts and useExpiryCalendar
- * so BranchList can display revenue + risk + expiry without a backend change.
+ * so BranchListRollup can display revenue + risk + expiry without a backend change.
  */
 
 export interface BranchRollupRow {
