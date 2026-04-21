@@ -16,9 +16,7 @@ import {
 import { useMembers, useMyAccess, useSectors } from "@/hooks/use-members";
 import { useToast } from "@/components/ui/toast";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { Breadcrumbs } from "@/components/layout/breadcrumbs";
-import { Header } from "@/components/layout/header";
-import { PageTransition } from "@/components/layout/page-transition";
+import { DashboardShell } from "@/components/dashboard-v2/shell";
 import { AnalyticsSectionHeader } from "@/components/layout/analytics-section-header";
 import { LoadingCard } from "@/components/loading-card";
 import type { MemberResponse, RoleKey, SectorResponse } from "@/types/members";
@@ -720,25 +718,38 @@ export default function TeamPage() {
     }
   }
 
+  const breadcrumbs = [
+    { label: "DataPulse", href: "/dashboard" },
+    { label: "Settings" },
+    { label: "Team" },
+  ];
+
   if (isLoading) {
     return (
-      <PageTransition>
-        <Breadcrumbs />
-        <Header title="Team" description="Manage members, roles, and sector access" />
-        <div className="mx-auto max-w-5xl space-y-6">
-          <LoadingCard className="h-48 rounded-[1.75rem]" lines={4} />
-          <LoadingCard className="h-64 rounded-[1.75rem]" lines={6} />
+      <DashboardShell activeHref="/team" breadcrumbs={breadcrumbs}>
+        <div className="page">
+          <div>
+            <h1 className="page-title">Team.</h1>
+            <p className="page-sub">Manage members, roles, and sector access.</p>
+          </div>
+          <div className="mx-auto max-w-5xl space-y-6">
+            <LoadingCard className="h-48 rounded-[1.75rem]" lines={4} />
+            <LoadingCard className="h-64 rounded-[1.75rem]" lines={6} />
+          </div>
         </div>
-      </PageTransition>
+      </DashboardShell>
     );
   }
 
   return (
-    <PageTransition>
-      <Breadcrumbs />
+    <DashboardShell activeHref="/team" breadcrumbs={breadcrumbs}>
+      <div className="page">
       <div className="mx-auto max-w-5xl space-y-6">
       <div className="flex items-center justify-between gap-4">
-        <Header title="Team" description="Manage members, roles, and sector access" />
+        <div>
+          <h1 className="page-title">Team.</h1>
+          <p className="page-sub">Manage members, roles, and sector access.</p>
+        </div>
         {canManage && (
           <button
             onClick={() => setInviteOpen(true)}
@@ -846,6 +857,7 @@ export default function TeamPage() {
         onCancel={() => setConfirmDeleteSector(null)}
       />
       </div>
-    </PageTransition>
+      </div>
+    </DashboardShell>
   );
 }

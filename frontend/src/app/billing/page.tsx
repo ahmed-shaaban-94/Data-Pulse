@@ -3,10 +3,8 @@
 import { useState } from "react";
 import { AlertCircle, CheckCircle2, CreditCard, ExternalLink, Zap } from "lucide-react";
 import { createCheckout, createPortalSession, useBilling } from "@/hooks/use-billing";
-import { Breadcrumbs } from "@/components/layout/breadcrumbs";
-import { Header } from "@/components/layout/header";
+import { DashboardShell } from "@/components/dashboard-v2/shell";
 import { LoadingCard } from "@/components/loading-card";
-import { PageTransition } from "@/components/layout/page-transition";
 import { useToast } from "@/components/ui/toast";
 
 function UsageMeter({
@@ -92,38 +90,46 @@ export default function BillingPage() {
     }
   }
 
+  const breadcrumbs = [
+    { label: "DataPulse", href: "/dashboard" },
+    { label: "Settings" },
+    { label: "Billing" },
+  ];
+
   if (isLoading) {
     return (
-      <PageTransition>
-        <Breadcrumbs />
-        <Header
-          title="Billing"
-          description="Track plan usage, billing status, and subscription controls"
-        />
-        <div className="mx-auto max-w-4xl space-y-6">
-          <LoadingCard className="h-64 rounded-[1.75rem]" lines={5} />
-          <LoadingCard className="h-48 rounded-[1.75rem]" lines={4} />
+      <DashboardShell activeHref="/billing" breadcrumbs={breadcrumbs}>
+        <div className="page">
+          <div>
+            <h1 className="page-title">Billing.</h1>
+            <p className="page-sub">Track plan usage, billing status, and subscription controls.</p>
+          </div>
+          <div className="mx-auto max-w-4xl space-y-6">
+            <LoadingCard className="h-64 rounded-[1.75rem]" lines={5} />
+            <LoadingCard className="h-48 rounded-[1.75rem]" lines={4} />
+          </div>
         </div>
-      </PageTransition>
+      </DashboardShell>
     );
   }
 
   if (isError || !billing) {
     return (
-      <PageTransition>
-        <Breadcrumbs />
-        <Header
-          title="Billing"
-          description="Track plan usage, billing status, and subscription controls"
-        />
-        <div className="mx-auto max-w-4xl">
-          <div className="viz-panel rounded-[1.75rem] p-8">
-            <p className="text-sm text-text-secondary">
-              Unable to load billing information. Please try again later.
-            </p>
+      <DashboardShell activeHref="/billing" breadcrumbs={breadcrumbs}>
+        <div className="page">
+          <div>
+            <h1 className="page-title">Billing.</h1>
+            <p className="page-sub">Track plan usage, billing status, and subscription controls.</p>
+          </div>
+          <div className="mx-auto max-w-4xl">
+            <div className="viz-panel rounded-[1.75rem] p-8">
+              <p className="text-sm text-text-secondary">
+                Unable to load billing information. Please try again later.
+              </p>
+            </div>
           </div>
         </div>
-      </PageTransition>
+      </DashboardShell>
     );
   }
 
@@ -131,12 +137,12 @@ export default function BillingPage() {
   const isPastDue = billing.subscription_status === "past_due";
 
   return (
-    <PageTransition>
-      <Breadcrumbs />
-      <Header
-        title="Billing"
-        description="Track plan usage, billing status, and subscription controls"
-      />
+    <DashboardShell activeHref="/billing" breadcrumbs={breadcrumbs}>
+      <div className="page">
+        <div>
+          <h1 className="page-title">Billing.</h1>
+          <p className="page-sub">Track plan usage, billing status, and subscription controls.</p>
+        </div>
 
       <div className="mx-auto max-w-4xl space-y-6">
         <section className="viz-panel relative overflow-hidden rounded-[1.9rem] p-6 sm:p-7">
@@ -238,6 +244,7 @@ export default function BillingPage() {
           </div>
         </section>
       </div>
-    </PageTransition>
+      </div>
+    </DashboardShell>
   );
 }
