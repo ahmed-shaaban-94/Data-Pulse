@@ -17,7 +17,6 @@ import { Download, Plus } from "lucide-react";
 import { useSession } from "next-auth/react";
 
 import {
-  DashboardSidebar,
   AttentionQueue,
   KpiStrip,
   DashboardFooterBar,
@@ -28,6 +27,7 @@ import {
   ExpiryHeatmap,
   type KpiPill,
 } from "@/components/dashboard/new";
+import { DashboardShell } from "@/components/dashboard-v2/shell";
 import { OnboardingStrip } from "@/components/dashboard/onboarding-strip";
 import { FirstInsightCard } from "@/components/dashboard/first-insight-card";
 import { useDashboard } from "@/hooks/use-dashboard";
@@ -49,7 +49,6 @@ import type {
   PipelineHealth,
   TimeSeriesPoint,
 } from "@/types/api";
-import type { ExpiryCalendarDay } from "@/types/expiry";
 import type { ReorderAlert } from "@/types/inventory";
 
 type Period = "Day" | "Week" | "Month" | "Quarter" | "YTD";
@@ -301,10 +300,14 @@ export default function DashboardPage() {
   }, [pipeline]);
 
   return (
-    <div className="min-h-screen bg-page text-ink-primary font-sans grid grid-cols-1 xl:grid-cols-[248px_1fr]">
-      <DashboardSidebar activeHref="/dashboard" />
-
-      <main className="px-8 py-7 pb-10 max-w-[1600px]">
+    <DashboardShell
+      activeHref="/dashboard"
+      breadcrumbs={[
+        { label: "DataPulse", href: "/dashboard" },
+        { label: "Overview" },
+      ]}
+    >
+      <div className="page">
         <header className="flex flex-wrap items-end gap-5 mb-6">
           <div className="flex-1 min-w-[320px]">
             <div className="text-sm text-ink-secondary flex items-center gap-2 flex-wrap">
@@ -371,8 +374,8 @@ export default function DashboardPage() {
           pipeline={pipelineSummary}
           channelsSlot={<ChannelDonut data={channels} loading={channelsLoading} />}
         />
-      </main>
-    </div>
+      </div>
+    </DashboardShell>
   );
 }
 
