@@ -26,6 +26,10 @@ jobs:
         run: ruff check src/ tests/
       - name: Check formatting
         run: ruff format --check src/ tests/
+      - name: Check migration integrity (no duplicate prefixes)
+        # Issue #538: guards against duplicate migration numbers that a
+        # prefix-keyed runner can silently skip. Uses stdlib only — no deps.
+        run: python scripts/check_migration_numbers.py
 
   typecheck:
     name: Type Check

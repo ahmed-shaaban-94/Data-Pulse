@@ -96,6 +96,61 @@ docker exec datapulse-db psql -U datapulse -c \
     "DROP INDEX IF EXISTS idx_agg_product_tenant_ym;"
 ```
 
+### Migration naming convention + CI guard
+
+Every file in `migrations/` is keyed by the token before its first
+underscore:
+
+- `NNN_description.sql` — normal migration in ordinal slot `NNN`
+- `NNN<letter>_description.sql` — sub-slot variant (e.g. `030a`, `030b`,
+  `071b`). Use this when a follow-up fix must land AFTER a specific
+  prior migration but before the next integer slot is freed.
+
+Two files sharing the same key (e.g. both start with `088_`) are a
+**bug**: a prefix-keyed migration runner can silently skip one. CI
+blocks this via `scripts/check_migration_numbers.py` (run locally with
+`python scripts/check_migration_numbers.py`).
+
+### Reconciling a duplicate-prefix pair (issue #538 procedure)
+
+If two files share a numeric prefix — e.g. `088_a.sql` and `088_b.sql` —
+you can't simply rename one and push. Staging and production may have
+applied different halves of the pair, and a blind rename would leave one
+file unapplied on one host.
+
+**Before touching the files**, audit every live environment:
+
+```bash
+docker exec datapulse-db psql -U datapulse -c \
+    "SELECT id, name, applied_at FROM schema_migrations
+     WHERE id LIKE '088%' ORDER BY applied_at;"
+```
+
+Run this on dev, staging, and prod. For each host, record which
+`088_*` file is in the table.
+
+**Decision table** (example for prefix 088, where we want to rename the
+"b" file to the next free slot 095):
+
+| Host | Applied under 088 | Action on that host |
+|------|-------------------|---------------------|
+| dev  | `088_a`           | No-op — `088_b` will apply as `095_b` on next deploy |
+| staging | `088_a`        | Same as dev — no-op |
+| prod | `088_a`            | Same — no-op |
+| any host | `088_b`        | Manually insert `INSERT INTO schema_migrations (id, name, applied_at) VALUES ('095', '088_b equivalent', NOW());` so the renamed file is marked as already applied, then deploy |
+
+**Then rename and deploy**:
+
+```bash
+# In a PR:
+git mv migrations/088_b.sql migrations/095_b.sql
+# Update any hardcoded references in code, docs, tests
+git commit -m "migrations: rename 088_b -> 095_b (reconcile duplicate prefix, #538)"
+```
+
+For the currently-outstanding pairs (031, 088, 089), this audit is still
+pending — the CI guard is already live to prevent NEW duplicates.
+
 ---
 
 ## 4. Bronze Ingestion Pipeline
