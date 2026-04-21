@@ -385,7 +385,9 @@ class InventoryRepository:
                 "drug_code": request.drug_code,
                 "site_code": request.site_code,
                 "batch_number": request.batch_number,
-                "quantity": float(request.quantity),
+                # Decimal straight to NUMERIC(18,4) — never via float()
+                # (see adjacent note in expiry/repository.py write_off_batch).
+                "quantity": request.quantity,
                 "reason": request.reason,
                 "loaded_at": datetime.now(tz=UTC),
             },
@@ -395,5 +397,5 @@ class InventoryRepository:
             drug_code=request.drug_code,
             site_code=request.site_code,
             adjustment_type=request.adjustment_type,
-            quantity=float(request.quantity),
+            quantity=float(request.quantity),  # logging: float is fine
         )

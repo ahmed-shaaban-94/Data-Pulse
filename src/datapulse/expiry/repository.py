@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import UTC, date, datetime
+from decimal import Decimal
 
 from sqlalchemy import text
 from sqlalchemy.orm import Session
@@ -382,7 +383,10 @@ class ExpiryRepository:
                 "drug_code": request.drug_code,
                 "site_code": request.site_code,
                 "batch_number": request.batch_number,
-                "quantity": float(request.quantity),
+                # Pass Decimal straight to NUMERIC(18,4); do NOT downgrade via
+                # float() — binary-float can't represent every NUMERIC exactly
+                # and the rounding drift accumulates across aggregated reports.
+                "quantity": request.quantity,
                 "reason": request.reason,
                 "now": now,
             },
@@ -394,7 +398,7 @@ class ExpiryRepository:
             site_code=request.site_code,
             batch_number=request.batch_number,
             adjustment_type="write_off",
-            quantity=-float(request.quantity),
+            quantity=-request.quantity,
             reason=request.reason,
         )
 
@@ -413,7 +417,7 @@ class ExpiryRepository:
         site_code: str,
         batch_number: str,
         adjustment_type: str,
-        quantity: float,
+        quantity: Decimal | int,
         reason: str,
     ) -> None:
         """Insert a stock adjustment event for audit trail."""
