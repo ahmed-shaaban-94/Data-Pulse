@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { DashboardShell } from "@/components/dashboard-v2/shell";
 import { createPromotion } from "@/hooks/use-promotions";
 import type {
   PromotionCreateInput,
@@ -98,9 +99,19 @@ export default function NewPromotionPage() {
   }
 
   return (
-    <div className="p-6 max-w-2xl mx-auto">
-      <h1 className="text-2xl font-semibold mb-1">New promotion</h1>
-      <p className="text-sm text-zinc-400 mb-6">
+    <DashboardShell
+      activeHref="/settings/promotions"
+      breadcrumbs={[
+        { label: "DataPulse", href: "/dashboard" },
+        { label: "Settings" },
+        { label: "Promotions", href: "/settings/promotions" },
+        { label: "New" },
+      ]}
+    >
+      <div className="page">
+      <div className="max-w-2xl mx-auto">
+      <h1 className="page-title">New promotion.</h1>
+      <p className="page-sub mb-6">
         Create a discount campaign. It starts in <b>paused</b> state — activate it from the
         list once you&apos;re ready.
       </p>
@@ -356,6 +367,8 @@ export default function NewPromotionPage() {
           </button>
         </div>
       </form>
-    </div>
+      </div>
+      </div>
+    </DashboardShell>
   );
 }

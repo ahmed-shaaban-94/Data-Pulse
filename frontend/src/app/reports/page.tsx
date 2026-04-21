@@ -1,9 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Header } from "@/components/layout/header";
-import { Breadcrumbs } from "@/components/layout/breadcrumbs";
-import { PageTransition } from "@/components/layout/page-transition";
+import { DashboardShell } from "@/components/dashboard-v2/shell";
 import { fetchAPI, postAPI } from "@/lib/api-client";
 import { LoadingCard } from "@/components/loading-card";
 import { useToast } from "@/components/ui/toast";
@@ -90,12 +88,18 @@ export default function ReportsPage() {
   }, [selectedTemplate, paramValues, success, toastError]);
 
   return (
-    <PageTransition>
-      <Breadcrumbs />
-      <Header
-        title="Reports"
-        description="Generate parameterized reports from templates"
-      />
+    <DashboardShell
+      activeHref="/reports"
+      breadcrumbs={[
+        { label: "DataPulse", href: "/dashboard" },
+        { label: "Reports" },
+      ]}
+    >
+      <div className="page">
+        <div>
+          <h1 className="page-title">Reports.</h1>
+          <p className="page-sub">Generate parameterized reports from templates.</p>
+        </div>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-[240px_1fr] md:gap-6 lg:grid-cols-[280px_1fr]">
         {/* Template list */}
@@ -277,6 +281,7 @@ export default function ReportsPage() {
           )}
         </div>
       </div>
-    </PageTransition>
+      </div>
+    </DashboardShell>
   );
 }

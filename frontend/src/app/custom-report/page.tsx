@@ -1,9 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { Header } from "@/components/layout/header";
-import { Breadcrumbs } from "@/components/layout/breadcrumbs";
-import { PageTransition } from "@/components/layout/page-transition";
+import { DashboardShell } from "@/components/dashboard-v2/shell";
 import { TemplatePicker } from "@/components/custom-report/template-picker";
 import { MeasureSelector } from "@/components/custom-report/measure-selector";
 import { GroupingSelector } from "@/components/custom-report/grouping-selector";
@@ -135,30 +133,39 @@ export default function CustomReportPage() {
   const canGenerate =
     selectedDimensions.length > 0 || selectedMetrics.length > 0;
 
+  const breadcrumbs = [
+    { label: "DataPulse", href: "/dashboard" },
+    { label: "Reports", href: "/reports" },
+    { label: "Custom Report" },
+  ];
+
   if (catalogLoading) {
     return (
-      <PageTransition>
-        <Breadcrumbs />
-        <Header
-          title="Custom Report"
-          description="Build your own analysis"
-        />
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-          <LoadingCard />
-          <LoadingCard />
-          <LoadingCard />
+      <DashboardShell activeHref="/custom-report" breadcrumbs={breadcrumbs}>
+        <div className="page">
+          <div>
+            <h1 className="page-title">Custom report.</h1>
+            <p className="page-sub">Build your own analysis.</p>
+          </div>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+            <LoadingCard />
+            <LoadingCard />
+            <LoadingCard />
+          </div>
         </div>
-      </PageTransition>
+      </DashboardShell>
     );
   }
 
   return (
-    <PageTransition>
-      <Breadcrumbs />
-      <Header
-        title="Custom Report"
-        description="Build your own analysis -- pick a template or start from scratch"
-      />
+    <DashboardShell activeHref="/custom-report" breadcrumbs={breadcrumbs}>
+      <div className="page">
+        <div>
+          <h1 className="page-title">Custom report.</h1>
+          <p className="page-sub">
+            Build your own analysis — pick a template or start from scratch.
+          </p>
+        </div>
 
       <div className="space-y-6">
         {/* Templates */}
@@ -322,6 +329,7 @@ export default function CustomReportPage() {
           />
         )}
       </div>
-    </PageTransition>
+      </div>
+    </DashboardShell>
   );
 }

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { DashboardShell } from "@/components/dashboard-v2/shell";
 import { useVouchers } from "@/hooks/use-vouchers";
 import type { VoucherStatus } from "@/types/vouchers";
 
@@ -44,10 +45,19 @@ export default function VouchersPage() {
   );
 
   return (
-    <div className="p-6 max-w-6xl mx-auto">
+    <DashboardShell
+      activeHref="/settings/vouchers"
+      breadcrumbs={[
+        { label: "DataPulse", href: "/dashboard" },
+        { label: "Settings" },
+        { label: "Vouchers" },
+      ]}
+    >
+      <div className="page">
+      <div className="max-w-6xl mx-auto">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-semibold">Vouchers</h1>
+          <h1 className="page-title">Vouchers.</h1>
           <p className="text-sm text-zinc-400 mt-1">
             Create and manage redeemable discount codes for your POS.
           </p>
@@ -147,6 +157,8 @@ export default function VouchersPage() {
           </table>
         </div>
       )}
-    </div>
+      </div>
+      </div>
+    </DashboardShell>
   );
 }

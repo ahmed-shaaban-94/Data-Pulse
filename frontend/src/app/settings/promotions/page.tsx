@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { DashboardShell } from "@/components/dashboard-v2/shell";
 import { usePromotions } from "@/hooks/use-promotions";
 import type { PromotionStatus } from "@/types/promotions";
 
@@ -42,11 +43,20 @@ export default function PromotionsPage() {
   );
 
   return (
-    <div className="p-6 max-w-6xl mx-auto">
+    <DashboardShell
+      activeHref="/settings/promotions"
+      breadcrumbs={[
+        { label: "DataPulse", href: "/dashboard" },
+        { label: "Settings" },
+        { label: "Promotions" },
+      ]}
+    >
+      <div className="page">
+      <div className="max-w-6xl mx-auto">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-semibold">Promotions</h1>
-          <p className="text-sm text-zinc-400 mt-1">
+          <h1 className="page-title">Promotions.</h1>
+          <p className="page-sub">
             Seasonal discount campaigns that cashiers can apply at checkout.
           </p>
         </div>
@@ -152,6 +162,8 @@ export default function PromotionsPage() {
           </table>
         </div>
       )}
-    </div>
+      </div>
+      </div>
+    </DashboardShell>
   );
 }

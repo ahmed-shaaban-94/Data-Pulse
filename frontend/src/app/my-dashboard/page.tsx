@@ -22,6 +22,7 @@ import {
 } from "@/components/dashboard-builder/widget-catalog";
 import { useToast } from "@/components/ui/toast";
 import { DashboardContent } from "@/components/dashboard/dashboard-content";
+import { DashboardShell } from "@/components/dashboard-v2/shell";
 
 import "react-grid-layout/css/styles.css";
 
@@ -218,24 +219,32 @@ export default function MyDashboardPage() {
     setDirty(true);
   }
 
+  const breadcrumbs = [
+    { label: "DataPulse", href: "/dashboard" },
+    { label: "My Dashboard" },
+  ];
+
   if (isLoading || !initialized) {
     return (
-      <div className="space-y-4 p-6">
-        <div className="h-8 w-64 animate-pulse rounded-lg bg-card" />
-        <div className="grid grid-cols-4 gap-4">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} className="h-48 animate-pulse rounded-xl bg-card" />
-          ))}
+      <DashboardShell activeHref="/my-dashboard" breadcrumbs={breadcrumbs}>
+        <div className="page">
+          <div className="h-8 w-64 animate-pulse rounded-lg bg-card" />
+          <div className="grid grid-cols-4 gap-4">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="h-48 animate-pulse rounded-xl bg-card" />
+            ))}
+          </div>
         </div>
-      </div>
+      </DashboardShell>
     );
   }
 
   return (
-    <div className="space-y-4 p-3 sm:p-4 lg:p-6">
+    <DashboardShell activeHref="/my-dashboard" breadcrumbs={breadcrumbs}>
+      <div className="page">
       {/* Toolbar */}
       <div className="flex flex-wrap items-center gap-2">
-        <h1 className="text-xl font-bold text-text-primary">My Dashboard</h1>
+        <h1 className="page-title">My dashboard.</h1>
         <div className="ml-auto flex items-center gap-2">
           <button
             onClick={() => setLocked(!locked)}
@@ -364,7 +373,8 @@ export default function MyDashboardPage() {
         }}
         activeWidgets={activeWidgets}
       />
-    </div>
+      </div>
+    </DashboardShell>
   );
 }
 

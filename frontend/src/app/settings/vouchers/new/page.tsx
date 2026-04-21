@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { DashboardShell } from "@/components/dashboard-v2/shell";
 import { createVoucher } from "@/hooks/use-vouchers";
 import type { VoucherCreateInput, VoucherType } from "@/types/vouchers";
 
@@ -72,9 +73,19 @@ export default function NewVoucherPage() {
   }
 
   return (
-    <div className="p-6 max-w-xl mx-auto">
-      <h1 className="text-2xl font-semibold mb-1">New voucher</h1>
-      <p className="text-sm text-zinc-400 mb-6">
+    <DashboardShell
+      activeHref="/settings/vouchers"
+      breadcrumbs={[
+        { label: "DataPulse", href: "/dashboard" },
+        { label: "Settings" },
+        { label: "Vouchers", href: "/settings/vouchers" },
+        { label: "New" },
+      ]}
+    >
+      <div className="page">
+      <div className="max-w-xl mx-auto">
+      <h1 className="page-title">New voucher.</h1>
+      <p className="page-sub mb-6">
         Create a discount code that cashiers can redeem at checkout.
       </p>
 
@@ -233,6 +244,8 @@ export default function NewVoucherPage() {
           </button>
         </div>
       </form>
-    </div>
+      </div>
+      </div>
+    </DashboardShell>
   );
 }

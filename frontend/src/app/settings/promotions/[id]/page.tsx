@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useState } from "react";
+import { DashboardShell } from "@/components/dashboard-v2/shell";
 import { setPromotionStatus, usePromotion } from "@/hooks/use-promotions";
 import type { PromotionStatus } from "@/types/promotions";
 
@@ -76,7 +77,17 @@ export default function PromotionDetailPage() {
   const isExpired = data.status === "expired";
 
   return (
-    <div className="p-6 max-w-3xl mx-auto">
+    <DashboardShell
+      activeHref="/settings/promotions"
+      breadcrumbs={[
+        { label: "DataPulse", href: "/dashboard" },
+        { label: "Settings" },
+        { label: "Promotions", href: "/settings/promotions" },
+        { label: data?.name ?? "Detail" },
+      ]}
+    >
+      <div className="page">
+      <div className="max-w-3xl mx-auto">
       <div className="mb-4">
         <Link
           href="/settings/promotions"
@@ -214,6 +225,8 @@ export default function PromotionDetailPage() {
           Done
         </button>
       </div>
-    </div>
+      </div>
+      </div>
+    </DashboardShell>
   );
 }
