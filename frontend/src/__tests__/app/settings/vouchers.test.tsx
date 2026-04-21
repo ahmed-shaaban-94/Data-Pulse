@@ -3,7 +3,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { SWRConfig } from "swr";
 import React from "react";
-import VouchersPage from "@/app/(app)/settings/vouchers/page";
+import VouchersPage from "@/app/settings/vouchers/page";
 
 function renderPage() {
   return render(

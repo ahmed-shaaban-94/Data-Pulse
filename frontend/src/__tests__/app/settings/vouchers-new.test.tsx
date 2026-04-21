@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import React from "react";
-import NewVoucherPage from "@/app/(app)/settings/vouchers/new/page";
+import NewVoucherPage from "@/app/settings/vouchers/new/page";
 
 // The shared setup.ts mocks next/navigation.useRouter but returns a fresh mock
 // object per import; we re-mock here so we can spy on .push().
