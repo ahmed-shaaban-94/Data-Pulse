@@ -30,12 +30,12 @@ export function DrugsTable({
     <div
       className={cn(
         "flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl",
-        "border border-border bg-[rgba(8,24,38,0.5)]",
+        "border border-[var(--pos-line)] bg-[rgba(8,24,38,0.5)]",
       )}
     >
       <div
         className={cn(
-          "grid items-center gap-2 border-b border-border px-4 py-2.5",
+          "grid items-center gap-2 border-b border-[var(--pos-line)] px-4 py-2.5",
           "bg-gradient-to-b from-white/[0.03] to-transparent",
           "grid-cols-[1.6fr_130px_100px_100px_132px_76px]",
         )}
@@ -92,7 +92,7 @@ export function DrugsTable({
               aria-selected={active}
               onClick={() => onActivateIdx(idx)}
               className={cn(
-                "grid cursor-pointer items-center gap-2 border-b border-border",
+                "grid cursor-pointer items-center gap-2 border-b border-[var(--pos-line)]",
                 "grid-cols-[1.6fr_130px_100px_100px_132px_76px]",
                 "px-4 py-2.5 transition-colors",
                 active && "bg-cyan-400/5",
@@ -137,7 +137,7 @@ export function DrugsTable({
                   disabled={disabled}
                   aria-label={`Decrease quantity for ${row.drug_name}`}
                   className={cn(
-                    "flex h-7 w-7 items-center justify-center rounded-md border border-border",
+                    "flex h-7 w-7 items-center justify-center rounded-md border border-[var(--pos-line)]",
                     "bg-white/[0.05] text-text-primary",
                     "disabled:cursor-not-allowed disabled:opacity-50",
                   )}
@@ -154,7 +154,7 @@ export function DrugsTable({
                   disabled={disabled}
                   data-testid={`qty-input-${row.drug_code}`}
                   className={cn(
-                    "h-7 w-10 rounded-md border border-border bg-[rgba(8,24,38,0.7)]",
+                    "h-7 w-10 rounded-md border border-[var(--pos-line)] bg-[rgba(8,24,38,0.7)]",
                     "text-center font-mono text-[13px] font-semibold tabular-nums text-text-primary",
                     "focus:outline-none focus:ring-1 focus:ring-cyan-400",
                     "disabled:cursor-not-allowed disabled:opacity-50",
@@ -171,7 +171,7 @@ export function DrugsTable({
                   className={cn(
                     "flex h-7 w-7 items-center justify-center rounded-md border",
                     disabled
-                      ? "border-border bg-white/[0.03] text-text-secondary"
+                      ? "border-[var(--pos-line)] bg-white/[0.03] text-text-secondary"
                       : "border-cyan-400/30 bg-cyan-400/10 text-cyan-300",
                     "disabled:cursor-not-allowed disabled:opacity-50",
                   )}
@@ -195,7 +195,7 @@ export function DrugsTable({
                   "rounded-md px-2.5 py-1.5 text-xs font-bold",
                   "transition-transform active:scale-[0.97]",
                   disabled
-                    ? "cursor-not-allowed border border-border bg-white/[0.04] text-text-secondary"
+                    ? "cursor-not-allowed border border-[var(--pos-line)] bg-white/[0.04] text-text-secondary"
                     : "bg-gradient-to-b from-cyan-300 to-cyan-600 text-[#021018] shadow-[0_0_12px_rgba(0,199,242,0.25),inset_0_1px_0_rgba(255,255,255,0.3)]",
                 )}
               >

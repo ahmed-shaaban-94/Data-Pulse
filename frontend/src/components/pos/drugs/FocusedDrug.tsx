@@ -10,7 +10,7 @@ interface Props {
 export function FocusedDrug({ row, qty, onAdd }: Props) {
   if (!row) {
     return (
-      <div className="rounded-xl border border-border bg-[rgba(8,24,38,0.6)] px-3.5 py-3 text-xs text-text-secondary">
+      <div className="rounded-xl border border-[var(--pos-line)] bg-[rgba(8,24,38,0.6)] px-3.5 py-3 text-xs text-text-secondary">
         Select a row to preview details.
       </div>
     );
@@ -20,7 +20,7 @@ export function FocusedDrug({ row, qty, onAdd }: Props) {
   return (
     <div
       className={cn(
-        "flex flex-col gap-2 rounded-xl border border-border",
+        "flex flex-col gap-2 rounded-xl border border-[var(--pos-line)]",
         "bg-[rgba(8,24,38,0.6)] px-3.5 py-3",
       )}
       data-testid="focused-drug"
@@ -48,7 +48,7 @@ export function FocusedDrug({ row, qty, onAdd }: Props) {
           "mt-1 grid grid-cols-[auto_1fr_auto] items-center gap-2.5 rounded-lg px-3 py-2.5",
           "text-sm font-bold",
           disabled
-            ? "cursor-not-allowed border border-border bg-white/[0.04] text-text-secondary"
+            ? "cursor-not-allowed border border-[var(--pos-line)] bg-white/[0.04] text-text-secondary"
             : "bg-gradient-to-b from-cyan-300 to-cyan-600 text-[#021018] shadow-[0_0_18px_rgba(0,199,242,0.25),inset_0_1px_0_rgba(255,255,255,0.3)]",
         )}
       >

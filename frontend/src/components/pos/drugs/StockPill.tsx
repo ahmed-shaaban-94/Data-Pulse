@@ -29,7 +29,7 @@ const PALETTE: Record<StockTag, { label: string; container: string; value: strin
   },
   unknown: {
     label: "—",
-    container: "border-border bg-surface-raised/60",
+    container: "border-[var(--pos-line)] bg-[var(--pos-card)]/60",
     value: "text-text-secondary",
   },
 };

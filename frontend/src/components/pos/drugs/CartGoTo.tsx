@@ -21,7 +21,7 @@ export function CartGoTo({ itemCount, grandTotal }: Props) {
         "mt-auto grid grid-cols-[auto_1fr_auto] items-center gap-2.5 rounded-xl px-3.5 py-3 text-start",
         hasItems
           ? "border border-emerald-400/40 bg-emerald-400/10 text-emerald-300"
-          : "border border-border bg-white/[0.03] text-text-secondary",
+          : "border border-[var(--pos-line)] bg-white/[0.03] text-text-secondary",
       )}
     >
       <ShoppingCart className="h-4.5 w-4.5" aria-hidden="true" />

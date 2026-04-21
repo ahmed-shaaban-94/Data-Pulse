@@ -65,7 +65,7 @@ export const DrugsSearchBar = forwardRef<HTMLInputElement, Props>(function Drugs
         </span>
         <kbd
           className={cn(
-            "hidden rounded border border-border bg-surface-raised px-1.5 py-0.5",
+            "hidden rounded border border-[var(--pos-line)] bg-[var(--pos-card)] px-1.5 py-0.5",
             "font-mono text-[10px] uppercase tracking-wider text-text-secondary sm:inline-flex",
           )}
         >
@@ -152,19 +152,19 @@ function FilterChip({ label, active, onClick, color, testid }: ChipProps) {
   const colorClasses = {
     amber: active
       ? "border-amber-400 bg-amber-400/15 text-amber-300"
-      : "border-border text-text-secondary",
+      : "border-[var(--pos-line)] text-text-secondary",
     red: active
       ? "border-red-400 bg-red-400/15 text-red-300"
-      : "border-border text-text-secondary",
+      : "border-[var(--pos-line)] text-text-secondary",
     purple: active
       ? "border-purple-400 bg-purple-400/15 text-purple-300"
-      : "border-border text-text-secondary",
+      : "border-[var(--pos-line)] text-text-secondary",
     cyan: active
       ? "border-cyan-400 bg-cyan-400/15 text-cyan-300"
-      : "border-border text-text-secondary",
+      : "border-[var(--pos-line)] text-text-secondary",
     default: active
       ? "border-cyan-400 bg-cyan-400/15 text-cyan-300"
-      : "border-border text-text-secondary",
+      : "border-[var(--pos-line)] text-text-secondary",
   };
   const cls = color ? colorClasses[color] : colorClasses.default;
   return (

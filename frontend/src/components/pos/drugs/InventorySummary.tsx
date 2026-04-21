@@ -60,7 +60,7 @@ function Stat({
   const toneClass =
     tone === "amber" ? "text-amber-300" : tone === "red" ? "text-red-300" : "text-text-primary";
   return (
-    <div className="rounded-lg border border-border bg-[rgba(8,24,38,0.5)] px-2.5 py-2">
+    <div className="rounded-lg border border-[var(--pos-line)] bg-[rgba(8,24,38,0.5)] px-2.5 py-2">
       <div className={cn("font-mono text-lg font-bold tabular-nums", toneClass)}>{value}</div>
       <div className="mt-0.5 font-mono text-[9px] uppercase tracking-[0.16em] text-text-secondary">
         {label}
