@@ -653,8 +653,8 @@ class PosService:
         # ── Receipt generation (B4) ────────────────────────────────
         payment_info = {
             "method": request.payment_method.value,
-            "amount_charged": float(grand_total),
-            "change_due": float(change_due),
+            "amount_charged": grand_total,
+            "change_due": change_due,
             "insurance_no": request.insurance_no,
         }
         txn_for_receipt = {
@@ -840,8 +840,8 @@ class PosService:
         items = self._repo.get_transaction_items(transaction_id)
         payment_info = {
             "method": header.get("payment_method", "cash"),
-            "amount_charged": float(_to_decimal(header.get("grand_total", 0))),
-            "change_due": 0.0,
+            "amount_charged": _to_decimal(header.get("grand_total", 0)),
+            "change_due": Decimal("0"),
             "insurance_no": None,
         }
         content = (
