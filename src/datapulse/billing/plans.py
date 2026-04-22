@@ -20,9 +20,12 @@ class PlanLimits:
 
     # Egypt PMF (#604). price_egp in piastres (1 EGP = 100 piastres) to
     # map cleanly onto provider cents APIs; price_currency_default decides
-    # what to render when the tenant hasn't picked a currency yet.
-    price_egp: int
-    price_currency_default: Literal["USD", "EGP"]
+    # what to render when the tenant hasn't picked a currency yet. Defaults
+    # keep back-compat with pre-existing PlanLimits(...) call-sites in the
+    # test suite — every real plan entry in PLAN_LIMITS below still sets
+    # these explicitly.
+    price_egp: int = 0
+    price_currency_default: Literal["USD", "EGP"] = "USD"
 
     # Platform tier fields (pharmaceutical inventory & dispensing)
     inventory_management: bool = False
