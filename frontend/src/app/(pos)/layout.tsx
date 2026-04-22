@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useCallback, type ReactNode } from "react";
-import { Fraunces, JetBrains_Mono } from "next/font/google";
+import { Fraunces, JetBrains_Mono, Cairo } from "next/font/google";
 import { useSession, signIn } from "@/lib/auth-bridge";
 import { ThemeProvider } from "next-themes";
 import { SWRConfig } from "swr";
@@ -26,6 +26,18 @@ const jetbrainsMono = JetBrains_Mono({
   subsets: ["latin"],
   weight: ["400", "500", "600", "700"],
   variable: "--font-jetbrains-mono",
+  display: "swap",
+});
+
+// Arabic body copy on the POS + receipt surfaces. Cairo fills the
+// --font-plex-arabic slot — see PR #620 for why we swapped off
+// IBM_Plex_Sans_Arabic (squash-merge dropped the import + next 15.5.15
+// SWC name-resolution failure) and why Cairo is the right substitute
+// (DataPulse's own colors_and_type.css names Cairo as `--dp-font-ar`).
+const plexArabic = Cairo({
+  subsets: ["arabic"],
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-plex-arabic",
   display: "swap",
 });
 
@@ -111,7 +123,7 @@ export default function PosLayout({ children }: { children: ReactNode }) {
                   <RendererCrashBridge>
                     <PosKeyboardHandler>
                       <div
-                        className={`${fraunces.variable} ${jetbrainsMono.variable} flex min-h-screen flex-col overflow-hidden bg-background text-foreground`}
+                        className={`pos-omni ${fraunces.variable} ${jetbrainsMono.variable} ${plexArabic.variable} flex min-h-screen flex-col overflow-hidden bg-[var(--pos-bg)] text-[var(--pos-ink)]`}
                       >
                         {children}
                       </div>
