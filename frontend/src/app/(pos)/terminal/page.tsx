@@ -28,7 +28,10 @@ import { CheckoutConfirmModal } from "@/components/pos/terminal/CheckoutConfirmM
 import { ClinicalPanelSkeleton } from "@/components/pos/terminal/ClinicalPanelSkeleton";
 import { CustomerBar } from "@/components/pos/terminal/CustomerBar";
 import { ChurnAlertCard } from "@/components/pos/terminal/ChurnAlertCard";
+import { ShiftOpenModal } from "@/components/pos/terminal/ShiftOpenModal";
+import { ManagerPinOverrideModal } from "@/components/pos/terminal/ManagerPinOverrideModal";
 import { usePosCustomerLookup } from "@/hooks/use-pos-customer-lookup";
+import { useManagerOverride } from "@/hooks/use-manager-override";
 import { usePosCart } from "@/hooks/use-pos-cart";
 import { usePosCheckout } from "@/hooks/use-pos-checkout";
 import { usePosProducts } from "@/hooks/use-pos-products";
@@ -39,7 +42,7 @@ import { computeVoucherDiscount, type CartVoucher } from "@/contexts/pos-cart-co
 import { fmtEgp } from "@/components/pos/terminal/types";
 
 // ---- Terminal guard ----
-function useActiveTerminal(): TerminalSessionResponse | null {
+function useActiveTerminal(): [TerminalSessionResponse | null, (s: TerminalSessionResponse) => void] {
   const [terminal, setTerminal] = useState<TerminalSessionResponse | null>(null);
   useEffect(() => {
     const stored = localStorage.getItem("pos:active_terminal");
@@ -51,12 +54,14 @@ function useActiveTerminal(): TerminalSessionResponse | null {
       }
     }
   }, []);
-  return terminal;
+  return [terminal, setTerminal];
 }
 
 export default function PosTerminalPage() {
   const router = useRouter();
-  const terminal = useActiveTerminal();
+  const [terminal, setTerminal] = useActiveTerminal();
+  const { overrideOpen, overrideLabel, requestOverride, approveOverride, cancelOverride } =
+    useManagerOverride();
   const {
     items,
     appliedDiscount,
@@ -124,13 +129,7 @@ export default function PosTerminalPage() {
 
   const scanInputRef = useRef<HTMLInputElement>(null);
 
-  // If no terminal open, redirect to shift page
-  useEffect(() => {
-    if (terminal === null) {
-      const timer = setTimeout(() => router.push("/shift"), 800);
-      return () => clearTimeout(timer);
-    }
-  }, [terminal, router]);
+  // No redirect — ShiftOpenModal blocks the page until a shift is opened.
 
   // Auto-focus scan bar on mount
   useEffect(() => {
@@ -242,14 +241,16 @@ export default function PosTerminalPage() {
 
   const handleRemove = useCallback(
     (drugCode: string) => {
-      removeItem(drugCode);
-      setUnsyncedCodes((prev) => {
-        const next = new Set(prev);
-        next.delete(drugCode);
-        return next;
+      requestOverride("حذف صنف من السلة", () => {
+        removeItem(drugCode);
+        setUnsyncedCodes((prev) => {
+          const next = new Set(prev);
+          next.delete(drugCode);
+          return next;
+        });
       });
     },
-    [removeItem],
+    [removeItem, requestOverride],
   );
 
   // ----- Voucher flow -----
@@ -430,16 +431,6 @@ export default function PosTerminalPage() {
   }, [router]);
 
   // ---- Render ----
-
-  if (!terminal) {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <div className="text-center text-text-secondary">
-          <p className="text-sm">No terminal open. Redirecting to shift…</p>
-        </div>
-      </div>
-    );
-  }
 
   const isOffline = !offline.isOnline;
   const averageItem = itemCount > 0 ? grandTotal / itemCount : 0;
@@ -691,6 +682,21 @@ export default function PosTerminalPage() {
           setPharmacistOpen(false);
           setPendingDrug(null);
         }}
+      />
+
+      {/* D5 — shift-open gate (shown when there is no active terminal session) */}
+      {!terminal && (
+        <ShiftOpenModal
+          onOpened={(session) => setTerminal(session)}
+        />
+      )}
+
+      {/* D5 — manager PIN gate for destructive cart actions */}
+      <ManagerPinOverrideModal
+        open={overrideOpen}
+        actionLabel={overrideLabel}
+        onApproved={approveOverride}
+        onCancel={cancelOverride}
       />
     </div>
   );
