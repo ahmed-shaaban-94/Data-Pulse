@@ -159,7 +159,7 @@ def test_eligible_base_scope_category_sums_only_matching_clusters() -> None:
 
 
 def test_eligible_base_scope_brand_sums_only_matching_brands() -> None:
-    """Brand scope (migration 101) — case-insensitive match on drug_brand."""
+    """Brand scope (migration 104) — case-insensitive match on drug_brand."""
     promo = _promo(scope=PromotionScope.brand, scope_brands=["Bayer", "GSK"])
     items = _items(
         ("A", None, Decimal("2"), Decimal("15"), "BAYER"),  # case-insensitive → 30

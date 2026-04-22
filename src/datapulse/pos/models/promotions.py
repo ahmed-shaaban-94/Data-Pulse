@@ -23,7 +23,7 @@ class PromotionScope(StrEnum):
     """Which cart items a promotion may be applied against.
 
     ``brand`` matches against ``dim_product.drug_brand`` — added in
-    migration 101 as an extension of the original (091) scope enum.
+    migration 104 as an extension of the original (091) scope enum.
     ``active_ingredient`` is not yet supported — that scope needs the
     product dimension to gain an ``active_ingredient`` column first
     (tracked as a separate follow-up ticket).
@@ -147,7 +147,7 @@ class EligibleCartItem(BaseModel):
     """One cart line sent to ``POST /pos/promotions/eligible`` for scoring.
 
     ``drug_brand`` is optional; when null the line simply cannot match a
-    ``scope='brand'`` promotion (added in migration 101).
+    ``scope='brand'`` promotion (added in migration 104).
     """
 
     model_config = ConfigDict(frozen=True)

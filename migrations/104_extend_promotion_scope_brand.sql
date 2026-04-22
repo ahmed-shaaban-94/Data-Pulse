@@ -1,4 +1,4 @@
--- Migration: 101 — extend pos.promotions scope enum with 'brand'
+-- Migration: 104 — extend pos.promotions scope enum with 'brand'
 -- Layer: POS operational (extension to migration 091).
 -- Idempotent.
 --
@@ -70,4 +70,4 @@ GRANT SELECT                           ON TABLE pos.promotion_brands TO datapuls
 COMMENT ON TABLE pos.promotion_brands IS
     'Brand-scope target rows for pos.promotions. Matched against '
     'public_marts.dim_product.drug_brand at eligibility time. Added in '
-    'migration 101 as an extension of the original scope enum (091).';
+    'migration 104 as an extension of the original scope enum (091).';

@@ -168,7 +168,7 @@ def test_set_status_active_runs_update() -> None:
         _mock_exec(_row(id=7, status="active")),  # main SELECT
         _mock_exec([]),  # scope_items
         _mock_exec([]),  # scope_categories
-        _mock_exec([]),  # scope_brands (migration 101)
+        _mock_exec([]),  # scope_brands (migration 104)
         _mock_exec({"n": 0, "total": Decimal("0")}),  # usage_stats
     ]
     repo = PromotionRepository(session)
@@ -199,7 +199,7 @@ def test_lock_for_application_raises_on_paused() -> None:
         _mock_exec(_row(status="paused")),
         _mock_exec([]),  # scope_items
         _mock_exec([]),  # scope_categories
-        _mock_exec([]),  # scope_brands (migration 101)
+        _mock_exec([]),  # scope_brands (migration 104)
     ]
     repo = PromotionRepository(session)
     with pytest.raises(HTTPException) as exc:
@@ -214,7 +214,7 @@ def test_lock_for_application_raises_on_expired_window() -> None:
         _mock_exec(_row(status="active", starts_at=past - timedelta(days=5), ends_at=past)),
         _mock_exec([]),  # scope_items
         _mock_exec([]),  # scope_categories
-        _mock_exec([]),  # scope_brands (migration 101)
+        _mock_exec([]),  # scope_brands (migration 104)
     ]
     repo = PromotionRepository(session)
     with pytest.raises(HTTPException) as exc:
@@ -228,7 +228,7 @@ def test_lock_for_application_succeeds_for_active_in_window() -> None:
         _mock_exec(_row(status="active")),
         _mock_exec([]),  # scope_items
         _mock_exec([]),  # scope_categories
-        _mock_exec([]),  # scope_brands (migration 101)
+        _mock_exec([]),  # scope_brands (migration 104)
     ]
     repo = PromotionRepository(session)
     promo = repo.lock_for_application(1, 42, datetime.now(UTC))

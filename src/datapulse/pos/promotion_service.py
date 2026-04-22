@@ -169,7 +169,7 @@ class PromotionService:
                 ),
                 Decimal("0"),
             )
-        # brand (migration 101)
+        # brand (migration 104)
         brands = {b.lower() for b in promo.scope_brands}
         return sum(
             (
