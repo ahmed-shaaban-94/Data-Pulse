@@ -16,7 +16,13 @@
  *   />
  */
 
-import { useEffect, useRef, useState } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type ChangeEvent,
+} from "react";
 import { Lock, Loader2 } from "lucide-react";
 import { postAPI } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
@@ -82,7 +88,7 @@ export function ManagerPinOverrideModal({
     }
   }
 
-  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+  function handleKeyDown(e: ReactKeyboardEvent<HTMLInputElement>) {
     if (e.key === "Enter") {
       e.preventDefault();
       void handleVerify();
@@ -92,7 +98,7 @@ export function ManagerPinOverrideModal({
     }
   }
 
-  function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
+  function handleChange(e: ChangeEvent<HTMLInputElement>) {
     const val = e.target.value.replace(/\D/g, "").slice(0, 6);
     setError(null);
     setPin(val);

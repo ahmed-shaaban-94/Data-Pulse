@@ -9,7 +9,7 @@
  * the new session in localStorage and calls `onOpened`.
  */
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { Banknote, Loader2 } from "lucide-react";
 import { openTerminal } from "@/hooks/use-pos-terminal";
 import { cn } from "@/lib/utils";
@@ -58,7 +58,7 @@ export function ShiftOpenModal({
     }
   }
 
-  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+  function handleKeyDown(e: ReactKeyboardEvent<HTMLInputElement>) {
     if (e.key === "Enter") {
       e.preventDefault();
       void handleOpen();
