@@ -26,9 +26,6 @@
         "./src/*"
       ]
     },
-    "types": [
-      "vitest/globals"
-    ],
     "target": "ES2017"
   },
   "include": [
