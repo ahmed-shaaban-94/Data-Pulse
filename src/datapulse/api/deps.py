@@ -569,3 +569,13 @@ def get_first_insight_service(
             lambda tid: fetch_top_seller_candidate(session, tid),
         ],
     )
+
+
+def get_drug_master_service(
+    session: Annotated[Session, Depends(get_tenant_session)],
+):
+    """Factory for :class:`DrugMasterService` — wires repository to service."""
+    from datapulse.pharma.repository import DrugMasterRepository
+    from datapulse.pharma.service import DrugMasterService
+
+    return DrugMasterService(DrugMasterRepository(session))
