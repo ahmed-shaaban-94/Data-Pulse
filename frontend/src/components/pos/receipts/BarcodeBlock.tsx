@@ -1,39 +1,43 @@
 "use client";
 
-import bwipjs from "bwip-js";
-import { useEffect, useRef } from "react";
+// bwip-js exposes toSVG at runtime but @types/bwip-js omits it.
+// The cast is intentional and tested against the installed package version.
+import bwipjsLib from "bwip-js";
+
+const bwipjs = bwipjsLib as typeof bwipjsLib & {
+  toSVG: (opts: Record<string, unknown>) => string;
+};
 
 interface BarcodeBlockProps {
   value: string;
 }
 
 export function BarcodeBlock({ value }: BarcodeBlockProps) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas || !value) return;
+  let svgHtml = "";
+  if (value) {
     try {
-      bwipjs.toCanvas(canvas, {
+      svgHtml = bwipjs.toSVG({
         bcid: "code128",
         text: value,
         scale: 2,
-        height: 14,       // ~56px at scale 2 (203 DPI thermal target)
+        height: 14,       // ~56px at 203 DPI thermal target
         includetext: false,
-        textxalign: "center",
       });
     } catch {
       // Silently ignore render errors (e.g. invalid barcode chars)
     }
-  }, [value]);
+  }
 
   return (
     <div className="mb-3 flex flex-col items-center gap-1" dir="ltr">
-      <canvas
-        ref={canvasRef}
-        aria-label={`Barcode for ${value}`}
-        style={{ display: "block" }}
-      />
+      {svgHtml ? (
+        <span
+          // eslint-disable-next-line react/no-danger
+          dangerouslySetInnerHTML={{ __html: svgHtml }}
+          aria-label={`Barcode for ${value}`}
+          style={{ display: "block", lineHeight: 0 }}
+        />
+      ) : null}
       <div
         style={{
           fontFamily: "var(--font-jetbrains-mono, monospace)",
