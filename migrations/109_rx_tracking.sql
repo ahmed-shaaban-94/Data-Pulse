@@ -127,13 +127,16 @@ DO $$ BEGIN
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- 6. Grants
+-- 6. Grants (guarded — role may not exist in all environments)
 -- ─────────────────────────────────────────────────────────────────────────────
 
-GRANT SELECT, INSERT, UPDATE ON TABLE rx.prescriptions      TO datapulse_api;
-GRANT SELECT, INSERT, UPDATE ON TABLE rx.prescription_items TO datapulse_api;
-GRANT SELECT, INSERT, UPDATE ON TABLE rx.dispense_events    TO datapulse_api;
-
-GRANT USAGE, SELECT ON SEQUENCE rx.prescriptions_id_seq      TO datapulse_api;
-GRANT USAGE, SELECT ON SEQUENCE rx.prescription_items_id_seq TO datapulse_api;
-GRANT USAGE, SELECT ON SEQUENCE rx.dispense_events_id_seq    TO datapulse_api;
+DO $$ BEGIN
+    IF EXISTS (SELECT FROM pg_roles WHERE rolname = 'datapulse_api') THEN
+        GRANT SELECT, INSERT, UPDATE ON TABLE rx.prescriptions                 TO datapulse_api;
+        GRANT SELECT, INSERT, UPDATE ON TABLE rx.prescription_items            TO datapulse_api;
+        GRANT SELECT, INSERT, UPDATE ON TABLE rx.dispense_events               TO datapulse_api;
+        GRANT USAGE, SELECT ON SEQUENCE rx.prescriptions_id_seq               TO datapulse_api;
+        GRANT USAGE, SELECT ON SEQUENCE rx.prescription_items_id_seq          TO datapulse_api;
+        GRANT USAGE, SELECT ON SEQUENCE rx.dispense_events_id_seq             TO datapulse_api;
+    END IF;
+END $$;

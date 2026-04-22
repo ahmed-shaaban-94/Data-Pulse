@@ -160,15 +160,18 @@ DO $$ BEGIN
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- 7. Grants
+-- 7. Grants (guarded — role may not exist in all environments)
 -- ─────────────────────────────────────────────────────────────────────────────
 
-GRANT SELECT, INSERT, UPDATE ON TABLE insurance.insurance_companies TO datapulse_api;
-GRANT SELECT, INSERT, UPDATE ON TABLE insurance.insurance_plans      TO datapulse_api;
-GRANT SELECT, INSERT, UPDATE ON TABLE insurance.claims               TO datapulse_api;
-GRANT SELECT, INSERT, UPDATE ON TABLE insurance.claim_items          TO datapulse_api;
-
-GRANT USAGE, SELECT ON SEQUENCE insurance.insurance_companies_id_seq TO datapulse_api;
-GRANT USAGE, SELECT ON SEQUENCE insurance.insurance_plans_id_seq     TO datapulse_api;
-GRANT USAGE, SELECT ON SEQUENCE insurance.claims_id_seq              TO datapulse_api;
-GRANT USAGE, SELECT ON SEQUENCE insurance.claim_items_id_seq         TO datapulse_api;
+DO $$ BEGIN
+    IF EXISTS (SELECT FROM pg_roles WHERE rolname = 'datapulse_api') THEN
+        GRANT SELECT, INSERT, UPDATE ON TABLE insurance.insurance_companies       TO datapulse_api;
+        GRANT SELECT, INSERT, UPDATE ON TABLE insurance.insurance_plans           TO datapulse_api;
+        GRANT SELECT, INSERT, UPDATE ON TABLE insurance.claims                    TO datapulse_api;
+        GRANT SELECT, INSERT, UPDATE ON TABLE insurance.claim_items               TO datapulse_api;
+        GRANT USAGE, SELECT ON SEQUENCE insurance.insurance_companies_id_seq      TO datapulse_api;
+        GRANT USAGE, SELECT ON SEQUENCE insurance.insurance_plans_id_seq          TO datapulse_api;
+        GRANT USAGE, SELECT ON SEQUENCE insurance.claims_id_seq                   TO datapulse_api;
+        GRANT USAGE, SELECT ON SEQUENCE insurance.claim_items_id_seq              TO datapulse_api;
+    END IF;
+END $$;

@@ -9,6 +9,7 @@ import { InvoiceModal } from "@/components/pos/InvoiceModal";
 import { OfflineBadge } from "@/components/pos/OfflineBadge";
 import { SalesReceipt } from "@/components/pos/receipts/SalesReceipt";
 import { InsuranceReceipt } from "@/components/pos/receipts/InsuranceReceipt";
+import { DeliveryReceipt } from "@/components/pos/receipts/DeliveryReceipt";
 import { usePosCart } from "@/hooks/use-pos-cart";
 import { usePosCheckout } from "@/hooks/use-pos-checkout";
 import { fetchAPI, postAPI } from "@/lib/api-client";
@@ -28,6 +29,11 @@ interface PendingCheckout {
   transactionId: number;
   method: PaymentMethod;
   insuranceNo?: string;
+  isDelivery?: boolean;
+  deliveryAddress?: string;
+  deliveryRider?: string;
+  deliveryRiderPhone?: string;
+  deliveryEta?: number;
 }
 
 function buildReceiptData(
@@ -35,6 +41,7 @@ function buildReceiptData(
   result: CheckoutResponse,
   cashierName: string,
   insuranceNo?: string,
+  pendingDelivery?: Pick<PendingCheckout, "deliveryAddress" | "deliveryRider" | "deliveryRiderPhone" | "deliveryEta">,
 ): ReceiptData {
   const ts = new Date(txn.created_at);
   const data: ReceiptData = {
@@ -84,6 +91,15 @@ function buildReceiptData(
       insurer_amount: 0,
       patient_pct: 100,
       patient_amount: txn.grand_total,
+    };
+  }
+
+  if (pendingDelivery?.deliveryAddress) {
+    data.delivery = {
+      address: pendingDelivery.deliveryAddress,
+      rider_name: pendingDelivery.deliveryRider ?? "",
+      rider_phone: pendingDelivery.deliveryRiderPhone ?? "",
+      eta_minutes: pendingDelivery.deliveryEta ?? 30,
     };
   }
 
@@ -221,8 +237,10 @@ export default function CheckoutPage() {
       result,
       cashierName,
       pending?.insuranceNo,
+      pending ?? undefined,
     );
     const isInsurance = txnDetail.payment_method === "insurance";
+    const isDelivery = pending?.isDelivery === true;
 
     return (
       <div className="pos-root flex min-h-screen flex-col">
@@ -289,6 +307,8 @@ export default function CheckoutPage() {
           <div className="pos-print-root pos-omni">
             {isInsurance ? (
               <InsuranceReceipt data={receiptData} />
+            ) : isDelivery ? (
+              <DeliveryReceipt data={receiptData} />
             ) : (
               <SalesReceipt data={receiptData} />
             )}
