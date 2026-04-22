@@ -29,6 +29,15 @@ const jetbrainsMono = JetBrains_Mono({
   display: "swap",
 });
 
+// IBM Plex Sans Arabic = Arabic body copy on the POS + receipt surfaces
+// (cart item names, counseling text, customer names, thanks footer).
+const plexArabic = IBM_Plex_Sans_Arabic({
+  subsets: ["arabic"],
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-plex-arabic",
+  display: "swap",
+});
+
 /** Block children until session is resolved; redirect on refresh failure. */
 function SessionGuard({ children }: { children: ReactNode }) {
   const { data: session, status } = useSession();
@@ -111,7 +120,7 @@ export default function PosLayout({ children }: { children: ReactNode }) {
                   <RendererCrashBridge>
                     <PosKeyboardHandler>
                       <div
-                        className={`${fraunces.variable} ${jetbrainsMono.variable} flex min-h-screen flex-col overflow-hidden bg-background text-foreground`}
+                        className={`pos-omni ${fraunces.variable} ${jetbrainsMono.variable} ${plexArabic.variable} flex min-h-screen flex-col overflow-hidden bg-[var(--pos-bg)] text-[var(--pos-ink)]`}
                       >
                         {children}
                       </div>

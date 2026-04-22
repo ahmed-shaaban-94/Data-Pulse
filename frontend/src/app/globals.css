@@ -1191,3 +1191,217 @@ html {
     animation: none !important;
   }
 }
+
+/* ═══════════════════════════════════════════════════════════════════
+   POS Omni Edition — v9 design system additions
+   -------------------------------------------------------------------
+   Scoped to `.pos-omni`, mounted on the (pos) route group layout.
+   DESIGN NOTE: the base POS tokens already exist under `.pos-root`
+   (globals.css ~line 1086). This block is ADDITIVE — it only adds
+   tokens the v9 handoff needs that are not in `.pos-root`, plus new
+   surface/editorial primitives. Re-using existing names (--pos-bg,
+   --pos-accent, --pos-ink, --pos-card, --pos-paper, etc.) to stay
+   compatible with the 22+ files that already consume them.
+   ═══════════════════════════════════════════════════════════════════ */
+.pos-omni {
+  /* Base tokens — mirror .pos-root so pages inside (pos) that don't
+     wrap a .pos-root element still get the Omni palette. Values are
+     identical to .pos-root to avoid split-brain. */
+  --pos-bg: #050e17;
+  --pos-card: #081826;
+  --pos-gradient-top: #163452;
+  --pos-ink: #e8ecf2;
+  --pos-ink-2: #b8c0cc;
+  --pos-ink-3: #7a8494;
+  --pos-ink-4: #3f4a5a;
+  --pos-line: rgba(255, 255, 255, 0.06);
+  --pos-line-strong: rgba(255, 255, 255, 0.12);
+  --pos-accent: #00c7f2;
+  --pos-accent-hi: #5cdfff;
+  --pos-green: #1dd48b;
+  --pos-amber: #ffab3d;
+  --pos-red: #ff7b7b;
+  --pos-purple: #7467f8;
+
+  /* v9 additions — new surface scale for panes, inner panels, dim rules */
+  --pos-panel: #0c1f30;
+  --pos-panel-2: #102a43;
+  --pos-elevated: #163452;
+  --pos-line-dim: #122a40;
+
+  /* v9 additions — gold for commission / bonus / AI cross-sell
+     (the "commission is ambient" editorial principle) */
+  --pos-gold: #d4af37;
+  --pos-accent-deep: #0b7da1;
+
+  /* Receipt paper — v9 handoff values (warm off-white, near-black ink).
+     These override .pos-root's paper tokens (which were targeted at A4
+     invoice modals) when inside a .pos-omni .pos-receipt element.
+     Kept distinct via `--pos-paper-*` names, not `--pos-ink` which is
+     reserved for the dark-surface foreground text color. */
+  --pos-paper: #f5f2ec;
+  --pos-paper-ink: #1a1814;
+  --pos-paper-ink-2: #5a5650;
+  --pos-paper-ink-faint: #a8a098;
+  --pos-paper-highlight: #ffd967;
+  --pos-paper-red: #c14a4a;
+
+  /* Radii */
+  --pos-radius-sm: 8px;
+  --pos-radius-md: 12px;
+  --pos-radius-lg: 14px;
+  --pos-radius-card: 20px;
+  --pos-radius-hero: 24px;
+
+  /* Shadows */
+  --pos-shadow-terminal: 0 40px 80px rgba(0, 0, 0, 0.4),
+    0 0 0 1px rgba(0, 199, 242, 0.05);
+  --pos-shadow-cta: 0 10px 30px rgba(0, 199, 242, 0.25);
+  --pos-shadow-cta-hover: 0 16px 40px rgba(0, 199, 242, 0.4);
+  --pos-shadow-grand-total: 0 0 30px rgba(0, 199, 242, 0.3);
+  --pos-shadow-receipt: 0 30px 60px -20px rgba(0, 0, 0, 0.5);
+
+  /* Font family utilities — wired to next/font variables loaded by (pos)/layout.tsx */
+  --pos-font-arabic: var(--font-plex-arabic), "IBM Plex Sans Arabic",
+    "Segoe UI", system-ui, sans-serif;
+  --pos-font-sans: "Inter Variable", Inter, "Segoe UI", system-ui, sans-serif;
+  --pos-font-mono: var(--font-jetbrains-mono), "JetBrains Mono",
+    ui-monospace, SFMono-Regular, Menlo, monospace;
+  --pos-font-display: var(--font-fraunces), Fraunces, ui-serif, Georgia,
+    "Times New Roman", serif;
+}
+
+/* Utility atoms scoped to .pos-omni — opt-in, do not globally override */
+.pos-omni .font-arabic {
+  font-family: var(--pos-font-arabic);
+}
+.pos-omni .font-display {
+  font-family: var(--pos-font-display);
+  font-feature-settings: "ss01", "ss02";
+}
+.pos-omni .font-mono {
+  font-family: var(--pos-font-mono);
+  font-variant-ligatures: none;
+}
+
+/* Signature "one serif moment" — grand totals + invoice hero */
+.pos-omni .pos-grand-total {
+  font-family: var(--pos-font-display);
+  font-weight: 800;
+  color: var(--pos-accent-hi);
+  text-shadow: var(--pos-shadow-grand-total);
+  letter-spacing: -0.02em;
+}
+
+/* Editorial eyebrow — uppercase mono 10px with wide tracking */
+.pos-omni .pos-eyebrow {
+  font-family: var(--pos-font-mono);
+  font-size: 0.625rem; /* 10px */
+  font-weight: 600;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--pos-ink-3);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   POS Receipt — thermal 80mm paper surface
+   -------------------------------------------------------------------
+   Use on the outermost receipt div. Controls paper color, ink, torn
+   edges (on-screen only), and print degradation.
+   ═══════════════════════════════════════════════════════════════════ */
+.pos-omni .pos-receipt {
+  position: relative;
+  width: 320px;
+  max-width: 80mm;
+  background: var(--pos-paper);
+  color: var(--pos-paper-ink);
+  padding: 22px 20px 26px;
+  box-shadow: var(--pos-shadow-receipt);
+  font-family: var(--pos-font-mono);
+  font-size: 10.5px;
+  line-height: 1.4;
+}
+
+/* Subtle thermal-texture scan lines — on-screen only, stripped at print */
+.pos-omni .pos-receipt::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 0.015) 0,
+    rgba(0, 0, 0, 0.015) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+}
+
+/* Torn-edge pseudo is toggled via data-torn-edge on decorative element;
+   see ReceiptPaper.tsx. We intentionally suppress in print — see @media below. */
+
+/* Inverted-ink block — pharmacist counseling / note to rider */
+.pos-omni .pos-ink-block {
+  background: var(--pos-paper-ink);
+  color: var(--pos-paper);
+  border-radius: 6px;
+  padding: 10px 12px;
+}
+.pos-omni .pos-ink-block [data-highlight] {
+  color: var(--pos-paper-highlight);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   Print pipeline — 80mm thermal roll
+   -------------------------------------------------------------------
+   Only the element with class `.pos-receipt` should print; everything
+   else is suppressed. Color-adjust forces the inverted counsel block
+   to render as solid black ink.
+   ═══════════════════════════════════════════════════════════════════ */
+@media print {
+  @page {
+    size: 80mm auto;
+    margin: 0;
+  }
+
+  html,
+  body {
+    background: #ffffff !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* Hide everything that is not an ancestor of .pos-receipt */
+  body > *:not(.pos-print-root),
+  .pos-print-root > *:not(.pos-receipt):not(.pos-receipt-wrap) {
+    display: none !important;
+  }
+
+  .pos-no-print,
+  [data-no-print="true"] {
+    display: none !important;
+  }
+
+  .pos-omni .pos-receipt {
+    box-shadow: none !important;
+    width: 80mm !important;
+    max-width: 80mm !important;
+    padding: 4mm 4mm 6mm !important;
+    color: #000 !important;
+    background: #fff !important;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  .pos-omni .pos-receipt::before,
+  .pos-omni .pos-receipt [data-torn-edge] {
+    display: none !important;
+  }
+
+  .pos-omni .pos-receipt .pos-ink-block {
+    background: #000 !important;
+    color: #fff !important;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+}
