@@ -10,7 +10,7 @@
  * C2 replaces them with qrcode.react + bwip-js.
  */
 
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import type { ReceiptData, ReceiptItem, InsuranceInfo, DeliveryInfo } from "./receipt-mock";
 
 // ─── Shared helpers ────────────────────────────────────────────────────────────
@@ -113,12 +113,12 @@ interface MetaGridProps {
 }
 
 export function MetaGrid({ invoiceNumber, date, time, shiftId, cashierName }: MetaGridProps) {
-  const mono: React.CSSProperties = {
+  const mono: CSSProperties = {
     fontFamily: "var(--font-jetbrains-mono, monospace)",
     fontSize: 10.5,
   };
-  const label: React.CSSProperties = { ...mono, color: "var(--pos-paper-ink-2)" };
-  const value: React.CSSProperties = { ...mono, color: "var(--pos-paper-ink)", fontWeight: 600 };
+  const label: CSSProperties = { ...mono, color: "var(--pos-paper-ink-2)" };
+  const value: CSSProperties = { ...mono, color: "var(--pos-paper-ink)", fontWeight: 600 };
 
   return (
     <div className="mb-3" style={{ borderBottom: "1px dashed var(--pos-paper-ink-2)", paddingBottom: 8 }}>
@@ -267,7 +267,7 @@ interface TotalsBlockProps {
 }
 
 export function TotalsBlock({ subtotal, discount, vat = 0 }: TotalsBlockProps) {
-  const row: React.CSSProperties = {
+  const row: CSSProperties = {
     display: "flex",
     justifyContent: "space-between",
     fontFamily: "var(--font-jetbrains-mono, monospace)",
