@@ -1,0 +1,306 @@
+/* ============================================================
+   DataPulse Design System — colors_and_type.css
+   ============================================================
+   Sourced from frontend/src/app/globals.css in the Data-Pulse
+   repository. This file exposes the DataPulse palette and type
+   scale as plain CSS variables and semantic element styles, so
+   it can be dropped into any HTML artifact.
+   ============================================================ */
+
+@import url("https://rsms.me/inter/inter.css");
+
+/* ─────────────────────────────────────────────────────────────
+   BASE TOKENS — Light (default)
+   ───────────────────────────────────────────────────────────── */
+:root {
+  /* Surfaces */
+  --dp-bg-page:         #f3f7fb;
+  --dp-bg-card:         #ffffff;
+  --dp-bg-elevated:     #fbfdff;
+  --dp-panel-soft:      #f5f9fd;
+  --dp-surface-strong:  #eaf2fb;
+
+  /* Borders & dividers */
+  --dp-border:          #d7e2ec;
+  --dp-divider:         #d9e5f0;
+
+  /* Foreground */
+  --dp-fg-primary:      #102a43;  /* near-navy: primary body/heading */
+  --dp-fg-secondary:    #627d98;  /* muted slate-blue: labels, captions */
+
+  /* Brand accents — "Data-pulse" cyan */
+  --dp-accent:          #00c7f2;  /* primary action, live indicators */
+  --dp-accent-strong:   #0b7da1;  /* pressed/hover link */
+
+  /* Chart palette (8-series) — Recharts */
+  --dp-chart-1:         #1cb9e7;  /* cyan      */
+  --dp-chart-2:         #1cc985;  /* mint      */
+  --dp-chart-3:         #ffab3d;  /* amber     */
+  --dp-chart-4:         #6f61f6;  /* violet    */
+  --dp-chart-5:         #f46d75;  /* coral     */
+  --dp-chart-6:         #18a4d0;  /* deep cyan */
+  --dp-chart-7:         #ffc94a;  /* gold      */
+  --dp-chart-8:         #31567d;  /* navy      */
+
+  /* Growth (semantic) */
+  --dp-growth-green:    #1cc985;
+  --dp-growth-green-rgb: 28, 201, 133;
+  --dp-growth-red:      #f46d75;
+  --dp-growth-red-rgb:  244, 109, 117;
+
+  /* Radii */
+  --dp-radius-sm:       0.5rem;
+  --dp-radius-md:       0.75rem;
+  --dp-radius-lg:       1rem;
+  --dp-radius-card:     1.5rem;
+  --dp-radius-hero:     1.75rem;
+  --dp-radius-full:     9999px;
+
+  /* Spacing scale (Tailwind-aligned) */
+  --dp-space-1: 0.25rem;
+  --dp-space-2: 0.5rem;
+  --dp-space-3: 0.75rem;
+  --dp-space-4: 1rem;
+  --dp-space-5: 1.25rem;
+  --dp-space-6: 1.5rem;
+  --dp-space-8: 2rem;
+  --dp-space-10: 2.5rem;
+  --dp-space-12: 3rem;
+
+  /* Shadows */
+  --dp-shadow-sm:  0 1px 2px rgba(16, 42, 67, 0.06);
+  --dp-shadow-md:  0 8px 24px rgba(16, 42, 67, 0.08);
+  --dp-shadow-lg:  0 18px 50px rgba(16, 42, 67, 0.08),
+                   inset 0 1px 0 rgba(255, 255, 255, 0.35);
+  --dp-shadow-hero:0 30px 120px rgba(0, 0, 0, 0.25);
+  --dp-shadow-accent: 0 22px 65px rgba(0, 199, 242, 0.18),
+                     0 0 0 1px rgba(0, 199, 242, 0.22),
+                     inset 0 1px 0 rgba(255, 255, 255, 0.45);
+
+  /* Typography */
+  --dp-font-sans: "Inter Variable", "Inter", "Segoe UI", system-ui, -apple-system,
+                  "Helvetica Neue", Arial, sans-serif;
+  --dp-font-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+  --dp-font-ar:   "Cairo", "Tajawal", var(--dp-font-sans);  /* Arabic (RTL) */
+}
+
+/* ─────────────────────────────────────────────────────────────
+   DARK THEME — "midnight-pharma"
+   ───────────────────────────────────────────────────────────── */
+.dp-dark,
+[data-theme="dark"],
+.marketing-dark {
+  --dp-bg-page:        #081826;
+  --dp-bg-card:        #102a43;
+  --dp-bg-elevated:    #163452;
+  --dp-panel-soft:     #1a3550;
+  --dp-surface-strong: #243b53;
+  --dp-border:         #33506b;
+  --dp-divider:        #46627c;
+  --dp-fg-primary:     #f7fbff;
+  --dp-fg-secondary:   #b8c0cc;
+  --dp-accent:         #00c7f2;
+  --dp-accent-strong:  #5cdfff;
+  --dp-chart-1: #20bce5;
+  --dp-chart-2: #1dd48b;
+  --dp-chart-3: #ffab3d;
+  --dp-chart-4: #7467f8;
+  --dp-chart-5: #ff7b7b;
+  --dp-chart-6: #70e1ff;
+  --dp-chart-7: #ffd166;
+  --dp-chart-8: #627d98;
+  --dp-growth-green: #1dd48b;
+  --dp-growth-green-rgb: 29, 212, 139;
+  --dp-growth-red:   #ff7b7b;
+  --dp-growth-red-rgb: 255, 123, 123;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   TYPE — base + semantic element styles
+   ───────────────────────────────────────────────────────────── */
+html, body {
+  font-family: var(--dp-font-sans);
+  color: var(--dp-fg-primary);
+  background: var(--dp-bg-page);
+  -webkit-font-smoothing: antialiased;
+  font-feature-settings: "cv11", "ss01";
+}
+
+/* Display / Hero (marketing) */
+.dp-display,
+h1 {
+  font-size: clamp(2.5rem, 5.2vw, 4.5rem);
+  line-height: 1.02;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--dp-fg-primary);
+}
+
+/* Section heading */
+.dp-h2, h2 {
+  font-size: clamp(1.75rem, 2.4vw, 2.25rem);
+  line-height: 1.15;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+}
+
+/* Card/panel heading */
+.dp-h3, h3 {
+  font-size: 1.25rem;
+  line-height: 1.3;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+/* Sub-heading */
+.dp-h4, h4 {
+  font-size: 1rem;
+  line-height: 1.35;
+  font-weight: 600;
+}
+
+/* Body */
+.dp-body, p, li {
+  font-size: 1rem;
+  line-height: 1.55;
+  color: var(--dp-fg-primary);
+}
+.dp-body-lg { font-size: 1.125rem; line-height: 1.55; }
+.dp-body-sm { font-size: 0.875rem; line-height: 1.5; }
+
+/* Muted / secondary */
+.dp-muted { color: var(--dp-fg-secondary); }
+
+/* Micro-label — used pervasively on KPIs/panels */
+.dp-eyebrow {
+  font-size: 0.6875rem;                 /* 11px */
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.22em;
+  color: var(--dp-fg-secondary);
+}
+
+/* Mono */
+.dp-mono, code, pre, kbd {
+  font-family: var(--dp-font-mono);
+  font-variant-ligatures: none;
+  font-size: 0.9em;
+}
+
+/* Tabular numbers — KPIs, tables */
+.dp-tabular,
+td, th,
+[data-kpi-value],
+.recharts-text {
+  font-variant-numeric: tabular-nums;
+}
+
+/* KPI value (hero) */
+.dp-kpi {
+  font-size: 2.2rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+  color: var(--dp-fg-primary);
+}
+
+/* Growth pill */
+.dp-pill-up   { color: var(--dp-growth-green); }
+.dp-pill-down { color: var(--dp-growth-red); }
+
+/* Gradient text (hero accent — marketing) */
+.dp-gradient-text {
+  background: linear-gradient(135deg, #D97706, #4F46E5);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.dp-gradient-text-animated {
+  background: linear-gradient(90deg, #FF4500, #F59E0B, #3B82F6, #FF4500);
+  background-size: 300% 100%;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: dpGradientShift 6s ease-in-out infinite;
+}
+@keyframes dpGradientShift {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+/* ─────────────────────────────────────────────────────────────
+   SURFACE PRIMITIVES — viz panels (the signature DataPulse look)
+   ───────────────────────────────────────────────────────────── */
+.dp-viz-panel {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--dp-border) 88%, white);
+  background: linear-gradient(180deg,
+    color-mix(in srgb, var(--dp-bg-card) 92%, white 8%) 0%,
+    var(--dp-bg-card) 100%);
+  box-shadow:
+    0 18px 60px rgba(16, 42, 67, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  border-radius: var(--dp-radius-card);
+}
+.dp-viz-panel::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(circle at top right,
+    color-mix(in srgb, var(--dp-accent) 15%, transparent), transparent 35%);
+  opacity: 0.9;
+}
+.dp-viz-panel-soft {
+  border: 1px solid color-mix(in srgb, var(--dp-border) 80%, white);
+  background: color-mix(in srgb, var(--dp-panel-soft) 86%, white 14%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28);
+  border-radius: var(--dp-radius-lg);
+}
+.dp-viz-card-hover {
+  transition: transform .28s ease, box-shadow .28s ease, border-color .28s ease;
+}
+.dp-viz-card-hover:hover {
+  transform: translateY(-4px);
+  box-shadow:
+    0 24px 70px color-mix(in srgb, var(--dp-accent) 18%, transparent),
+    0 0 0 1px color-mix(in srgb, var(--dp-accent) 28%, transparent);
+  border-color: color-mix(in srgb, var(--dp-accent) 28%, var(--dp-border));
+}
+
+/* Top accent bar — used on KPI cards & hero panels */
+.dp-accent-bar {
+  position: absolute;
+  inset-inline: 1.25rem;
+  top: 0;
+  height: 4px;
+  border-radius: 0 0 999px 999px;
+  background: linear-gradient(90deg,
+    var(--dp-chart-1),
+    var(--dp-accent),
+    var(--dp-chart-4));
+}
+
+/* Grid-surface pattern used behind charts */
+.dp-viz-grid-surface {
+  background-image:
+    linear-gradient(to right, color-mix(in srgb, var(--dp-accent) 10%, transparent) 1px, transparent 1px),
+    linear-gradient(to bottom, color-mix(in srgb, var(--dp-accent) 10%, transparent) 1px, transparent 1px);
+  background-size: 44px 44px;
+}
+
+/* Ambient gradient background — app shell */
+.dp-ambient-bg {
+  background:
+    radial-gradient(circle at top left,
+      color-mix(in srgb, var(--dp-accent) 12%, transparent) 0%, transparent 30%),
+    radial-gradient(circle at 100% 10%,
+      color-mix(in srgb, var(--dp-chart-4) 8%, transparent) 0%, transparent 28%),
+    linear-gradient(180deg,
+      color-mix(in srgb, var(--dp-bg-page) 92%, white 8%) 0%,
+      var(--dp-bg-page) 52%,
+      color-mix(in srgb, var(--dp-bg-page) 88%, black 12%) 100%);
+}

@@ -1,0 +1,872 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<title>DataPulse — Thermal Receipts</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&family=Fraunces:wght@600;700;800&family=Libre+Barcode+128:wght@400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #050e17;
+    --bg-2: #081826;
+    --panel: #0c1f30;
+    --panel-2: #102a43;
+    --line: #1a3752;
+    --line-dim: #122a40;
+    --fg: #e8ecf2;
+    --fg-2: #b8c0cc;
+    --mute: #7a8494;
+    --dim: #5a6b7c;
+    --cyan: #00c7f2;
+    --cyan-hi: #5cdfff;
+    --gold: #d4af37;
+    --amber: #ffab3d;
+    --green: #1dd48b;
+    --red: #ff7b7b;
+    --violet: #7467f8;
+
+    /* Receipt paper */
+    --paper: #f5f2ec;
+    --ink: #1a1814;
+    --ink-2: #5a5650;
+    --ink-faint: #a8a098;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--bg); color: var(--fg);
+    font-family: "IBM Plex Sans Arabic", "Inter", system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .mono { font-family: "JetBrains Mono", ui-monospace, monospace; }
+
+  /* ─── CANVAS ─── */
+  .canvas {
+    padding: 48px 40px 64px;
+    background:
+      radial-gradient(ellipse at top left, rgba(0,199,242,.06), transparent 45%),
+      radial-gradient(ellipse at 80% 10%, rgba(212,175,55,.04), transparent 50%),
+      var(--bg);
+    min-height: 100vh;
+  }
+  .intro {
+    display: grid; grid-template-columns: 1fr auto; gap: 32px;
+    align-items: end; border-bottom: 1px solid var(--line);
+    padding-bottom: 24px; margin-bottom: 40px;
+    direction: ltr;
+  }
+  .intro .left { direction: rtl; }
+  .eyb {
+    display: inline-flex; align-items: center; gap: 12px;
+    font-family: "JetBrains Mono", monospace; font-size: 11px;
+    letter-spacing: .22em; text-transform: uppercase; color: var(--mute);
+  }
+  .eyb .n { color: var(--cyan); font-weight: 700; }
+  .eyb .rule { width: 28px; height: 1px; background: var(--line); }
+  .intro h1 {
+    margin: 14px 0 6px; font-family: "Fraunces", Georgia, serif;
+    font-weight: 800; letter-spacing: -0.03em; line-height: 1;
+    font-size: clamp(2.2rem, 3.6vw, 3rem); color: var(--fg);
+  }
+  .intro h1 em { font-style: italic; color: var(--gold); }
+  .intro p { margin: 0; max-width: 640px; color: var(--fg-2); font-size: 15px; line-height: 1.5; }
+  .intro .meta {
+    font-family: "JetBrains Mono", monospace; font-size: 10px; color: var(--dim);
+    letter-spacing: .16em; text-transform: uppercase; text-align: left;
+  }
+  .intro .meta div + div { margin-top: 4px; }
+
+  /* ─── RECEIPT RACK ─── */
+  .rack {
+    display: grid; grid-template-columns: repeat(3, 1fr);
+    gap: 48px; align-items: start;
+    margin-bottom: 48px;
+  }
+  .slot {
+    display: flex; flex-direction: column; align-items: center; gap: 18px;
+  }
+  .slot-head {
+    width: 100%; text-align: center;
+  }
+  .slot-head .tag {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 4px 12px; border-radius: 999px;
+    font-family: "JetBrains Mono", monospace; font-size: 10px;
+    letter-spacing: .2em; text-transform: uppercase; font-weight: 700;
+  }
+  .slot-head .tag.sales { background: rgba(0,199,242,.1); color: var(--cyan); border: 1px solid rgba(0,199,242,.3); }
+  .slot-head .tag.ins { background: rgba(116,103,248,.1); color: var(--violet); border: 1px solid rgba(116,103,248,.3); }
+  .slot-head .tag.deliv { background: rgba(29,212,139,.1); color: var(--green); border: 1px solid rgba(29,212,139,.3); }
+  .slot-head .dot { width: 5px; height: 5px; border-radius: 999px; background: currentColor; }
+  .slot-head h3 {
+    margin: 12px 0 6px; font-size: 22px; font-weight: 700; color: var(--fg);
+    font-family: "IBM Plex Sans Arabic", sans-serif; letter-spacing: -0.01em;
+  }
+  .slot-head p { margin: 0; font-size: 13px; color: var(--fg-2); line-height: 1.5; max-width: 280px; margin-inline: auto; }
+
+  /* ─── THERMAL PAPER ─── */
+  .receipt {
+    width: 320px;              /* ≈ 80mm at typical DPI */
+    background: var(--paper);
+    color: var(--ink);
+    padding: 22px 20px 0;
+    direction: rtl;
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 11.5px; line-height: 1.55;
+    position: relative;
+    box-shadow:
+      0 30px 60px -20px rgba(0,0,0,.5),
+      0 1px 0 rgba(255,255,255,.05) inset;
+    background-image:
+      repeating-linear-gradient(0deg, rgba(0,0,0,.015) 0 2px, transparent 2px 4px);
+  }
+  .receipt::before, .receipt::after {
+    content: ""; position: absolute; left: 0; right: 0; height: 14px;
+    background:
+      linear-gradient(-45deg, transparent 33%, var(--paper) 33%, var(--paper) 66%, transparent 66%) 0 0 / 14px 14px repeat-x;
+  }
+  .receipt::before { top: -13px; transform: scaleY(-1); }
+  .receipt::after { bottom: -13px; }
+
+  .receipt .inner { padding-bottom: 26px; }
+
+  .r-brand {
+    text-align: center; padding-bottom: 12px; border-bottom: 1px dashed var(--ink-2);
+  }
+  .r-brand .mark {
+    width: 38px; height: 38px; margin: 0 auto 8px;
+    border: 2px solid var(--ink); border-radius: 10px;
+    display: grid; place-items: center;
+  }
+  .r-brand .mark svg { width: 22px; height: 22px; }
+  .r-brand .nm {
+    font-family: "Inter", sans-serif; font-weight: 900;
+    font-size: 19px; letter-spacing: -.01em; color: var(--ink);
+  }
+  .r-brand .nm span { font-weight: 300; }
+  .r-brand .sub {
+    font-size: 9px; letter-spacing: .22em; text-transform: uppercase;
+    margin-top: 4px; color: var(--ink-2);
+  }
+  .r-brand .addr {
+    font-family: "IBM Plex Sans Arabic", sans-serif;
+    font-size: 11px; margin-top: 8px; color: var(--ink-2);
+  }
+  .r-brand .addr small { display: block; font-family: "JetBrains Mono", monospace; font-size: 9.5px; margin-top: 2px; letter-spacing: .04em; }
+
+  .r-meta {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 6px 14px;
+    padding: 12px 0; border-bottom: 1px dashed var(--ink-2);
+    font-size: 10.5px;
+  }
+  .r-meta .row { display: flex; justify-content: space-between; }
+  .r-meta .row b { color: var(--ink-2); font-weight: 500; }
+  .r-meta .row span { color: var(--ink); font-weight: 700; }
+
+  .r-cust {
+    padding: 10px 0; border-bottom: 1px dashed var(--ink-2);
+    font-family: "IBM Plex Sans Arabic", sans-serif;
+  }
+  .r-cust .lbl {
+    font-family: "JetBrains Mono", monospace; font-size: 9px;
+    letter-spacing: .2em; text-transform: uppercase; color: var(--ink-2); margin-bottom: 4px;
+  }
+  .r-cust .nm { font-size: 13px; font-weight: 700; color: var(--ink); }
+  .r-cust .ph { font-family: "JetBrains Mono", monospace; font-size: 11px; color: var(--ink-2); margin-top: 2px; }
+
+  .section-head {
+    font-family: "JetBrains Mono", monospace;
+    font-size: 9px; letter-spacing: .22em; text-transform: uppercase;
+    color: var(--ink-2); margin: 14px 0 8px; font-weight: 700;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .section-head::after { content: ""; flex: 1; height: 1px; border-bottom: 1px dashed var(--ink-faint); }
+
+  .r-items .item {
+    margin-bottom: 10px;
+  }
+  .r-items .item .nm {
+    font-family: "IBM Plex Sans Arabic", sans-serif;
+    font-weight: 700; font-size: 12.5px; color: var(--ink); line-height: 1.3;
+  }
+  .r-items .item .qty-row {
+    display: flex; justify-content: space-between; align-items: baseline;
+    margin-top: 3px; font-size: 11px; color: var(--ink-2);
+  }
+  .r-items .item .qty-row b { color: var(--ink); font-weight: 700; }
+  .r-items .item .qty-row .price { color: var(--ink); font-weight: 700; }
+
+  .r-totals {
+    padding: 14px 0 10px;
+    border-top: 1px dashed var(--ink-2);
+    border-bottom: 1px dashed var(--ink-2);
+  }
+  .r-totals .line { display: flex; justify-content: space-between; padding: 3px 0; font-size: 11px; }
+  .r-totals .line b { color: var(--ink-2); font-weight: 500; }
+  .r-totals .line span { color: var(--ink); font-weight: 700; }
+  .r-totals .line.vat b, .r-totals .line.vat span { color: var(--ink-2); font-size: 10px; }
+  .r-totals .line.disc span { color: #c14a4a; }
+
+  .grand {
+    text-align: center; padding: 14px 0 10px;
+    border-bottom: 1px dashed var(--ink-2);
+  }
+  .grand .lbl {
+    font-family: "IBM Plex Sans Arabic", sans-serif;
+    font-size: 11px; color: var(--ink-2); margin-bottom: 4px; letter-spacing: .04em;
+  }
+  .grand .val {
+    font-family: "Fraunces", Georgia, serif;
+    font-size: 38px; font-weight: 800; color: var(--ink);
+    line-height: 1; letter-spacing: -.03em;
+  }
+  .grand .val small {
+    font-family: "Inter", sans-serif; font-size: 14px; font-weight: 600; color: var(--ink-2); margin-inline-end: 6px;
+  }
+  .grand .en {
+    font-family: "Inter", sans-serif; font-size: 10px; color: var(--ink-2); margin-top: 4px;
+    font-style: italic;
+  }
+
+  .pay-row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 10px 0; border-bottom: 1px dashed var(--ink-2);
+    font-family: "IBM Plex Sans Arabic", sans-serif;
+  }
+  .pay-row .method {
+    display: inline-flex; align-items: center; gap: 6px; font-weight: 700; font-size: 12px;
+  }
+  .pay-row .method svg { width: 14px; height: 14px; }
+  .pay-row .amt { font-family: "JetBrains Mono", monospace; font-weight: 700; font-size: 12px; color: var(--ink); }
+
+  /* Counseling stripe — signature editorial move on the paper */
+  .counsel {
+    margin: 12px 0;
+    padding: 10px 12px;
+    background: var(--ink); color: var(--paper);
+    border-radius: 6px;
+    font-family: "IBM Plex Sans Arabic", sans-serif;
+    font-size: 11px; line-height: 1.5;
+  }
+  .counsel .l {
+    font-family: "JetBrains Mono", monospace; font-size: 8.5px;
+    letter-spacing: .22em; text-transform: uppercase; opacity: .7; margin-bottom: 4px;
+  }
+  .counsel b { color: #ffd967; }
+
+  /* Cross-sell "you might also need" */
+  .xsell {
+    padding: 10px 0; border-bottom: 1px dashed var(--ink-2);
+    font-family: "IBM Plex Sans Arabic", sans-serif;
+  }
+  .xsell .l {
+    font-family: "JetBrains Mono", monospace; font-size: 9px;
+    letter-spacing: .2em; text-transform: uppercase; color: var(--ink-2); margin-bottom: 6px;
+  }
+  .xsell ul { margin: 0; padding-right: 16px; font-size: 11px; color: var(--ink); }
+  .xsell li { margin-bottom: 3px; }
+
+  /* Loyalty band */
+  .loyal {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 10px 0; border-bottom: 1px dashed var(--ink-2);
+    font-family: "IBM Plex Sans Arabic", sans-serif; font-size: 11px;
+  }
+  .loyal .plus { color: #1a7a4a; font-weight: 700; }
+  .loyal .bal { font-family: "JetBrains Mono", monospace; color: var(--ink); font-weight: 700; }
+
+  /* QR + barcode */
+  .codes {
+    display: grid; grid-template-columns: auto 1fr; gap: 14px; align-items: center;
+    padding: 14px 0 12px;
+  }
+  .qr {
+    width: 80px; height: 80px; background: var(--ink);
+    padding: 6px; border-radius: 4px;
+  }
+  .qr-inner {
+    width: 100%; height: 100%;
+    background:
+      conic-gradient(from 0deg at 25% 25%, var(--paper) 0 90deg, var(--ink) 90deg 180deg, var(--paper) 180deg 270deg, var(--ink) 270deg) 0 0/28px 28px,
+      linear-gradient(90deg, var(--paper) 0 2px, transparent 2px) 0 0/6px 6px,
+      linear-gradient(0deg, var(--paper) 0 2px, transparent 2px) 0 0/6px 6px,
+      var(--ink);
+    background-blend-mode: normal;
+    position: relative;
+  }
+  .qr-inner::before, .qr-inner::after, .qr-inner .c3 {
+    content: ""; position: absolute; width: 18px; height: 18px;
+    border: 3px solid var(--paper); background: var(--ink);
+  }
+  .qr-inner::before { top: 0; right: 0; }
+  .qr-inner::after { top: 0; left: 0; }
+  .qr-inner .c3 { bottom: 0; right: 0; }
+  .codes .note {
+    font-family: "IBM Plex Sans Arabic", sans-serif;
+    font-size: 10.5px; color: var(--ink-2); line-height: 1.5;
+  }
+  .codes .note b { color: var(--ink); font-weight: 700; }
+
+  .barcode {
+    text-align: center; padding: 8px 0 12px;
+    border-top: 1px dashed var(--ink-2);
+  }
+  .barcode .bars {
+    font-family: "Libre Barcode 128", monospace;
+    font-size: 56px; line-height: 1; color: var(--ink);
+    letter-spacing: 0;
+  }
+  .barcode .inv {
+    font-family: "JetBrains Mono", monospace;
+    font-size: 10px; color: var(--ink-2); margin-top: 2px; letter-spacing: .14em;
+  }
+
+  .thanks {
+    text-align: center; padding: 12px 0 0;
+    font-family: "IBM Plex Sans Arabic", sans-serif;
+  }
+  .thanks .ar { font-size: 13px; font-weight: 700; color: var(--ink); }
+  .thanks .en {
+    font-family: "Fraunces", Georgia, serif; font-style: italic;
+    font-size: 13px; color: var(--ink-2); margin-top: 2px;
+  }
+  .thanks .url {
+    font-family: "JetBrains Mono", monospace;
+    font-size: 9.5px; color: var(--ink-2); margin-top: 10px; letter-spacing: .1em;
+  }
+
+  /* Insurance-specific */
+  .ins-panel {
+    padding: 12px; margin: 12px 0;
+    border: 2px solid var(--ink); border-radius: 4px;
+    font-family: "IBM Plex Sans Arabic", sans-serif;
+  }
+  .ins-panel .head {
+    font-family: "JetBrains Mono", monospace; font-size: 9px;
+    letter-spacing: .22em; text-transform: uppercase; color: var(--ink); font-weight: 700; margin-bottom: 8px;
+    display: flex; justify-content: space-between;
+  }
+  .ins-panel .head .co { color: var(--ink); }
+  .ins-panel .split {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 2px;
+    margin-top: 6px;
+  }
+  .ins-panel .split .box {
+    padding: 8px; text-align: center;
+  }
+  .ins-panel .split .box.a { background: var(--ink); color: var(--paper); border-radius: 3px; }
+  .ins-panel .split .box.b { background: transparent; color: var(--ink); }
+  .ins-panel .split .box .lbl { font-family: "JetBrains Mono", monospace; font-size: 8.5px; letter-spacing: .18em; text-transform: uppercase; opacity: .8; margin-bottom: 3px; }
+  .ins-panel .split .box .v { font-family: "Fraunces", Georgia, serif; font-size: 22px; font-weight: 800; line-height: 1; letter-spacing: -.02em; }
+  .ins-panel .approval {
+    margin-top: 10px; padding-top: 8px;
+    border-top: 1px dashed var(--ink-2);
+    font-size: 10.5px; display: flex; justify-content: space-between;
+  }
+  .ins-panel .approval b { font-family: "JetBrains Mono", monospace; font-weight: 700; color: var(--ink); }
+
+  /* Delivery-specific */
+  .deliv-block {
+    padding: 14px; margin: 12px 0;
+    background: var(--ink); color: var(--paper);
+    border-radius: 6px;
+    font-family: "IBM Plex Sans Arabic", sans-serif;
+  }
+  .deliv-block .lbl {
+    font-family: "JetBrains Mono", monospace; font-size: 9px;
+    letter-spacing: .22em; text-transform: uppercase; opacity: .7; margin-bottom: 4px;
+  }
+  .deliv-block .addr-txt { font-size: 13px; font-weight: 700; line-height: 1.4; }
+  .deliv-block .landmark {
+    font-size: 10.5px; opacity: .75; margin-top: 4px; font-style: italic;
+  }
+  .deliv-block hr { border: 0; border-top: 1px dashed rgba(245,242,236,.3); margin: 10px 0; }
+  .deliv-block .rider {
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 12px;
+  }
+  .deliv-block .rider b { font-weight: 700; }
+  .deliv-block .rider .phone { font-family: "JetBrains Mono", monospace; font-weight: 700; }
+  .deliv-block .eta {
+    display: flex; justify-content: space-between; align-items: baseline;
+    margin-top: 10px; padding-top: 10px;
+    border-top: 1px dashed rgba(245,242,236,.3);
+  }
+  .deliv-block .eta .lbl-t { font-size: 10px; opacity: .7; font-family: "JetBrains Mono", monospace; letter-spacing: .18em; text-transform: uppercase; }
+  .deliv-block .eta .val { font-family: "Fraunces", Georgia, serif; font-weight: 800; font-size: 24px; letter-spacing: -.02em; color: #ffd967; }
+
+  .deliv-signatures {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 16px;
+    padding: 12px 0 4px;
+    font-family: "IBM Plex Sans Arabic", sans-serif;
+  }
+  .deliv-signatures .box {
+    text-align: center;
+  }
+  .deliv-signatures .line {
+    height: 1px; background: var(--ink); margin-bottom: 6px;
+  }
+  .deliv-signatures .lbl {
+    font-family: "JetBrains Mono", monospace; font-size: 9px;
+    letter-spacing: .2em; text-transform: uppercase; color: var(--ink-2);
+  }
+
+  /* ─── ANNOTATION RAIL ─── */
+  .annot-strip {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px;
+    margin-top: 36px; padding-top: 28px;
+    border-top: 1px solid var(--line);
+  }
+  .annot {
+    padding: 16px 18px;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    border-right: 3px solid var(--annot-accent, var(--cyan));
+  }
+  .annot.cyan { --annot-accent: var(--cyan); }
+  .annot.gold { --annot-accent: var(--gold); }
+  .annot.green { --annot-accent: var(--green); }
+  .annot.violet { --annot-accent: var(--violet); }
+  .annot .n {
+    font-family: "JetBrains Mono", monospace; font-size: 10px;
+    font-weight: 700; letter-spacing: .2em; text-transform: uppercase;
+    color: var(--annot-accent);
+  }
+  .annot h4 { margin: 8px 0 4px; font-size: 14px; font-weight: 700; color: var(--fg); }
+  .annot p { margin: 0; font-size: 12px; color: var(--fg-2); line-height: 1.5; }
+
+  .footer {
+    margin-top: 36px; padding-top: 20px;
+    border-top: 1px solid var(--line);
+    display: flex; justify-content: space-between;
+    font-family: "JetBrains Mono", monospace; font-size: 10px;
+    color: var(--dim); letter-spacing: .14em; text-transform: uppercase;
+  }
+
+  @media (max-width: 1200px) {
+    .rack { grid-template-columns: repeat(2, 1fr); gap: 40px; }
+    .annot-strip { grid-template-columns: 1fr 1fr; }
+  }
+  @media (max-width: 720px) {
+    .canvas { padding: 24px 16px 48px; }
+    .rack { grid-template-columns: 1fr; }
+    .annot-strip { grid-template-columns: 1fr; }
+    .receipt { width: 100%; max-width: 340px; }
+  }
+</style>
+</head>
+<body data-screen-label="Thermal Receipts">
+<main class="canvas">
+
+  <section class="intro">
+    <div class="left">
+      <div class="eyb"><span class="n">006</span><span class="rule"></span>POS · Thermal print · 80mm strip</div>
+      <h1>Paper, <em>with hierarchy</em>.</h1>
+      <p>Three receipts printed from the same roll. Sales, insurance co-pay, and a delivery dispatch slip — each earns its own editorial move on a surface that's usually all mono caps.</p>
+    </div>
+    <div class="meta">
+      <div>80mm thermal · 320px artboard</div>
+      <div>Plex Sans Arabic + Fraunces + JetBrains Mono</div>
+      <div>RTL · bilingual · 203 DPI</div>
+    </div>
+  </section>
+
+  <!-- RECEIPT RACK -->
+  <div class="rack">
+
+    <!-- ══════ 1. SALES RECEIPT ══════ -->
+    <div class="slot">
+      <div class="slot-head">
+        <span class="tag sales"><span class="dot"></span>Sales · Walk-in</span>
+        <h3>فاتورة بيع</h3>
+        <p>Standard sales receipt — counseling tip, cross-sell, loyalty, QR to digital copy.</p>
+      </div>
+
+      <div class="receipt">
+        <div class="inner">
+
+          <div class="r-brand">
+            <div class="mark">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12h3l2-6 4 12 3-9 2 5h6"/></svg>
+            </div>
+            <div class="nm">DataPulse <span>Omni</span></div>
+            <div class="sub">Smart Pharmacy · Cairo</div>
+            <div class="addr">صيدلية النخبة — فرع مصر الجديدة<br><small>14 EL-HEGAZ ST · TEL 16789 · VAT 302-456-789</small></div>
+          </div>
+
+          <div class="r-meta">
+            <div class="row"><b>Inv ·</b><span>INV-38291</span></div>
+            <div class="row"><b>Date</b><span>2026-04-22</span></div>
+            <div class="row"><b>Shift</b><span>SHF-2841</span></div>
+            <div class="row"><b>Time</b><span>08:47:32</span></div>
+            <div class="row" style="grid-column: 1/-1;"><b>Cashier · د. أحمد مجدي</b><span>T01</span></div>
+          </div>
+
+          <div class="r-cust">
+            <div class="lbl">Customer · VIP</div>
+            <div class="nm">أستاذة منى محمد</div>
+            <div class="ph">01198765432 · member #8821</div>
+          </div>
+
+          <div class="section-head">Items · 4</div>
+          <div class="r-items">
+            <div class="item">
+              <div class="nm">أوجمنتين 1 جم</div>
+              <div class="qty-row"><span>2 × 130.00</span><span class="price">260.00</span></div>
+            </div>
+            <div class="item">
+              <div class="nm">كونكور 5 ملجم</div>
+              <div class="qty-row"><span>1 × 65.00</span><span class="price">65.00</span></div>
+            </div>
+            <div class="item">
+              <div class="nm">فيتامين سي 1000 + زنك</div>
+              <div class="qty-row"><span>2 × 45.00</span><span class="price">90.00</span></div>
+            </div>
+            <div class="item">
+              <div class="nm">بندول إكسترا</div>
+              <div class="qty-row"><span>1 × 30.00</span><span class="price">30.00</span></div>
+            </div>
+          </div>
+
+          <div class="r-totals">
+            <div class="line"><b>الإجمالي الفرعي · Subtotal</b><span>445.00</span></div>
+            <div class="line disc"><b>خصم VIP · 5%</b><span>− 22.25</span></div>
+            <div class="line vat"><b>VAT included (14%)</b><span>51.90</span></div>
+          </div>
+
+          <div class="grand">
+            <div class="lbl">المستحق الإجمالي · Total due</div>
+            <div class="val"><small>EGP</small>422.75</div>
+            <div class="en">four hundred twenty-two &amp; 75/100</div>
+          </div>
+
+          <div class="pay-row">
+            <span class="method">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="13" rx="2"/><path d="M2 10h20"/></svg>
+              Visa · ···· 4829
+            </span>
+            <span class="amt">422.75</span>
+          </div>
+
+          <div class="counsel">
+            <div class="l">Pharmacist counseling</div>
+            تناول <b>أوجمنتين</b> مع بداية الوجبة. أكمل الجرعة كاملة ٧ أيام حتى لو تحسنت الأعراض. فيتامين سي — بعد الإفطار مع الماء.
+          </div>
+
+          <div class="xsell">
+            <div class="l">قد تحتاج أيضاً · You may also need</div>
+            <ul>
+              <li>بروبيوتيك لحماية القولون أثناء المضاد الحيوي</li>
+              <li>جهاز قياس ضغط منزلي (خصم 15% للأعضاء)</li>
+            </ul>
+          </div>
+
+          <div class="loyal">
+            <span>نقاط الولاء المكتسبة</span>
+            <span><span class="plus">+ 42</span> &nbsp; الرصيد <span class="bal">342 pts</span></span>
+          </div>
+
+          <div class="codes">
+            <div class="qr"><div class="qr-inner"><div class="c3"></div></div></div>
+            <div class="note">
+              امسح للحصول على <b>فاتورتك الرقمية</b> وتفعيل الضمان ومتابعة تذكيرات الأدوية على واتساب.
+            </div>
+          </div>
+
+          <div class="barcode">
+            <div class="bars">*INV38291*</div>
+            <div class="inv">INV-38291 · SHF-2841 · T01</div>
+          </div>
+
+          <div class="thanks">
+            <div class="ar">شكراً لزيارتك — نتمنى لك الصحة والعافية</div>
+            <div class="en">Thank you — be well.</div>
+            <div class="url">DATAPULSE.HEALTH/R/38291 · 16789</div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════ 2. INSURANCE RECEIPT ══════ -->
+    <div class="slot">
+      <div class="slot-head">
+        <span class="tag ins"><span class="dot"></span>Insurance · Co-pay</span>
+        <h3>فاتورة تأمين</h3>
+        <p>Insurance co-pay breakdown with insurer portion, patient portion, and live approval ID.</p>
+      </div>
+
+      <div class="receipt">
+        <div class="inner">
+
+          <div class="r-brand">
+            <div class="mark">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12h3l2-6 4 12 3-9 2 5h6"/></svg>
+            </div>
+            <div class="nm">DataPulse <span>Omni</span></div>
+            <div class="sub">Smart Pharmacy · Cairo</div>
+            <div class="addr">صيدلية النخبة — فرع مصر الجديدة<br><small>14 EL-HEGAZ ST · VAT 302-456-789</small></div>
+          </div>
+
+          <div class="r-meta">
+            <div class="row"><b>Inv ·</b><span>INV-38292</span></div>
+            <div class="row"><b>Date</b><span>2026-04-22</span></div>
+            <div class="row"><b>Shift</b><span>SHF-2841</span></div>
+            <div class="row"><b>Time</b><span>09:12:05</span></div>
+            <div class="row" style="grid-column: 1/-1;"><b>Cashier · د. أحمد مجدي</b><span>T01</span></div>
+          </div>
+
+          <div class="r-cust">
+            <div class="lbl">Patient · Insured</div>
+            <div class="nm">محمد إبراهيم سعد</div>
+            <div class="ph">01012345678 · القومي الموحد 2-8612-4190</div>
+          </div>
+
+          <div class="section-head">Prescription · Rx</div>
+          <div class="r-items">
+            <div class="item">
+              <div class="nm">جلوكوفاج 850 ملجم</div>
+              <div class="qty-row"><span>3 × 38.00 · للسكر</span><span class="price">114.00</span></div>
+            </div>
+            <div class="item">
+              <div class="nm">كريستور 10 ملجم</div>
+              <div class="qty-row"><span>2 × 245.00 · للكوليسترول</span><span class="price">490.00</span></div>
+            </div>
+            <div class="item">
+              <div class="nm">لازيكس 40 ملجم</div>
+              <div class="qty-row"><span>1 × 22.00 · مدر</span><span class="price">22.00</span></div>
+            </div>
+            <div class="item">
+              <div class="nm">بلافكس 75 ملجم</div>
+              <div class="qty-row"><span>1 × 185.00 · مميع</span><span class="price">185.00</span></div>
+            </div>
+          </div>
+
+          <div class="r-totals">
+            <div class="line"><b>إجمالي الوصفة · Rx total</b><span>811.00</span></div>
+            <div class="line vat"><b>VAT included (14%)</b><span>99.57</span></div>
+          </div>
+
+          <div class="ins-panel">
+            <div class="head">
+              <span>Insurance breakdown</span>
+              <span class="co">AXA Gulf · Platinum</span>
+            </div>
+            <div class="split">
+              <div class="box a">
+                <div class="lbl">يتحمل التأمين · 80%</div>
+                <div class="v"><small style="font-family:Inter; font-weight:600; font-size:11px; color:inherit;">EGP</small> 648.80</div>
+              </div>
+              <div class="box b">
+                <div class="lbl">على المريض · 20%</div>
+                <div class="v"><small style="font-family:Inter; font-weight:600; font-size:11px; color:inherit;">EGP</small> 162.20</div>
+              </div>
+            </div>
+            <div class="approval">
+              <span><b>Approval:</b> AXA-884-3291-KX</span>
+              <span>Auth 09:10:44</span>
+            </div>
+          </div>
+
+          <div class="grand">
+            <div class="lbl">يُحصَّل من المريض · Patient co-pay</div>
+            <div class="val"><small>EGP</small>162.20</div>
+            <div class="en">one hundred sixty-two &amp; 20/100</div>
+          </div>
+
+          <div class="pay-row">
+            <span class="method">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M3 12h18M12 3v18"/></svg>
+              Cash · نقداً
+            </span>
+            <span class="amt">162.20</span>
+          </div>
+
+          <div class="counsel">
+            <div class="l">Pharmacist counseling</div>
+            <b>جلوكوفاج</b>: مع الوجبة لتقليل اضطراب المعدة. <b>كريستور</b>: قبل النوم. تابع السكر والكوليسترول كل ٣ أشهر.
+          </div>
+
+          <div class="codes">
+            <div class="qr"><div class="qr-inner"><div class="c3"></div></div></div>
+            <div class="note">
+              <b>اعتماد التأمين الرقمي</b> — احتفظ بهذا الإيصال لمتابعة المطالبة أو التعويض، أو عرض الفاتورة رقمياً.
+            </div>
+          </div>
+
+          <div class="barcode">
+            <div class="bars">*INV38292*</div>
+            <div class="inv">INV-38292 · AUTH AXA-884-3291</div>
+          </div>
+
+          <div class="thanks">
+            <div class="ar">رعاية آمنة — التزم بالجرعة والمواعيد</div>
+            <div class="en">Safe care — adhere to your schedule.</div>
+            <div class="url">DATAPULSE.HEALTH/CLAIM/38292</div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════ 3. DELIVERY DISPATCH SLIP ══════ -->
+    <div class="slot">
+      <div class="slot-head">
+        <span class="tag deliv"><span class="dot"></span>Delivery · Dispatch</span>
+        <h3>إيصال توصيل</h3>
+        <p>Rider dispatch slip — address, landmark, rider info, ETA, and delivery signature lines.</p>
+      </div>
+
+      <div class="receipt">
+        <div class="inner">
+
+          <div class="r-brand">
+            <div class="mark">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12h3l2-6 4 12 3-9 2 5h6"/></svg>
+            </div>
+            <div class="nm">DataPulse <span>Omni</span></div>
+            <div class="sub">Delivery dispatch · طلب توصيل</div>
+            <div class="addr">صيدلية النخبة — فرع مصر الجديدة<br><small>HOTLINE 16789 · WhatsApp 01001234567</small></div>
+          </div>
+
+          <div class="r-meta">
+            <div class="row"><b>Order ·</b><span>DLV-5427</span></div>
+            <div class="row"><b>Date</b><span>2026-04-22</span></div>
+            <div class="row"><b>Shift</b><span>SHF-2841</span></div>
+            <div class="row"><b>Placed</b><span>08:52</span></div>
+            <div class="row" style="grid-column: 1/-1;"><b>Channel</b><span>WhatsApp · طلب رقم 12</span></div>
+          </div>
+
+          <div class="r-cust">
+            <div class="lbl">Customer</div>
+            <div class="nm">السيد كريم عبد اللطيف</div>
+            <div class="ph">01055443322</div>
+          </div>
+
+          <div class="deliv-block">
+            <div class="lbl">Deliver to · عنوان التوصيل</div>
+            <div class="addr-txt">
+              شارع أحمد عرابي — ٢٤<br>
+              الدور ٥ · شقة ٨ — المهندسين
+            </div>
+            <div class="landmark">علامة مميزة: بجوار صيدلية الدواء، مقابل كافيه سيلانترو</div>
+            <hr>
+            <div class="rider">
+              <span><b>Rider</b> · محمود السيد</span>
+              <span class="phone">01144556677</span>
+            </div>
+            <div class="eta">
+              <span class="lbl-t">ETA · زمن الوصول</span>
+              <span class="val">22 min</span>
+            </div>
+          </div>
+
+          <div class="section-head">Items · 3</div>
+          <div class="r-items">
+            <div class="item">
+              <div class="nm">أدول باراسيتامول 500 ملجم</div>
+              <div class="qty-row"><span>2 × 18.00</span><span class="price">36.00</span></div>
+            </div>
+            <div class="item">
+              <div class="nm">كلاريتين 10 ملجم</div>
+              <div class="qty-row"><span>1 × 72.00</span><span class="price">72.00</span></div>
+            </div>
+            <div class="item">
+              <div class="nm">ديتول سائل معقم 500 مل</div>
+              <div class="qty-row"><span>1 × 95.00</span><span class="price">95.00</span></div>
+            </div>
+          </div>
+
+          <div class="r-totals">
+            <div class="line"><b>إجمالي الأصناف</b><span>203.00</span></div>
+            <div class="line"><b>رسوم التوصيل · Delivery</b><span>25.00</span></div>
+            <div class="line vat"><b>VAT included (14%)</b><span>27.99</span></div>
+          </div>
+
+          <div class="grand">
+            <div class="lbl">يحصّل عند الاستلام · Cash on delivery</div>
+            <div class="val"><small>EGP</small>228.00</div>
+            <div class="en">two hundred twenty-eight only</div>
+          </div>
+
+          <div class="pay-row">
+            <span class="method">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
+              COD · نقدي عند الاستلام
+            </span>
+            <span class="amt">228.00</span>
+          </div>
+
+          <div class="counsel">
+            <div class="l">Note to rider · ملاحظة للمندوب</div>
+            اتصل قبل الوصول بـ ٥ دقائق. إذا لم يُفتح الباب من المحاولة الثانية — اترك مع <b>البواب أسامة</b> بالموافقة.
+          </div>
+
+          <div class="codes">
+            <div class="qr"><div class="qr-inner"><div class="c3"></div></div></div>
+            <div class="note">
+              <b>تتبع الطلب حياً</b> — امسح الكود لمعرفة موقع المندوب، أو قيّم خدمة التوصيل بعد الاستلام.
+            </div>
+          </div>
+
+          <div class="deliv-signatures">
+            <div class="box">
+              <div class="line"></div>
+              <div class="lbl">Rider · توقيع</div>
+            </div>
+            <div class="box">
+              <div class="line"></div>
+              <div class="lbl">Customer · توقيع</div>
+            </div>
+          </div>
+
+          <div class="barcode">
+            <div class="bars">*DLV5427*</div>
+            <div class="inv">DLV-5427 · RIDER-MS04</div>
+          </div>
+
+          <div class="thanks">
+            <div class="ar">توصيل آمن — شكراً لثقتك</div>
+            <div class="en">Safe delivery — thank you.</div>
+            <div class="url">DATAPULSE.HEALTH/T/5427</div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /rack -->
+
+  <!-- ANNOTATION STRIP -->
+  <div class="annot-strip">
+    <div class="annot cyan">
+      <div class="n">A · PAPER</div>
+      <h4>Not flat — textured</h4>
+      <p>The thermal sheet has subtle horizontal scan lines, torn zigzag top &amp; bottom, and a warm off-white tone (#f5f2ec). Shadows ground it on the dark canvas.</p>
+    </div>
+    <div class="annot gold">
+      <div class="n">B · HIERARCHY</div>
+      <h4>One serif moment</h4>
+      <p>Fraunces shows up only on the grand total and the insurance split &amp; ETA. Everything else stays monospace — the way thermal prints naturally.</p>
+    </div>
+    <div class="annot green">
+      <div class="n">C · CLINICAL</div>
+      <h4>Black counsel block</h4>
+      <p>Counseling &amp; rider notes get inverted ink (black fill, paper text). This is the one moment the pharmacist's voice should interrupt the transaction.</p>
+    </div>
+    <div class="annot violet">
+      <div class="n">D · BILINGUAL</div>
+      <h4>AR leads, EN follows</h4>
+      <p>Arabic is primary; English is the small italic line underneath. Invoice numbers, timestamps, and codes stay Latin for scanner compatibility.</p>
+    </div>
+  </div>
+
+  <div class="footer">
+    <span>DataPulse · Thermal receipts · v1</span>
+    <span>80mm · 203 DPI · Bilingual AR / EN</span>
+    <span>RTL · 2026</span>
+  </div>
+
+</main>
+</body>
+</html>
