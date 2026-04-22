@@ -54,7 +54,9 @@ function useActiveTerminal(): [TerminalSessionResponse | null, (s: TerminalSessi
       }
     }
   }, []);
-  return [terminal, setTerminal];
+  // Wrap setter to narrow the type: callers only ever pass a full session object.
+  const updateTerminal = (s: TerminalSessionResponse) => setTerminal(s);
+  return [terminal, updateTerminal];
 }
 
 export default function PosTerminalPage() {
