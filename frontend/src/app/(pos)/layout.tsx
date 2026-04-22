@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useCallback, type ReactNode } from "react";
-import { Fraunces, JetBrains_Mono } from "next/font/google";
+import { Fraunces, JetBrains_Mono, IBM_Plex_Sans_Arabic } from "next/font/google";
 import { useSession, signIn } from "next-auth/react";
 import { ThemeProvider } from "next-themes";
 import { SWRConfig } from "swr";
@@ -26,6 +26,15 @@ const jetbrainsMono = JetBrains_Mono({
   subsets: ["latin"],
   weight: ["400", "500", "600", "700"],
   variable: "--font-jetbrains-mono",
+  display: "swap",
+});
+
+// IBM Plex Sans Arabic = Arabic body copy on the POS + receipt surfaces
+// (cart item names, counseling text, customer names, thanks footer).
+const plexArabic = IBM_Plex_Sans_Arabic({
+  subsets: ["arabic"],
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-plex-arabic",
   display: "swap",
 });
 
@@ -111,7 +120,7 @@ export default function PosLayout({ children }: { children: ReactNode }) {
                   <RendererCrashBridge>
                     <PosKeyboardHandler>
                       <div
-                        className={`${fraunces.variable} ${jetbrainsMono.variable} flex min-h-screen flex-col overflow-hidden bg-background text-foreground`}
+                        className={`pos-omni ${fraunces.variable} ${jetbrainsMono.variable} ${plexArabic.variable} flex min-h-screen flex-col overflow-hidden bg-[var(--pos-bg)] text-[var(--pos-ink)]`}
                       >
                         {children}
                       </div>
