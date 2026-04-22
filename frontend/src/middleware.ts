@@ -6,6 +6,33 @@ import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 const AUTH_PROVIDER =
   (process.env.NEXT_PUBLIC_AUTH_PROVIDER as "auth0" | "clerk") || "auth0";
 
+/**
+ * Derive the Clerk Frontend API origin.
+ *
+ * Clerk's publishable key base64-encodes the host followed by a ``$``
+ * sentinel (e.g. ``pk_test_b3JpZW50ZWQtbGFyay02OC5jbGVyay5hY2NvdW50cy5kZXYk``
+ * decodes to ``oriented-lark-68.clerk.accounts.dev$``). Decoding means the
+ * CSP allow-list stays correct even when the operator forgets to set
+ * ``NEXT_PUBLIC_CLERK_FRONTEND_API``. The explicit env var wins if present.
+ */
+function clerkFrontendOrigin(): string {
+  const explicit = process.env.NEXT_PUBLIC_CLERK_FRONTEND_API;
+  if (explicit) return explicit.replace(/\/$/, "");
+
+  const pk = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY || "";
+  const prefix = pk.startsWith("pk_test_") ? "pk_test_" : pk.startsWith("pk_live_") ? "pk_live_" : "";
+  if (!prefix) return "";
+  const encoded = pk.slice(prefix.length);
+  try {
+    // Global ``atob`` is available in Edge Runtime where middleware runs.
+    const decoded = atob(encoded);
+    const host = decoded.replace(/\$$/, "");
+    return host ? `https://${host}` : "";
+  } catch {
+    return "";
+  }
+}
+
 /** Paths that do not require authentication. */
 const PUBLIC_PATHS = [
   "/login",
@@ -74,19 +101,13 @@ function applyCommonHeaders(
 
   const auth0Domain = process.env.AUTH0_DOMAIN || "";
   const auth0Origin = auth0Domain ? `https://${auth0Domain}` : "";
-  const clerkFrontend = process.env.NEXT_PUBLIC_CLERK_FRONTEND_API || "";
-  const clerkOrigin = clerkFrontend ? clerkFrontend.replace(/\/$/, "") : "";
+  const clerkOrigin = AUTH_PROVIDER === "clerk" ? clerkFrontendOrigin() : "";
   const isDev = process.env.NODE_ENV === "development";
 
   // Allow scripts from Clerk when active — Clerk injects its JS from its
   // own CDN (e.g. https://oriented-lark-68.clerk.accounts.dev/). Keep the
   // Auth0 additions for the return path.
-  const scriptExtras = [
-    auth0Origin,
-    AUTH_PROVIDER === "clerk" ? clerkOrigin : "",
-  ]
-    .filter(Boolean)
-    .join(" ");
+  const scriptExtras = [auth0Origin, clerkOrigin].filter(Boolean).join(" ");
 
   const scriptSrc = isDev
     ? `script-src 'self' 'unsafe-inline' 'unsafe-eval' ${scriptExtras}`.trim()
