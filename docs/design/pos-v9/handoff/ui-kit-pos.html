@@ -1,0 +1,950 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<title>DataPulse — POS v10 (Pharmacy Terminal)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&family=Fraunces:wght@600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:         #050e17;
+    --bg-2:       #081826;
+    --panel:      #0c1f30;
+    --panel-2:    #102a43;
+    --elevated:   #163452;
+    --line:       #1a3752;
+    --line-dim:   #122a40;
+
+    --fg:         #e8ecf2;
+    --fg-2:       #b8c0cc;
+    --mute:       #7a8494;
+    --dim:        #5a6b7c;
+    --faint:      #3f4a5a;
+
+    --cyan:       #00c7f2;
+    --cyan-hi:    #5cdfff;
+    --cyan-deep:  #0b7da1;
+    --gold:       #d4af37;
+    --amber:      #ffab3d;
+    --green:      #1dd48b;
+    --red:        #ff7b7b;
+    --violet:     #7467f8;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--bg); color: var(--fg);
+    font-family: "IBM Plex Sans Arabic", "Inter", system-ui, sans-serif;
+    font-feature-settings: "ss01";
+    -webkit-font-smoothing: antialiased;
+  }
+  .mono { font-family: "JetBrains Mono", ui-monospace, monospace; }
+  .display { font-family: "Fraunces", Georgia, serif; font-weight: 700; letter-spacing: -0.02em; }
+
+  /* ═══════════ CANVAS SHELL ═══════════ */
+  .canvas {
+    padding: 48px 40px 64px;
+    background:
+      radial-gradient(ellipse at top left, rgba(0,199,242,.06), transparent 45%),
+      radial-gradient(ellipse at 80% 10%, rgba(116,103,248,.04), transparent 50%),
+      var(--bg);
+    min-height: 100vh;
+  }
+  .intro {
+    display: grid; grid-template-columns: 1fr auto; gap: 32px;
+    align-items: end; border-bottom: 1px solid var(--line);
+    padding-bottom: 24px; margin-bottom: 28px;
+    direction: ltr; /* keep eyebrow + meta in reading order */
+  }
+  .intro .left { direction: rtl; }
+  .eyb {
+    display: inline-flex; align-items: center; gap: 12px;
+    font-family: "JetBrains Mono", monospace; font-size: 11px;
+    letter-spacing: .22em; text-transform: uppercase; color: var(--mute);
+  }
+  .eyb .n { color: var(--cyan); font-weight: 700; }
+  .eyb .rule { width: 28px; height: 1px; background: var(--line); }
+  .intro h1 {
+    margin: 14px 0 6px; font-family: "Fraunces", Georgia, serif;
+    font-weight: 800; letter-spacing: -0.03em; line-height: 1;
+    font-size: clamp(2.2rem, 3.6vw, 3rem); color: var(--fg);
+  }
+  .intro h1 em { font-style: italic; color: var(--cyan); }
+  .intro p { margin: 0; max-width: 640px; color: var(--fg-2); font-size: 15px; line-height: 1.5; }
+  .intro .meta {
+    font-family: "JetBrains Mono", monospace; font-size: 10px; color: var(--dim);
+    letter-spacing: .16em; text-transform: uppercase; text-align: left;
+  }
+  .intro .meta div + div { margin-top: 4px; }
+
+  /* ═══════════ TERMINAL FRAME ═══════════ */
+  .terminal {
+    background: linear-gradient(180deg, var(--bg-2), var(--bg));
+    border: 1px solid var(--line);
+    border-radius: 24px;
+    overflow: hidden;
+    box-shadow: 0 40px 80px rgba(0,0,0,.4), 0 0 0 1px rgba(0,199,242,.05);
+  }
+
+  /* ─── header ─── */
+  .status-strip {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 8px 20px;
+    background: var(--bg);
+    border-bottom: 1px solid var(--line-dim);
+    font-size: 10px; font-family: "JetBrains Mono", monospace;
+    letter-spacing: .14em; text-transform: uppercase;
+  }
+  .status-strip .sync {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 3px 10px; border-radius: 999px;
+    background: rgba(29,212,139,.1); border: 1px solid rgba(29,212,139,.3);
+    color: var(--green); font-weight: 700;
+  }
+  .status-strip .sync .dot { width: 5px; height: 5px; border-radius: 999px; background: var(--green); box-shadow: 0 0 0 3px rgba(29,212,139,.2); }
+  .status-strip .last-sync { color: var(--dim); margin-right: 16px; }
+
+  .hr-block { display: flex; align-items: center; gap: 14px; }
+  .commish {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 3px 12px; border-radius: 6px;
+    background: rgba(212,175,55,.08); border: 1px solid rgba(212,175,55,.3);
+    color: var(--gold); font-weight: 700;
+  }
+  .commish svg { width: 12px; height: 12px; }
+  .target {
+    display: inline-flex; align-items: center; gap: 10px;
+    min-width: 220px;
+  }
+  .target svg { width: 13px; height: 13px; color: var(--gold); }
+  .target .track { flex: 1; height: 4px; background: var(--panel-2); border-radius: 999px; overflow: hidden; }
+  .target .fill { height: 100%; background: linear-gradient(90deg, var(--gold), var(--amber)); border-radius: 999px; }
+  .target .pct { color: var(--gold); font-weight: 700; font-size: 10px; }
+
+  .masthead {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 16px 24px;
+    background: linear-gradient(180deg, rgba(0,199,242,.03), transparent);
+    border-bottom: 1px solid var(--line);
+  }
+  .brand { display: flex; align-items: center; gap: 14px; }
+  .brand .mark {
+    width: 40px; height: 40px; border-radius: 12px;
+    background: linear-gradient(135deg, rgba(0,199,242,.25), rgba(0,199,242,.05));
+    border: 1px solid rgba(0,199,242,.35);
+    display: grid; place-items: center; color: var(--cyan);
+  }
+  .brand .mark svg { width: 22px; height: 22px; }
+  .brand .wd-name {
+    font-family: "Inter", sans-serif;
+    font-weight: 900; font-size: 22px; letter-spacing: -0.01em; line-height: 1;
+    color: var(--fg);
+  }
+  .brand .wd-name span { font-weight: 300; color: var(--cyan); }
+  .brand .wd-sub {
+    margin-top: 4px;
+    font-family: "JetBrains Mono", monospace; font-size: 9px;
+    letter-spacing: .22em; text-transform: uppercase;
+    color: var(--green); font-weight: 700;
+  }
+
+  .right-block { display: flex; align-items: center; gap: 14px; }
+  .clock {
+    display: inline-flex; align-items: center; gap: 10px;
+    background: var(--bg); padding: 8px 14px;
+    border-radius: 12px; border: 1px solid var(--line-dim);
+  }
+  .clock svg { width: 16px; height: 16px; color: var(--mute); }
+  .clock .t { font-family: "JetBrains Mono", monospace; font-weight: 700; font-size: 14px; letter-spacing: .05em; color: var(--fg); }
+  .user {
+    display: flex; align-items: center; gap: 10px;
+    padding: 7px 14px; border-radius: 12px;
+    background: rgba(16,42,67,.4); border: 1px solid var(--line-dim);
+    cursor: pointer;
+  }
+  .user:hover { border-color: var(--cyan); }
+  .user .av {
+    width: 30px; height: 30px; border-radius: 8px;
+    background: var(--bg); display: grid; place-items: center;
+    color: var(--cyan); border: 1px solid var(--line-dim);
+  }
+  .user .av svg { width: 14px; height: 14px; }
+  .user .nm { font-weight: 700; font-size: 12px; color: var(--fg); }
+  .user .rl { font-family: "JetBrains Mono", monospace; font-size: 9px; color: var(--green); letter-spacing: .1em; margin-top: 2px; }
+
+  /* ═══════════ BODY GRID ═══════════ */
+  .terminal-body {
+    display: grid;
+    grid-template-columns: 4fr 3fr 2.5fr;
+    gap: 14px;
+    padding: 14px;
+    min-height: 820px;
+  }
+  .col {
+    display: flex; flex-direction: column; gap: 14px;
+    min-width: 0;
+  }
+  .pane {
+    background: rgba(12,31,48,.4);
+    border: 1px solid var(--line);
+    border-radius: 20px;
+    overflow: hidden;
+    display: flex; flex-direction: column;
+  }
+  .pane-head {
+    padding: 14px 16px;
+    background: var(--bg-2);
+    border-bottom: 1px solid var(--line);
+    display: flex; align-items: center; justify-content: space-between;
+    flex-shrink: 0;
+  }
+  .pane-head h3 {
+    margin: 0; font-size: 13px; font-weight: 700;
+    display: inline-flex; align-items: center; gap: 8px; color: var(--fg);
+  }
+  .pane-head h3 svg { width: 16px; height: 16px; color: var(--cyan); }
+  .pane-head .meta-r { font-family: "JetBrains Mono", monospace; font-size: 10px; color: var(--mute); letter-spacing: .14em; text-transform: uppercase; }
+
+  /* ─── CART COLUMN ─── */
+  .customer-bar {
+    padding: 14px 16px;
+    background: linear-gradient(180deg, var(--bg-2), var(--panel));
+    border-bottom: 1px solid var(--line);
+    display: flex; flex-direction: column; gap: 10px;
+    flex-shrink: 0;
+  }
+  .phone-input {
+    position: relative;
+  }
+  .phone-input svg { position: absolute; right: 14px; top: 50%; transform: translateY(-50%); width: 16px; height: 16px; color: var(--violet); }
+  .phone-input input {
+    width: 100%; background: var(--bg); border: 1px solid var(--line);
+    color: var(--fg); border-radius: 12px;
+    padding: 10px 42px 10px 12px; font-size: 13px;
+    font-family: "JetBrains Mono", monospace;
+    outline: none;
+  }
+  .phone-input input:focus { border-color: var(--violet); }
+
+  .customer-card {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 12px; background: rgba(16,42,67,.5);
+    border: 1px solid var(--line); border-radius: 10px;
+  }
+  .customer-card .l { display: flex; align-items: center; gap: 10px; }
+  .customer-card .av {
+    width: 32px; height: 32px; border-radius: 8px;
+    background: rgba(116,103,248,.2);
+    display: grid; place-items: center; color: var(--violet);
+  }
+  .customer-card .av svg { width: 16px; height: 16px; }
+  .customer-card .nm { font-weight: 700; font-size: 13px; color: var(--fg); }
+  .customer-card .sub { font-size: 10px; color: var(--mute); margin-top: 2px; }
+  .customer-card .credit-lbl { font-size: 9px; font-family: "JetBrains Mono", monospace; color: var(--mute); letter-spacing: .14em; text-transform: uppercase; }
+  .customer-card .credit-val { font-family: "JetBrains Mono", monospace; font-size: 12px; font-weight: 700; color: var(--red); margin-top: 2px; }
+
+  .churn-alert {
+    display: flex; align-items: start; gap: 10px;
+    padding: 10px 12px; background: rgba(255,123,123,.08);
+    border: 1px solid rgba(255,123,123,.3); border-radius: 10px;
+  }
+  .churn-alert svg { width: 18px; height: 18px; color: var(--red); flex-shrink: 0; margin-top: 1px; }
+  .churn-alert .t { font-size: 11px; font-weight: 700; color: var(--red); margin-bottom: 4px; }
+  .churn-alert .b { font-size: 11px; color: var(--fg-2); line-height: 1.5; }
+  .churn-alert .b b { color: var(--fg); }
+
+  .scan-bar {
+    padding: 12px 16px;
+    background: var(--panel);
+    border-bottom: 1px solid var(--line);
+    position: relative;
+    flex-shrink: 0;
+  }
+  .scan-bar svg.scan-icon { position: absolute; right: 28px; top: 50%; transform: translateY(-50%); width: 20px; height: 20px; color: var(--cyan); z-index: 2; }
+  .scan-bar input {
+    width: 100%; background: var(--bg); border: 2px solid var(--line);
+    color: var(--fg); border-radius: 14px;
+    padding: 12px 50px 12px 14px; font-size: 16px; font-weight: 700;
+    outline: none;
+    font-family: "IBM Plex Sans Arabic", sans-serif;
+  }
+  .scan-bar input:focus { border-color: var(--cyan); }
+  .scan-bar .kbd-hint {
+    position: absolute; left: 28px; top: 50%; transform: translateY(-50%);
+    font-family: "JetBrains Mono", monospace; font-size: 10px;
+    color: var(--dim); padding: 3px 8px; border: 1px solid var(--line); border-radius: 5px; background: var(--bg);
+  }
+
+  .cart-list {
+    flex: 1; overflow-y: auto; padding: 10px;
+    display: flex; flex-direction: column; gap: 8px;
+    background: rgba(5,14,23,.3);
+  }
+  .cart-item {
+    display: grid;
+    grid-template-columns: 32px 88px 1fr auto;
+    gap: 12px; align-items: center;
+    padding: 12px; background: var(--bg);
+    border: 1.5px solid var(--line-dim); border-radius: 14px;
+    transition: all .15s ease;
+    cursor: pointer;
+  }
+  .cart-item:hover { border-color: var(--line); }
+  .cart-item.active { background: rgba(16,42,67,.7); border-color: rgba(0,199,242,.5); box-shadow: 0 0 0 3px rgba(0,199,242,.08); }
+  .cart-item .trash {
+    padding: 7px; border-radius: 10px;
+    background: rgba(16,42,67,.3); color: var(--dim);
+    display: grid; place-items: center; cursor: pointer;
+    border: none; transition: all .15s ease;
+  }
+  .cart-item .trash:hover { color: var(--amber); background: rgba(255,171,61,.1); }
+  .cart-item .trash svg { width: 16px; height: 16px; }
+  .qty-box {
+    display: flex; align-items: center; justify-content: space-between;
+    background: var(--bg-2); border: 1px solid var(--line); border-radius: 10px;
+    padding: 4px 8px;
+  }
+  .qty-box button { border: none; background: transparent; color: var(--fg-2); cursor: pointer; padding: 2px; display: grid; place-items: center; }
+  .qty-box button:hover { color: var(--fg); }
+  .qty-box button svg { width: 13px; height: 13px; }
+  .qty-box .q { font-family: "JetBrains Mono", monospace; color: var(--cyan); font-weight: 900; font-size: 16px; }
+  .cart-item .body h4 { margin: 0 0 6px; font-size: 14px; font-weight: 700; color: var(--fg); letter-spacing: -0.01em; line-height: 1.2; }
+  .cart-item .tags { display: flex; gap: 6px; flex-wrap: wrap; }
+  .tag {
+    font-family: "JetBrains Mono", monospace;
+    font-size: 9px; padding: 2px 7px;
+    border-radius: 4px; letter-spacing: .04em;
+  }
+  .tag.price { background: rgba(16,42,67,.5); color: var(--mute); }
+  .tag.bonus {
+    background: transparent; border: 1px solid rgba(212,175,55,.4);
+    color: var(--gold); display: inline-flex; align-items: center; gap: 3px;
+  }
+  .tag.bonus svg { width: 8px; height: 8px; }
+  .cart-item .sum {
+    font-family: "JetBrains Mono", monospace; font-weight: 900;
+    font-size: 22px; color: var(--fg); min-width: 92px; text-align: left;
+    letter-spacing: -0.01em;
+  }
+
+  .cart-foot {
+    padding: 18px 20px; background: linear-gradient(180deg, var(--panel), var(--bg-2));
+    border-top: 1px solid var(--line);
+    flex-shrink: 0;
+  }
+  .cart-totals {
+    display: flex; justify-content: space-between; align-items: end;
+    margin-bottom: 14px;
+  }
+  .cart-totals .lbl { font-size: 18px; color: var(--fg-2); font-weight: 700; }
+  .cart-totals .val {
+    font-family: "Fraunces", Georgia, serif; font-weight: 800;
+    font-size: 52px; color: var(--cyan-hi); line-height: 1;
+    letter-spacing: -0.03em;
+    text-shadow: 0 0 30px rgba(0,199,242,.3);
+  }
+  .cart-totals .val .u { font-family: "Inter", sans-serif; font-weight: 600; font-size: 20px; color: var(--cyan); margin-right: 6px; }
+  .checkout-btn {
+    width: 100%; padding: 18px;
+    background: linear-gradient(135deg, var(--cyan), #20bce5);
+    color: var(--bg); border: none; border-radius: 14px;
+    font-family: "IBM Plex Sans Arabic", sans-serif;
+    font-weight: 700; font-size: 18px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; gap: 12px;
+    box-shadow: 0 10px 30px rgba(0,199,242,.25);
+    transition: all .2s ease;
+    position: relative; overflow: hidden;
+  }
+  .checkout-btn:hover { transform: translateY(-1px); box-shadow: 0 16px 40px rgba(0,199,242,.4); }
+  .checkout-btn .kbd { font-family: "JetBrains Mono", monospace; font-size: 10px; font-weight: 600; padding: 3px 7px; border: 1px solid rgba(5,14,23,.4); border-radius: 5px; background: rgba(5,14,23,.15); margin-right: auto; }
+
+  /* ─── QUICK CATALOG (middle) ─── */
+  .catalog-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+    padding: 14px; overflow-y: auto; flex: 1;
+  }
+  .sku-btn {
+    position: relative;
+    height: 120px; padding: 14px;
+    background: linear-gradient(165deg, var(--elevated), var(--panel));
+    border: 1px solid var(--line); border-bottom: 4px solid var(--line-dim);
+    border-radius: 16px; cursor: pointer;
+    display: flex; flex-direction: column; justify-content: space-between;
+    text-align: right;
+    transition: transform .1s ease, filter .15s ease;
+    overflow: hidden;
+  }
+  .sku-btn:hover { filter: brightness(1.15); }
+  .sku-btn:active { transform: translateY(2px); border-bottom-width: 2px; }
+  .sku-btn::before {
+    content: ""; position: absolute; top: 0; left: 14px; right: 14px; height: 2px;
+    background: var(--sku-accent, var(--cyan)); border-radius: 0 0 999px 999px;
+    opacity: .6;
+  }
+  .sku-btn .top-row { display: flex; justify-content: space-between; align-items: start; gap: 8px; }
+  .sku-btn .price-chip {
+    font-family: "JetBrains Mono", monospace; font-weight: 700; font-size: 12px;
+    background: var(--bg); color: var(--green);
+    padding: 5px 10px; border-radius: 6px; box-shadow: inset 0 1px 2px rgba(0,0,0,.3);
+  }
+  .sku-btn .star { color: var(--gold); }
+  .sku-btn .star svg { width: 14px; height: 14px; }
+  .sku-btn .nm { font-weight: 700; font-size: 14px; line-height: 1.3; color: var(--fg); }
+  .sku-btn .meta-foot {
+    font-family: "JetBrains Mono", monospace; font-size: 9px; color: var(--dim);
+    letter-spacing: .08em; display: flex; justify-content: space-between;
+  }
+  .sku-btn .meta-foot .low { color: var(--red); font-weight: 700; }
+
+  /* ─── CLINICAL PANEL (right) ─── */
+  .sel-head {
+    padding: 20px 20px 14px;
+    background: linear-gradient(180deg, rgba(22,52,82,.2), transparent);
+    border-bottom: 1px solid var(--line-dim);
+  }
+  .sel-head h2 {
+    margin: 0 0 12px; font-size: 20px; font-weight: 700; color: var(--fg);
+    letter-spacing: -0.01em; line-height: 1.25;
+    font-family: "IBM Plex Sans Arabic", sans-serif;
+  }
+  .sel-meta-row {
+    display: flex; gap: 10px; margin-bottom: 14px;
+  }
+  .sel-pill {
+    font-family: "JetBrains Mono", monospace; font-size: 10px;
+    padding: 4px 10px; border-radius: 6px; letter-spacing: .1em;
+  }
+  .sel-pill.gen { background: rgba(16,42,67,.6); color: var(--fg-2); }
+  .sel-pill.cat { background: rgba(0,199,242,.1); color: var(--cyan); border: 1px solid rgba(0,199,242,.3); }
+
+  .counseling {
+    display: flex; gap: 12px; padding: 14px;
+    background: rgba(0,199,242,.06); border: 1px solid rgba(0,199,242,.2);
+    border-radius: 12px;
+  }
+  .counseling svg { width: 18px; height: 18px; color: var(--cyan); flex-shrink: 0; margin-top: 1px; }
+  .counseling .lbl { font-family: "JetBrains Mono", monospace; font-size: 9px;
+    font-weight: 700; color: var(--cyan); letter-spacing: .18em; text-transform: uppercase; margin-bottom: 5px; }
+  .counseling .bd { font-size: 12px; color: var(--fg); line-height: 1.6; font-weight: 500; }
+
+  .stats-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--line-dim);
+  }
+  .stat-box {
+    padding: 12px; background: var(--bg);
+    border: 1px solid var(--line-dim); border-radius: 12px;
+  }
+  .stat-box .lbl { font-family: "JetBrains Mono", monospace; font-size: 9px;
+    color: var(--mute); letter-spacing: .16em; text-transform: uppercase; margin-bottom: 6px; }
+  .stat-box .val {
+    font-family: "JetBrains Mono", monospace; font-weight: 900;
+    font-size: 24px; letter-spacing: -0.01em;
+  }
+  .stat-box .val.low { color: var(--red); }
+  .stat-box .val.ok { color: var(--green); }
+
+  .sub-head {
+    padding: 12px 20px 8px;
+    font-family: "JetBrains Mono", monospace; font-size: 10px;
+    font-weight: 700; color: var(--mute); letter-spacing: .2em; text-transform: uppercase;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .sub-head svg { width: 13px; height: 13px; }
+
+  .xsell-list, .alt-list { padding: 0 20px 14px; display: flex; flex-direction: column; gap: 8px; }
+  .xsell-row {
+    display: flex; justify-content: space-between; align-items: center; gap: 10px;
+    padding: 10px 12px;
+    background: linear-gradient(90deg, rgba(212,175,55,.08), transparent);
+    border: 1px solid rgba(212,175,55,.25); border-radius: 10px;
+  }
+  .xsell-row .nm { font-weight: 700; font-size: 13px; color: var(--fg); }
+  .xsell-row .rsn { font-size: 10px; color: var(--gold); font-family: "JetBrains Mono", monospace; letter-spacing: .08em; margin-top: 2px; }
+  .xsell-row button {
+    background: var(--gold); color: var(--bg); border: none;
+    padding: 6px 12px; border-radius: 7px; font-weight: 700; font-size: 11px; cursor: pointer;
+    font-family: "IBM Plex Sans Arabic", sans-serif;
+  }
+  .alt-row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 10px 12px; background: var(--bg-2);
+    border: 1px solid var(--line-dim); border-radius: 10px;
+  }
+  .alt-row .nm { font-weight: 700; font-size: 13px; color: var(--fg); }
+  .alt-row .sv {
+    font-family: "JetBrains Mono", monospace; font-weight: 700; font-size: 11px;
+    color: var(--green); background: rgba(29,212,139,.1);
+    padding: 3px 8px; border-radius: 5px;
+  }
+  .alt-row .px {
+    font-family: "JetBrains Mono", monospace; font-weight: 700; font-size: 13px;
+    color: var(--cyan); background: var(--bg);
+    padding: 5px 10px; border-radius: 7px; border: 1px solid var(--line-dim);
+  }
+
+  /* Mini checkout summary — signature editorial stripe */
+  .summary-stripe {
+    margin: 14px 0 0;
+    padding: 14px 20px;
+    background: linear-gradient(90deg, rgba(0,199,242,.08), rgba(116,103,248,.03));
+    border-top: 1px solid var(--line);
+    border-bottom: 1px solid var(--line);
+    display: flex; align-items: center; gap: 16px;
+  }
+  .summary-stripe .tag-t {
+    font-family: "JetBrains Mono", monospace; font-size: 10px;
+    letter-spacing: .2em; color: var(--cyan); font-weight: 700;
+    border-left: 2px solid var(--cyan); padding-left: 12px;
+    flex-shrink: 0;
+  }
+  .summary-stripe .msg { color: var(--fg); font-size: 13px; }
+  .summary-stripe .msg b { color: var(--fg); font-weight: 700; }
+  .summary-stripe .msg .hl { color: var(--cyan); font-weight: 700; }
+
+  /* annotations strip */
+  .annot-strip {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px;
+    margin-top: 28px;
+  }
+  .annot {
+    padding: 16px 18px;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    border-right: 3px solid var(--annot-accent, var(--cyan));
+  }
+  .annot.cyan { --annot-accent: var(--cyan); }
+  .annot.gold { --annot-accent: var(--gold); }
+  .annot.green { --annot-accent: var(--green); }
+  .annot.violet { --annot-accent: var(--violet); }
+  .annot .n {
+    font-family: "JetBrains Mono", monospace; font-size: 10px;
+    font-weight: 700; letter-spacing: .2em; text-transform: uppercase;
+    color: var(--annot-accent);
+  }
+  .annot h4 { margin: 8px 0 4px; font-size: 14px; font-weight: 700; color: var(--fg); }
+  .annot p { margin: 0; font-size: 12px; color: var(--fg-2); line-height: 1.5; }
+
+  /* footer attribution */
+  .footer {
+    margin-top: 36px; padding-top: 20px;
+    border-top: 1px solid var(--line);
+    display: flex; justify-content: space-between;
+    font-family: "JetBrains Mono", monospace; font-size: 10px;
+    color: var(--dim); letter-spacing: .14em; text-transform: uppercase;
+  }
+
+  /* utility */
+  .k-hint {
+    font-family: "JetBrains Mono", monospace; font-size: 10px;
+    padding: 3px 7px; border-radius: 5px;
+    background: var(--bg); color: var(--mute); border: 1px solid var(--line-dim);
+    letter-spacing: .1em;
+  }
+
+  @media (max-width: 1400px) {
+    .terminal-body { grid-template-columns: 1.2fr 1fr; }
+    .terminal-body .col:nth-child(3) { grid-column: 1 / -1; }
+  }
+  @media (max-width: 900px) {
+    .canvas { padding: 24px 16px 40px; }
+    .terminal-body { grid-template-columns: 1fr; padding: 10px; }
+    .annot-strip { grid-template-columns: 1fr 1fr; }
+  }
+</style>
+</head>
+<body data-screen-label="POS v10">
+<main class="canvas">
+
+  <!-- intro -->
+  <section class="intro">
+    <div class="left">
+      <div class="eyb">
+        <span class="n">005</span>
+        <span class="rule"></span>
+        POS · Pharmacy terminal · Arabic / RTL
+      </div>
+      <h1>The counter, <em>but clinical</em>.</h1>
+      <p>A touch-first terminal for pharmacy cashiers who are also clinicians. Shift, cart, counseling, cross-sell, and one-press checkout — on the same screen. Editorial density over feature creep.</p>
+    </div>
+    <div class="meta">
+      <div>Terminal · 1920 × 1080</div>
+      <div>IBM Plex Sans Arabic + JetBrains Mono</div>
+      <div>Touch + keyboard · RTL-first</div>
+    </div>
+  </section>
+
+  <!-- TERMINAL -->
+  <div class="terminal">
+
+    <!-- STATUS STRIP -->
+    <div class="status-strip">
+      <div style="display:flex; align-items:center;">
+        <span class="sync"><span class="dot"></span>Connected · cloud sync</span>
+        <span class="last-sync">last sync 08:47:12</span>
+      </div>
+      <div class="hr-block">
+        <span class="commish">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3 7h7l-5.5 4.5L18 22l-6-4-6 4 1.5-8.5L2 9h7z"/></svg>
+          Earned shift commission · <span style="font-weight:800; margin-right: 4px;">84.20 EGP</span>
+        </span>
+        <div class="target">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6M18 9h1.5a2.5 2.5 0 0 0 0-5H18M4 22h16M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg>
+          <div class="track"><div class="fill" style="width: 62%"></div></div>
+          <span class="pct">62% · 15K target</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- MASTHEAD -->
+    <div class="masthead">
+      <div class="brand">
+        <div class="mark">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12h3l2-6 4 12 3-9 2 5h6"/></svg>
+        </div>
+        <div>
+          <div class="wd-name">DataPulse <span>Omni</span></div>
+          <div class="wd-sub">AI · DELIVERY · CLINICAL EDITION</div>
+        </div>
+      </div>
+      <div class="right-block">
+        <div class="clock">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+          <span class="t">٠٨:٤٧:٣٢</span>
+        </div>
+        <div class="user">
+          <div class="av"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2M12 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8z"/></svg></div>
+          <div>
+            <div class="nm">د. أحمد مجدي</div>
+            <div class="rl">SHIFT SHF-2841 · T01</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- BODY -->
+    <div class="terminal-body">
+
+      <!-- ═══ COL 1 · CART ═══ -->
+      <div class="col">
+        <div class="pane" style="flex: 1;">
+
+          <div class="customer-bar">
+            <div class="phone-input">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+              <input type="text" value="01198765432" placeholder="رقم هاتف العميل..." />
+            </div>
+
+            <div class="customer-card">
+              <div class="l">
+                <div class="av"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM8 22v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2"/></svg></div>
+                <div>
+                  <div class="nm">أستاذة منى (مريضة ضغط)</div>
+                  <div class="sub">نقاط الولاء: 300 · VIP منذ 2023</div>
+                </div>
+              </div>
+              <div style="text-align:left;">
+                <div class="credit-lbl">آجل</div>
+                <div class="credit-val">0.00 EGP</div>
+              </div>
+            </div>
+
+            <div class="churn-alert">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3zM19 10v2a7 7 0 0 1-14 0v-2M12 19v3"/></svg>
+              <div>
+                <div class="t">⚡ Churn risk detected — AI</div>
+                <div class="b">6 days late on <b>كونكور 5 ملجم</b> refill. Prompt refill + wellness check recommended.</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="scan-bar">
+            <svg class="scan-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2M3 12h18"/></svg>
+            <input type="text" placeholder="مسح باركود أو بحث عن صنف..." value="" />
+            <span class="kbd-hint">/</span>
+          </div>
+
+          <div class="cart-list">
+            <div class="cart-item active">
+              <button class="trash"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6l-1.5 14a2 2 0 0 1-2 2h-7a2 2 0 0 1-2-2L5 6M10 11v6M14 11v6M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/></svg></button>
+              <div class="qty-box">
+                <button><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M5 12h14"/></svg></button>
+                <span class="q">2</span>
+                <button><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 5v14M5 12h14"/></svg></button>
+              </div>
+              <div class="body">
+                <h4>أوجمنتين 1جم</h4>
+                <div class="tags">
+                  <span class="tag price">130.00 EGP / حبة</span>
+                  <span class="tag bonus">
+                    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3 7h7l-5.5 4.5L18 22l-6-4-6 4 1.5-8.5L2 9h7z"/></svg>
+                    صنف حافز 3%
+                  </span>
+                </div>
+              </div>
+              <div class="sum">260.00</div>
+            </div>
+
+            <div class="cart-item">
+              <button class="trash"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6l-1.5 14a2 2 0 0 1-2 2h-7a2 2 0 0 1-2-2L5 6"/></svg></button>
+              <div class="qty-box">
+                <button><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M5 12h14"/></svg></button>
+                <span class="q">1</span>
+                <button><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 5v14M5 12h14"/></svg></button>
+              </div>
+              <div class="body">
+                <h4>كونكور 5 ملجم</h4>
+                <div class="tags">
+                  <span class="tag price">65.00 EGP / حبة</span>
+                </div>
+              </div>
+              <div class="sum">65.00</div>
+            </div>
+
+            <div class="cart-item">
+              <button class="trash"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6l-1.5 14a2 2 0 0 1-2 2h-7a2 2 0 0 1-2-2L5 6"/></svg></button>
+              <div class="qty-box">
+                <button><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M5 12h14"/></svg></button>
+                <span class="q">2</span>
+                <button><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 5v14M5 12h14"/></svg></button>
+              </div>
+              <div class="body">
+                <h4>فيتامين سي 1000 + زنك فوار</h4>
+                <div class="tags">
+                  <span class="tag price">45.00 EGP / علبة</span>
+                  <span class="tag bonus">
+                    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3 7h7l-5.5 4.5L18 22l-6-4-6 4 1.5-8.5L2 9h7z"/></svg>
+                    حافز 10%
+                  </span>
+                </div>
+              </div>
+              <div class="sum">90.00</div>
+            </div>
+
+            <div class="cart-item">
+              <button class="trash"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6l-1.5 14a2 2 0 0 1-2 2h-7a2 2 0 0 1-2-2L5 6"/></svg></button>
+              <div class="qty-box">
+                <button><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M5 12h14"/></svg></button>
+                <span class="q">1</span>
+                <button><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 5v14M5 12h14"/></svg></button>
+              </div>
+              <div class="body">
+                <h4>بندول إكسترا</h4>
+                <div class="tags">
+                  <span class="tag price">30.00 EGP / شريط</span>
+                </div>
+              </div>
+              <div class="sum">30.00</div>
+            </div>
+          </div>
+
+          <div class="cart-foot">
+            <div class="cart-totals">
+              <div>
+                <div style="font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--mute); letter-spacing:.22em; text-transform:uppercase; font-weight:700; margin-bottom: 4px;">إجمالي السلة · 4 أصناف</div>
+                <div class="lbl">المستحق للتحصيل</div>
+              </div>
+              <div class="val"><span class="u">EGP</span>445.00</div>
+            </div>
+            <button class="checkout-btn">
+              بدء الدفع وتوجيه الطلب
+              <span class="kbd">⏎ Enter</span>
+            </button>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- ═══ COL 2 · CATALOG + SHIFT ═══ -->
+      <div class="col">
+        <div class="pane" style="flex:1;">
+          <div class="pane-head">
+            <h3>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m10.5 20.5-5-5a7.07 7.07 0 0 1 10-10l5 5a7.07 7.07 0 0 1-10 10z"/></svg>
+              الأصناف السريعة
+            </h3>
+            <div class="meta-r">5 of 214 SKUs</div>
+          </div>
+
+          <div class="catalog-grid">
+            <button class="sku-btn" style="--sku-accent: var(--cyan);">
+              <div class="top-row">
+                <span class="price-chip">45.00 EGP</span>
+              </div>
+              <div class="nm">أوميز 20 ملجم (كبسول)</div>
+              <div class="meta-foot"><span>120 stock</span><span>EXP 05/2027</span></div>
+            </button>
+
+            <button class="sku-btn" style="--sku-accent: var(--amber);">
+              <div class="top-row">
+                <span class="price-chip" style="color: var(--amber);">30.00 EGP</span>
+              </div>
+              <div class="nm">بندول إكسترا</div>
+              <div class="meta-foot"><span class="low">45 · low</span><span>EXP 11/2025</span></div>
+            </button>
+
+            <button class="sku-btn" style="--sku-accent: var(--red);">
+              <div class="top-row">
+                <span class="price-chip" style="color: var(--red);">65.00 EGP</span>
+              </div>
+              <div class="nm">كونكور 5 ملجم</div>
+              <div class="meta-foot"><span class="low">15 · reorder</span><span>EXP 02/2026</span></div>
+            </button>
+
+            <button class="sku-btn" style="--sku-accent: var(--gold);">
+              <div class="top-row">
+                <span class="price-chip">130.00 EGP</span>
+                <span class="star"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3 7h7l-5.5 4.5L18 22l-6-4-6 4 1.5-8.5L2 9h7z"/></svg></span>
+              </div>
+              <div class="nm">أوجمنتين 1جم</div>
+              <div class="meta-foot"><span class="low">8 · reorder</span><span>EXP 08/2026</span></div>
+            </button>
+
+            <button class="sku-btn" style="--sku-accent: var(--green);">
+              <div class="top-row">
+                <span class="price-chip">45.00 EGP</span>
+                <span class="star"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3 7h7l-5.5 4.5L18 22l-6-4-6 4 1.5-8.5L2 9h7z"/></svg></span>
+              </div>
+              <div class="nm">فيتامين سي 1000 + زنك</div>
+              <div class="meta-foot"><span style="color: var(--green); font-weight: 700;">200 stock</span><span>EXP 01/2028</span></div>
+            </button>
+
+            <button class="sku-btn" style="--sku-accent: var(--violet);">
+              <div class="top-row">
+                <span class="price-chip">18.00 EGP</span>
+              </div>
+              <div class="nm">فولتارين جل</div>
+              <div class="meta-foot"><span>76 stock</span><span>EXP 03/2027</span></div>
+            </button>
+          </div>
+
+          <!-- shift summary signature stripe -->
+          <div class="summary-stripe">
+            <span class="tag-t">Shift SHF-2841</span>
+            <span class="msg">
+              <b>47</b> transactions · avg basket <span class="hl">184 EGP</span> · <b>12</b> deliveries dispatched · opened <b>08:00</b>
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══ COL 3 · CLINICAL PANEL ═══ -->
+      <div class="col">
+        <div class="pane" style="flex:1;">
+          <div class="pane-head">
+            <h3>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h4l3-9 4 18 3-9h4"/></svg>
+              التثقيف والدعم السريري
+            </h3>
+            <div class="meta-r">SELECTED</div>
+          </div>
+
+          <div class="sel-head">
+            <h2>أوجمنتين 1جم</h2>
+            <div class="sel-meta-row">
+              <span class="sel-pill gen">Amoxicillin + Clavulanate</span>
+              <span class="sel-pill cat">مضاد حيوي</span>
+            </div>
+            <div class="counseling">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+              <div>
+                <div class="lbl">Counseling tip</div>
+                <div class="bd">يُفضل تناوله في بداية الوجبة لتقليل اضطرابات المعدة. يجب إكمال الجرعة كاملة حتى لو تحسنت الأعراض.</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="stats-grid">
+            <div class="stat-box">
+              <div class="lbl">الرصيد الحي</div>
+              <div class="val low">8</div>
+            </div>
+            <div class="stat-box">
+              <div class="lbl">أقرب انتهاء</div>
+              <div class="val" style="font-size: 18px; color: var(--fg);">08/2026</div>
+            </div>
+            <div class="stat-box" style="grid-column: 1 / -1;">
+              <div class="lbl">الموقع · الهامش</div>
+              <div style="display: flex; justify-content: space-between; align-items: baseline; margin-top: 4px;">
+                <span class="mono" style="font-weight:700; color: var(--fg); font-size: 14px;">رف C-05</span>
+                <span class="mono" style="color: var(--green); font-weight: 700;">+31.5 EGP margin · 24%</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="sub-head">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a4 4 0 1 0 0 8 4 4 0 0 0 0-8zM12 14v8M8 22h8"/></svg>
+            AI Cross-sell · boosts basket +18%
+          </div>
+          <div class="xsell-list">
+            <div class="xsell-row">
+              <div>
+                <div class="nm">فيتامين سي 1000 + زنك</div>
+                <div class="rsn">ROUTE · أثناء المضاد الحيوي</div>
+              </div>
+              <button>+ إضافة</button>
+            </div>
+            <div class="xsell-row">
+              <div>
+                <div class="nm">بروبيوتيك (أنتيرو جيرمينا)</div>
+                <div class="rsn">PROTECT · يحمي من اضطرابات القولون</div>
+              </div>
+              <button>+ إضافة</button>
+            </div>
+          </div>
+
+          <div class="sub-head">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 10l5-5 5 5M7 14l5 5 5-5"/></svg>
+            Generic alternatives
+          </div>
+          <div class="alt-list">
+            <div class="alt-row">
+              <div>
+                <div class="nm">هاي بويتك 1جم</div>
+                <div class="sv">يوفر 35 EGP</div>
+              </div>
+              <span class="px">95.00</span>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+    </div><!-- /body -->
+
+  </div><!-- /terminal -->
+
+  <!-- ANNOTATION RAIL -->
+  <div class="annot-strip">
+    <div class="annot cyan">
+      <div class="n">A · EDITORIAL</div>
+      <h4>Big numbers stay serif</h4>
+      <p>Fraunces on the grand total — display type earns its weight at the moment of truth. Everything else is Plex Sans Arabic for clarity.</p>
+    </div>
+    <div class="annot gold">
+      <div class="n">B · INCENTIVES</div>
+      <h4>Commission is ambient</h4>
+      <p>Gold stripe + live EGP counter at the top. No modal, no dashboard — the cashier sees their bonus grow as they sell.</p>
+    </div>
+    <div class="annot green">
+      <div class="n">C · CLINICAL</div>
+      <h4>Counseling first, stock second</h4>
+      <p>When an item is selected, the counseling tip is the largest surface in the panel. Pharmacists are clinicians before they are retailers.</p>
+    </div>
+    <div class="annot violet">
+      <div class="n">D · INTELLIGENCE</div>
+      <h4>AI nudges, not AI chatter</h4>
+      <p>Churn risk, cross-sell, alternatives — each appears only with a trigger (customer phone, selected SKU). No ambient chat panel.</p>
+    </div>
+  </div>
+
+  <div class="footer">
+    <span>DataPulse · Pharmacy POS · v10</span>
+    <span>IBM Plex Sans Arabic · Fraunces · JetBrains Mono</span>
+    <span>RTL · Touch-first · 2026</span>
+  </div>
+
+</main>
+</body>
+</html>
