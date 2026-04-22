@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useCallback, type ReactNode } from "react";
-import { Fraunces, JetBrains_Mono } from "next/font/google";
+import { Fraunces, JetBrains_Mono, Cairo } from "next/font/google";
 import { useSession, signIn } from "@/lib/auth-bridge";
 import { ThemeProvider } from "next-themes";
 import { SWRConfig } from "swr";
@@ -29,9 +29,24 @@ const jetbrainsMono = JetBrains_Mono({
   display: "swap",
 });
 
-// IBM Plex Sans Arabic = Arabic body copy on the POS + receipt surfaces
-// (cart item names, counseling text, customer names, thanks footer).
-const plexArabic = IBM_Plex_Sans_Arabic({
+// Arabic body copy on the POS + receipt surfaces (cart item names,
+// counseling text, customer names, thanks footer).
+//
+// NOTE: the v9 handoff README names IBM Plex Sans Arabic as the Arabic
+// font, but the existing DataPulse colors_and_type.css in the same
+// handoff bundle already defines Cairo as the primary Arabic font
+// (`--dp-font-ar: "Cairo", "Tajawal", …`), so we follow the CSS over
+// the README. Cairo also sidesteps a Next 15.5.15 name-resolution
+// failure against `IBM_Plex_Sans_Arabic` in `next build` (d.ts exports
+// it locally, CI rejects it — likely an SWC font-plugin allowlist drift).
+//
+// PR #615's squash merge into main dropped `IBM_Plex_Sans_Arabic` from
+// the import line during conflict resolution, but left the usage below,
+// leaving main in a broken "use without import" state. This PR fixes
+// both sides: swap to Cairo, add it to the import, keep the CSS var
+// name `--font-plex-arabic` so globals.css's `.pos-omni .font-arabic`
+// utility atom resolves without edits.
+const plexArabic = Cairo({
   subsets: ["arabic"],
   weight: ["400", "500", "600", "700"],
   variable: "--font-plex-arabic",
