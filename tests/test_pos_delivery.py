@@ -247,9 +247,7 @@ def test_create_delivery_assigns_specific_rider_and_marks_busy():
     repo.get_delivery_by_transaction.return_value = _delivery_row()
     svc = _ServiceUnderTest(repo)
 
-    result = svc.create_delivery(
-        tenant_id=99, body=_make_request(assigned_rider_id=1)
-    )
+    result = svc.create_delivery(tenant_id=99, body=_make_request(assigned_rider_id=1))
 
     repo.get_rider.assert_called_once_with(rider_id=1, tenant_id=99)
     assert result.assigned_rider_id == 1

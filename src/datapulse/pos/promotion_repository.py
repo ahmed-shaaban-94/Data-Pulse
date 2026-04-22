@@ -341,9 +341,7 @@ class PromotionRepository:
 
     def _delete_scope_active_ingredients(self, promotion_id: int) -> None:
         self._session.execute(
-            text(
-                "DELETE FROM pos.promotion_active_ingredients WHERE promotion_id = :pid"
-            ),
+            text("DELETE FROM pos.promotion_active_ingredients WHERE promotion_id = :pid"),
             {"pid": promotion_id},
         )
 

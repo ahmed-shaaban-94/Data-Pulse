@@ -98,15 +98,11 @@ class DeliveryMixin:
         Falls back to ``_DEFAULT_ETA_MINUTES`` when eta_minutes is not supplied.
         """
         if body.assigned_rider_id is not None:
-            rider_row = self._repo.get_rider(
-                rider_id=body.assigned_rider_id, tenant_id=tenant_id
-            )
+            rider_row = self._repo.get_rider(rider_id=body.assigned_rider_id, tenant_id=tenant_id)
             if rider_row is None:
                 raise RiderNotFoundError(body.assigned_rider_id)
             if rider_row["status"] != RiderStatus.available:
-                raise RiderUnavailableError(
-                    body.assigned_rider_id, rider_row["status"]
-                )
+                raise RiderUnavailableError(body.assigned_rider_id, rider_row["status"])
 
         eta = body.eta_minutes if body.eta_minutes is not None else _DEFAULT_ETA_MINUTES
         fee = body.delivery_fee if body.delivery_fee is not None else Decimal("0")

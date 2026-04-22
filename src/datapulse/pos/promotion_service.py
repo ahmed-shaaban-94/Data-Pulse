@@ -195,9 +195,7 @@ class PromotionService:
             Decimal("0"),
         )
 
-    def preview_matches(
-        self, tenant_id: int, req: PreviewMatchesRequest
-    ) -> PreviewMatchesResponse:
+    def preview_matches(self, tenant_id: int, req: PreviewMatchesRequest) -> PreviewMatchesResponse:
         """Return how many SKUs match the given scope+values in the product catalog."""
         return self._repo.preview_matches(tenant_id, req.scope, req.values)
 
