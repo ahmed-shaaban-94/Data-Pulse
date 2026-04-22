@@ -9,13 +9,13 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from decimal import Decimal
-from unittest.mock import MagicMock, call, patch
+from unittest.mock import MagicMock
 
 import pytest
 
 from datapulse.pos._service_delivery import (
-    DeliveryMixin,
     _DEFAULT_ETA_MINUTES,
+    DeliveryMixin,
     _build_delivery,
     _build_rider,
 )
@@ -25,7 +25,6 @@ from datapulse.pos.models.delivery import (
     CreateDeliveryRequest,
     DeliveryChannel,
     DeliveryResponse,
-    DeliveryStatus,
     RiderStatus,
 )
 
@@ -131,7 +130,9 @@ def test_build_delivery_embeds_rider_when_present():
 
 
 def test_build_delivery_no_rider_when_none():
-    row = _delivery_row(assigned_rider_id=None, rider_name=None, rider_phone=None, rider_status=None)
+    row = _delivery_row(
+        assigned_rider_id=None, rider_name=None, rider_phone=None, rider_status=None
+    )
     result = _build_delivery(row)
     assert result.rider is None
     assert result.assigned_rider_id is None
