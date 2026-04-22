@@ -86,3 +86,4 @@ docs/brain/_INDEX.md
 
 # Git worktrees
 .worktrees/
+.claude/scheduled_tasks.lock

@@ -10,6 +10,17 @@ class NotificationService:
     def __init__(self, repo: NotificationRepository) -> None:
         self._repo = repo
 
+    @classmethod
+    def for_session(cls, session) -> NotificationService:
+        """Construct a service for a caller-managed session.
+
+        Used by the SSE stream handler that opens/closes a fresh session
+        per poll tick (and therefore cannot use the standard FastAPI
+        ``Depends`` wiring that ties one session to one request). Keeps
+        the route layer from importing NotificationRepository directly.
+        """
+        return cls(NotificationRepository(session))
+
     def list_notifications(
         self, user_id: str, unread_only: bool = False, limit: int = 20
     ) -> list[NotificationResponse]:

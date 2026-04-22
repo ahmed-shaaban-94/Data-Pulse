@@ -8,13 +8,11 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Path, Query, Request
 from fastapi.responses import StreamingResponse
-from sqlalchemy.orm import Session
 
 from datapulse.api.auth import get_current_user
-from datapulse.api.deps import CurrentUser, get_tenant_session
+from datapulse.api.deps import CurrentUser, get_notification_service
 from datapulse.api.limiter import limiter
 from datapulse.notifications_center.models import NotificationCount, NotificationResponse
-from datapulse.notifications_center.repository import NotificationRepository
 from datapulse.notifications_center.service import NotificationService
 
 router = APIRouter(
@@ -22,12 +20,6 @@ router = APIRouter(
     tags=["notifications"],
     dependencies=[Depends(get_current_user)],
 )
-
-
-def get_notification_service(
-    session: Annotated[Session, Depends(get_tenant_session)],
-) -> NotificationService:
-    return NotificationService(NotificationRepository(session))
 
 
 ServiceDep = Annotated[NotificationService, Depends(get_notification_service)]
@@ -91,8 +83,8 @@ async def notification_stream(
                 try:
                     session.execute(sa_text("SET LOCAL app.tenant_id = :tid"), {"tid": tenant_id})
                     session.execute(sa_text("SET LOCAL statement_timeout = '10s'"))
-                    repo = NotificationRepository(session)
-                    count = repo.unread_count(user_id)
+                    service = NotificationService.for_session(session)
+                    count = service.unread_count(user_id).unread
                     if count != last_count:
                         last_count = count
                         data = json.dumps({"unread": count})
