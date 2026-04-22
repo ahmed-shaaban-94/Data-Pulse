@@ -25,6 +25,7 @@ import { ScanDisambigPicker } from "@/components/pos/terminal/ScanDisambigPicker
 import { ProvisionalBanner } from "@/components/pos/terminal/ProvisionalBanner";
 import { productToQuickPick, type TilePaymentMethod } from "@/components/pos/terminal/types";
 import { CheckoutConfirmModal } from "@/components/pos/terminal/CheckoutConfirmModal";
+import { ClinicalPanelSkeleton } from "@/components/pos/terminal/ClinicalPanelSkeleton";
 import { usePosCart } from "@/hooks/use-pos-cart";
 import { usePosCheckout } from "@/hooks/use-pos-checkout";
 import { usePosProducts } from "@/hooks/use-pos-products";
@@ -469,15 +470,31 @@ export default function PosTerminalPage() {
 
       {isOffline && <ProvisionalBanner pending={offline.pending} />}
 
-      {/* Main two-column layout (~1.45fr / 1fr) */}
+      {/* D1 — three-column layout (v9 handoff §1.3, 4fr / 3fr / 2.5fr).
+          Responsive cascade:
+          - ≥1280px (xl): 3-col — Cart · Quick catalog · Clinical
+          - 1024–1280px (lg): 2-col — Cart·Catalog on one row, Clinical below
+          - <1024px: single column stack
+       */}
       <main
         className={cn(
-          "flex flex-1 gap-3.5 overflow-hidden p-3.5",
-          "grid grid-cols-[minmax(0,1.45fr)_minmax(400px,1fr)]",
+          "grid flex-1 gap-3.5 overflow-hidden p-3.5",
+          "grid-cols-1",
+          "lg:grid-cols-[minmax(0,1.45fr)_minmax(0,1fr)] lg:grid-rows-[minmax(0,1fr)_minmax(0,auto)]",
+          "xl:grid-cols-[minmax(0,4fr)_minmax(0,3fr)_minmax(0,2.5fr)] xl:grid-rows-1",
         )}
       >
-        {/* LEFT column */}
-        <section className="flex min-w-0 flex-col gap-3 overflow-hidden">
+        {/* COL 1 — Cart column (handoff: customer bar → churn alert → scan
+            → cart list → cart foot with grand total + CTA). D3 adds the
+            customer bar and churn card above the scan bar. */}
+        <section
+          aria-label="Cart column"
+          className={cn(
+            "flex min-w-0 flex-col gap-3 overflow-hidden",
+            "lg:row-start-1 lg:col-start-1",
+            "xl:col-start-1",
+          )}
+        >
           <ScanBar
             ref={scanInputRef}
             value={scanQuery}
@@ -485,68 +502,95 @@ export default function PosTerminalPage() {
             onSubmit={handleScanSubmit}
             isOnline={!isOffline}
           />
-          <QuickPickGrid items={quickPick} onPick={addQuickPick} />
-          <CartTable
-            items={items}
-            unsyncedCodes={unsyncedCodes}
-            itemCount={itemCount}
-            averageItem={averageItem}
-            onIncrement={handleIncrement}
-            onDecrement={handleDecrement}
-            onRemove={handleRemove}
-          />
-        </section>
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+            <CartTable
+              items={items}
+              unsyncedCodes={unsyncedCodes}
+              itemCount={itemCount}
+              averageItem={averageItem}
+              onIncrement={handleIncrement}
+              onDecrement={handleDecrement}
+              onRemove={handleRemove}
+            />
+          </div>
 
-        {/* RIGHT column — D0 simplified: total + F-key legend + open-modal CTA.
-            Phase D1 will shrink this column to 2.5fr and add the Clinical/AI
-            panel; keypad + tiles + strip + charge all live inside
-            CheckoutConfirmModal (rendered at the bottom of this tree). */}
-        <section className="flex min-h-0 flex-col gap-3 overflow-y-auto">
-          <TotalsHero
-            subtotal={subtotal}
-            grandTotal={grandTotal}
-            itemDiscountTotal={itemDiscountTotal}
-            voucherDiscount={voucherDiscount}
-            taxTotal={taxTotal}
-            itemCount={itemCount}
-            voucherCode={voucherCode}
-            insuranceCoveragePct={insurance?.coveragePct ?? null}
-          />
-          <ShortcutLegend />
-          <button
-            type="button"
-            onClick={() => setCheckoutOpen(true)}
-            disabled={chargeDisabled}
-            aria-label={`Start checkout for EGP ${fmtEgp(grandTotal)} (Enter)`}
-            data-testid="start-checkout-button"
-            className={cn(
-              "grid items-center gap-3 rounded-xl px-5 py-4 transition-all duration-200",
-              "[grid-template-columns:auto_1fr_auto]",
-              chargeDisabled
-                ? "cursor-not-allowed border border-[var(--pos-line)] bg-white/[0.04] text-[var(--pos-ink-2)]"
-                : cn(
-                    "cursor-pointer border-0 text-[#021018]",
-                    "bg-gradient-to-b from-[#5cdfff] to-[#00a6cc]",
-                    "shadow-[0_0_24px_rgba(0,199,242,0.4),0_6px_16px_rgba(0,199,242,0.25),inset_0_1px_0_rgba(255,255,255,0.35)]",
-                    "hover:from-[#6be5ff] hover:to-[#00b5dd]",
-                  ),
-            )}
-          >
-            <span className="text-[18px] font-bold">Start Checkout</span>
-            <span className="text-center font-mono text-[22px] font-bold tabular-nums">
-              EGP {fmtEgp(grandTotal)}
-            </span>
-            <kbd
+          {/* Cart foot — handoff §1.3 "sticky bottom": totals hero + Start
+              Checkout CTA. Always visible above the fold. */}
+          <div className="flex flex-col gap-3 border-t border-[var(--pos-line)] pt-3">
+            <TotalsHero
+              subtotal={subtotal}
+              grandTotal={grandTotal}
+              itemDiscountTotal={itemDiscountTotal}
+              voucherDiscount={voucherDiscount}
+              taxTotal={taxTotal}
+              itemCount={itemCount}
+              voucherCode={voucherCode}
+              insuranceCoveragePct={insurance?.coveragePct ?? null}
+            />
+            <button
+              type="button"
+              onClick={() => setCheckoutOpen(true)}
+              disabled={chargeDisabled}
+              aria-label={`Start checkout for EGP ${fmtEgp(grandTotal)} (Enter)`}
+              data-testid="start-checkout-button"
               className={cn(
-                "rounded border px-2 py-0.5 font-mono text-[10px] font-semibold",
+                "grid items-center gap-3 rounded-xl px-5 py-4 transition-all duration-200",
+                "[grid-template-columns:auto_1fr_auto]",
                 chargeDisabled
-                  ? "border-[var(--pos-line)] bg-white/[0.04] text-[var(--pos-ink-3)]"
-                  : "border-[rgba(2,16,24,0.3)] bg-[rgba(2,16,24,0.22)] text-[#021018]",
+                  ? "cursor-not-allowed border border-[var(--pos-line)] bg-white/[0.04] text-[var(--pos-ink-2)]"
+                  : cn(
+                      "cursor-pointer border-0 text-[#021018]",
+                      "bg-gradient-to-b from-[#5cdfff] to-[#00a6cc]",
+                      "shadow-[0_0_24px_rgba(0,199,242,0.4),0_6px_16px_rgba(0,199,242,0.25),inset_0_1px_0_rgba(255,255,255,0.35)]",
+                      "hover:from-[#6be5ff] hover:to-[#00b5dd]",
+                    ),
               )}
             >
-              Enter ↵
-            </kbd>
-          </button>
+              <span className="text-[18px] font-bold">Start Checkout</span>
+              <span className="text-center font-mono text-[22px] font-bold tabular-nums">
+                EGP {fmtEgp(grandTotal)}
+              </span>
+              <kbd
+                className={cn(
+                  "rounded border px-2 py-0.5 font-mono text-[10px] font-semibold",
+                  chargeDisabled
+                    ? "border-[var(--pos-line)] bg-white/[0.04] text-[var(--pos-ink-3)]"
+                    : "border-[rgba(2,16,24,0.3)] bg-[rgba(2,16,24,0.22)] text-[#021018]",
+                )}
+              >
+                Enter ↵
+              </kbd>
+            </button>
+          </div>
+        </section>
+
+        {/* COL 2 — Quick catalog column. D6 will rebuild QuickPickGrid per
+            handoff (category accents, bonus stars, expiry meta, tactile
+            press animation). D1 just relocates it to its final home. */}
+        <section
+          aria-label="Quick catalog column"
+          className={cn(
+            "flex min-w-0 flex-col gap-3 overflow-hidden",
+            "lg:row-start-1 lg:col-start-2",
+            "xl:col-start-2",
+          )}
+        >
+          <ShortcutLegend />
+          <QuickPickGrid items={quickPick} onPick={addQuickPick} />
+        </section>
+
+        {/* COL 3 — Clinical / AI column. D1 renders a skeleton only;
+            D2 replaces with the real ClinicalPanel wired to an
+            `activeDrugCode` derived from the cart. */}
+        <section
+          aria-label="Clinical and AI column"
+          className={cn(
+            "flex min-w-0 flex-col overflow-hidden",
+            "lg:col-span-2 lg:row-start-2",
+            "xl:col-start-3 xl:col-span-1 xl:row-start-1",
+          )}
+        >
+          <ClinicalPanelSkeleton activeDrugCode={null} />
         </section>
       </main>
 
