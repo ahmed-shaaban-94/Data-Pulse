@@ -41,6 +41,10 @@ class TestBillingServiceRouting:
         assert exc_info.value.currency == "EGP"
 
     def test_unknown_currency_raises(self):
-        svc = _billing_service({})
+        # BillingService requires a USD provider at construction time
+        # (back-compat with the pre-refactor Stripe-only shape). An
+        # unregistered non-USD currency still raises ProviderUnavailable.
+        stripe = _stub_provider("USD", "stripe")
+        svc = _billing_service({"USD": stripe})
         with pytest.raises(ProviderUnavailableError):
             svc._provider_for("JPY")

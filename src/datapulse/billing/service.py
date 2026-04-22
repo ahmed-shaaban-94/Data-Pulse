@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from typing import cast
 from urllib.parse import urlparse
 
 import structlog
@@ -59,7 +60,10 @@ class BillingService:
         # Back-compat shim — checkout/portal/webhook code paths still reference
         # self._stripe directly. Route all new access through _provider_for;
         # existing call-sites migrate in a follow-up task (PR 2 keeps behaviour).
-        self._stripe = providers.get("USD")  # type: ignore[assignment]
+        # USD provider is required — raises KeyError if missing, mirroring
+        # pre-refactor behaviour where BillingService always received a
+        # StripeClient. Post-Spec-2 the USD requirement may relax.
+        self._stripe: PaymentProvider = providers["USD"]
         self._price_to_plan = price_to_plan
         self._base_url = base_url
 
@@ -221,7 +225,11 @@ class BillingService:
                 name=tenant_name,
                 metadata={"tenant_id": str(tenant_id)},
             )
-            customer_id = customer.id
+            # Stripe always returns a non-None id on successful create.
+            # cast() narrows the type for mypy; assert fails loudly if the
+            # SDK ever breaks that guarantee at runtime.
+            assert customer.id, "Stripe.Customer.create returned no id"
+            customer_id = cast(str, customer.id)
             self._repo.set_stripe_customer_id(tenant_id, customer_id)
             logger.info(
                 "stripe_customer_created",
