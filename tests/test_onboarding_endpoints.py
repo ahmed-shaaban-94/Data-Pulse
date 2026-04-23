@@ -161,9 +161,7 @@ class TestLoadSample:
         assert kwargs["tenant_id"] == 1
         assert kwargs["user_id"] == "test-user"
 
-    def test_load_sample_rejects_non_numeric_tenant_id(
-        self, app, mock_sample_service
-    ):
+    def test_load_sample_rejects_non_numeric_tenant_id(self, app, mock_sample_service):
         """Route returns 400 when auth provides a non-numeric tenant_id."""
         bad_user = {
             "sub": "test-user",
