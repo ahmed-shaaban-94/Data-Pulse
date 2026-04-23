@@ -140,9 +140,12 @@ def embed_query(
             _assert_safe_select_sql(sql)
 
             start = time.perf_counter()
-            # sql_builder validates identifiers via _SAFE_IDENT whitelist
-            # and binds all user values as :param parameters (not interpolated).
-            result = session.execute(text(sql), params)
+            # Identifiers (table/column names) are validated against _SAFE_IDENT
+            # (^[a-z_][a-z0-9_]*$) in explore/sql_builder.py before interpolation.
+            # All filter values are passed as SQLAlchemy :param bindings — never
+            # interpolated into the query string.
+            # codeql[py/sql-injection] false-positive: whitelist + parameterised values
+            result = session.execute(text(sql), params)  # noqa: S608
             columns = list(result.keys())
             rows: list[list] = []
             truncated = False
