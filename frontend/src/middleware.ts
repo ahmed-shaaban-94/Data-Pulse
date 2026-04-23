@@ -1,43 +1,10 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { getToken } from "next-auth/jwt";
-import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
-
-const AUTH_PROVIDER =
-  (process.env.NEXT_PUBLIC_AUTH_PROVIDER as "auth0" | "clerk") || "auth0";
-
-/**
- * Derive the Clerk Frontend API origin.
- *
- * Clerk's publishable key base64-encodes the host followed by a ``$``
- * sentinel (e.g. ``pk_test_b3JpZW50ZWQtbGFyay02OC5jbGVyay5hY2NvdW50cy5kZXYk``
- * decodes to ``oriented-lark-68.clerk.accounts.dev$``). Decoding means the
- * CSP allow-list stays correct even when the operator forgets to set
- * ``NEXT_PUBLIC_CLERK_FRONTEND_API``. The explicit env var wins if present.
- */
-function clerkFrontendOrigin(): string {
-  const explicit = process.env.NEXT_PUBLIC_CLERK_FRONTEND_API;
-  if (explicit) return explicit.replace(/\/$/, "");
-
-  const pk = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY || "";
-  const prefix = pk.startsWith("pk_test_") ? "pk_test_" : pk.startsWith("pk_live_") ? "pk_live_" : "";
-  if (!prefix) return "";
-  const encoded = pk.slice(prefix.length);
-  try {
-    // Global ``atob`` is available in Edge Runtime where middleware runs.
-    const decoded = atob(encoded);
-    const host = decoded.replace(/\$$/, "");
-    return host ? `https://${host}` : "";
-  } catch {
-    return "";
-  }
-}
 
 /** Paths that do not require authentication. */
 const PUBLIC_PATHS = [
   "/login",
-  "/sign-in",    // Clerk hosted sign-in route
-  "/sign-up",    // Clerk hosted sign-up route
   "/api/auth",
   // dev-login removed — was a temporary dev bypass
   "/",           // Marketing landing page
@@ -53,6 +20,27 @@ function isPublicPath(pathname: string): boolean {
   return PUBLIC_PATHS.some(
     (p) => pathname === p || pathname.startsWith(p + "/"),
   );
+}
+
+function isLegacyAuthPath(pathname: string): boolean {
+  return (
+    pathname === "/sign-in" ||
+    pathname.startsWith("/sign-in/") ||
+    pathname === "/sign-up" ||
+    pathname.startsWith("/sign-up/")
+  );
+}
+
+function safeRedirectPath(pathname: string | null): string {
+  if (!pathname || !pathname.startsWith("/") || pathname.startsWith("//")) {
+    return "/dashboard";
+  }
+  return pathname;
+}
+
+function relativeRequestPath(request: NextRequest): string {
+  const search = request.nextUrl.search || "";
+  return safeRedirectPath(`${request.nextUrl.pathname}${search}`);
 }
 
 /**
@@ -101,13 +89,8 @@ function applyCommonHeaders(
 
   const auth0Domain = process.env.AUTH0_DOMAIN || "";
   const auth0Origin = auth0Domain ? `https://${auth0Domain}` : "";
-  const clerkOrigin = AUTH_PROVIDER === "clerk" ? clerkFrontendOrigin() : "";
   const isDev = process.env.NODE_ENV === "development";
-
-  // Allow scripts from Clerk when active — Clerk injects its JS from its
-  // own CDN (e.g. https://oriented-lark-68.clerk.accounts.dev/). Keep the
-  // Auth0 additions for the return path.
-  const scriptExtras = [auth0Origin, clerkOrigin].filter(Boolean).join(" ");
+  const scriptExtras = auth0Origin;
 
   const scriptSrc = isDev
     ? `script-src 'self' 'unsafe-inline' 'unsafe-eval' ${scriptExtras}`.trim()
@@ -135,28 +118,30 @@ function applyCommonHeaders(
   return response;
 }
 
-const isProtectedRoute = createRouteMatcher([
-  "/((?!sign-in|sign-up|login|api/auth|embed|demo|terms|privacy|landing|$).*)",
-]);
-
-// --- Clerk path --------------------------------------------------------
-const clerkMw = clerkMiddleware(async (auth, request) => {
-  const tenantDomain = resolveTenantDomain(request);
-  if (isProtectedRoute(request)) {
-    const { userId } = await auth();
-    if (!userId) {
-      const loginUrl = new URL("/sign-in", request.url);
-      loginUrl.searchParams.set("redirect_url", request.url);
-      return NextResponse.redirect(loginUrl);
-    }
+async function redirectLegacyAuthPath(request: NextRequest): Promise<NextResponse | null> {
+  if (!isLegacyAuthPath(request.nextUrl.pathname)) {
+    return null;
   }
-  return applyCommonHeaders(NextResponse.next(), tenantDomain);
-});
+  const callbackUrl = safeRedirectPath(
+    request.nextUrl.searchParams.get("redirect_url") ??
+      request.nextUrl.searchParams.get("callbackUrl"),
+  );
+  const token = await getToken({
+    req: request,
+    secret: process.env.NEXTAUTH_SECRET,
+  });
+  const target = token ? callbackUrl : `/login?callbackUrl=${encodeURIComponent(callbackUrl)}`;
+  return NextResponse.redirect(new URL(target, request.url));
+}
 
-// --- Auth0 / NextAuth path --------------------------------------------
-async function nextAuthMiddleware(request: NextRequest): Promise<NextResponse> {
+export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const tenantDomain = resolveTenantDomain(request);
+  const legacyRedirect = await redirectLegacyAuthPath(request);
+
+  if (legacyRedirect) {
+    return applyCommonHeaders(legacyRedirect, tenantDomain);
+  }
 
   if (!isPublicPath(pathname)) {
     const token = await getToken({
@@ -166,21 +151,12 @@ async function nextAuthMiddleware(request: NextRequest): Promise<NextResponse> {
 
     if (!token) {
       const loginUrl = new URL("/login", request.url);
-      loginUrl.searchParams.set("callbackUrl", request.url);
+      loginUrl.searchParams.set("callbackUrl", relativeRequestPath(request));
       return NextResponse.redirect(loginUrl);
     }
   }
 
   return applyCommonHeaders(NextResponse.next(), tenantDomain);
-}
-
-// Single exported middleware — branches on the active provider so flipping
-// NEXT_PUBLIC_AUTH_PROVIDER does not require swapping import paths.
-export function middleware(request: NextRequest) {
-  if (AUTH_PROVIDER === "clerk") {
-    return clerkMw(request, {} as never);
-  }
-  return nextAuthMiddleware(request);
 }
 
 export const config = {

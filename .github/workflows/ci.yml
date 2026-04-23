@@ -35,6 +35,10 @@ jobs:
         # Grandfathered offenders are listed in
         # scripts/.known-api-layer-violations. Uses stdlib only — no deps.
         run: python scripts/check_api_layer_imports.py
+      - name: Check auth provider contract
+        # Issue #654: keep the runtime/env contract Auth0-only and fail fast
+        # if Clerk-era drift reappears in the frontend or backend auth path.
+        run: python scripts/check_auth_contract.py
       - name: Migration safety lint (PR-changed migrations only)
         # Issue #608: flags dangerous DDL (ADD COLUMN NOT NULL, CREATE INDEX
         # without CONCURRENTLY, ALTER COLUMN TYPE, TRUNCATE) on any migration

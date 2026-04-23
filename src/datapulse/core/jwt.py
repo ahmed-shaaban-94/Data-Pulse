@@ -1,12 +1,4 @@
-"""JWT verification using the active IdP's JWKS endpoint.
-
-Reads the JWKS URL, issuer, audience, and expected ``azp`` from
-:class:`Settings`' ``active_*`` properties so the same code path verifies
-Auth0 tokens (``AUTH_PROVIDER=auth0``) or Clerk tokens
-(``AUTH_PROVIDER=clerk``) without branching. Keys are cached per URL with
-a TTL so swapping providers via env does not stomp a stale Auth0 cache
-onto a Clerk deployment.
-"""
+"""JWT verification using Auth0's JWKS endpoint."""
 
 from __future__ import annotations
 
@@ -24,20 +16,19 @@ _JWKS_RETRY_DELAYS: tuple[float, ...] = (0.5, 1.0, 2.0)  # seconds between attem
 
 logger = structlog.get_logger()
 
-# Module-level JWKS cache — keyed by URL so switching AUTH_PROVIDER at
-# runtime (or in tests) never returns the previous provider's keys.
+# Module-level JWKS cache keyed by JWKS URL.
 _jwks_cache: dict[str, tuple[dict[str, Any], float]] = {}
 _JWKS_CACHE_TTL: int = 3600  # 1 hour (keys rarely rotate; miss triggers forced refresh)
 
 
 def _fetch_jwks(settings: Settings) -> dict[str, Any]:
-    """Fetch JWKS from the active IdP, with in-memory TTL cache and retry backoff.
+    """Fetch Auth0 JWKS with in-memory TTL cache and retry backoff.
 
     Attempts up to 3 times (delays: 0.5s, 1s, 2s) on network/timeout errors.
     HTTP 4xx responses are not retried — they indicate a configuration error.
     Returns stale cache as a last resort before raising 503.
     """
-    jwks_url = settings.active_jwks_url
+    jwks_url = settings.auth0_jwks_url
     if not jwks_url:
         raise HTTPException(
             status_code=503,
@@ -57,9 +48,7 @@ def _fetch_jwks(settings: Settings) -> dict[str, Any]:
             resp.raise_for_status()
             data = resp.json()
             _jwks_cache[jwks_url] = (data, time.monotonic())
-            logger.info(
-                "jwks_fetched", url=jwks_url, attempt=attempt, provider=settings.auth_provider
-            )
+            logger.info("jwks_fetched", url=jwks_url, attempt=attempt, provider="auth0")
             return data
         except httpx.HTTPStatusError as exc:
             # 4xx errors are not transient — don't retry
@@ -115,7 +104,7 @@ def _get_signing_key(token: str, settings: Settings) -> jwt.PyJWK:
             return key
 
     # Key not found — maybe keys rotated; expire this URL's cache and retry once
-    _jwks_cache.pop(settings.active_jwks_url, None)
+    _jwks_cache.pop(settings.auth0_jwks_url, None)
     jwks_data = _fetch_jwks(settings)
 
     try:
@@ -134,7 +123,7 @@ def _get_signing_key(token: str, settings: Settings) -> jwt.PyJWK:
 
 
 def verify_jwt(token: str, settings: Settings | None = None) -> dict[str, Any]:
-    """Decode and verify a JWT using the active IdP's JWKS keys.
+    """Decode and verify an Auth0 JWT using the configured JWKS keys.
 
     Returns the decoded claims dict on success.
     Raises HTTPException(401) on invalid/expired tokens.
@@ -144,14 +133,14 @@ def verify_jwt(token: str, settings: Settings | None = None) -> dict[str, Any]:
         settings = get_settings()
 
     signing_key = _get_signing_key(token, settings)
-    audience = settings.active_audience
+    audience = settings.auth0_audience
 
     try:
         claims = jwt.decode(
             token,
             signing_key.key,
             algorithms=["RS256"],
-            issuer=settings.active_issuer_url,
+            issuer=settings.auth0_issuer_url,
             audience=audience or None,
             options={
                 "verify_exp": True,
@@ -169,11 +158,8 @@ def verify_jwt(token: str, settings: Settings | None = None) -> dict[str, Any]:
         logger.warning("jwt_validation_failed", error=str(exc))
         raise HTTPException(status_code=401, detail="Invalid token") from exc
 
-    # Verify azp (authorized party) only when the active IdP supplies a
-    # stable expected value. Auth0 puts the client_id there; Clerk puts the
-    # Frontend API URL which is already covered by the issuer check, so we
-    # deliberately skip azp for Clerk.
-    expected_azp = settings.active_expected_azp
+    # Auth0 puts the application client_id in ``azp`` when present.
+    expected_azp = settings.auth0_client_id
     if expected_azp:
         azp = claims.get("azp")
         if azp and azp != expected_azp:
@@ -183,5 +169,5 @@ def verify_jwt(token: str, settings: Settings | None = None) -> dict[str, Any]:
 
 
 def clear_jwks_cache() -> None:
-    """Clear the JWKS cache (useful for testing and provider swaps)."""
+    """Clear the JWKS cache (useful for testing)."""
     _jwks_cache.clear()

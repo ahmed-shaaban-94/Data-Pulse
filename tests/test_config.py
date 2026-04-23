@@ -126,6 +126,14 @@ class TestSettings:
         )
         assert s.sentry_environment == "production"
 
+    def test_rejects_legacy_auth_provider_flag(self):
+        with pytest.raises(ValidationError, match="Input should be 'auth0'"):
+            _settings(auth_provider="clerk")
+
+    def test_rejects_legacy_clerk_runtime_vars(self):
+        with pytest.raises(ValidationError, match="Legacy Clerk runtime variables"):
+            _settings(clerk_secret_key="sk_test_legacy")
+
     def test_cors_wildcard_is_rejected(self):
         """CORS_ORIGINS=['*'] with credentials is a CSRF cliff (#546)."""
         with pytest.raises(ValidationError, match="CORS_ORIGINS"):

@@ -113,7 +113,7 @@ tests/                  # pytest: 237 test files, unit coverage enforced at 77% 
 | `api` | datapulse-api | 8000 | FastAPI analytics API |
 | `frontend` | datapulse-frontend | 3000 | Next.js dashboard |
 | `redis` | datapulse-redis | (internal) | Redis cache |
-| Auth0 / Clerk | Managed SaaS | — | Auth (OAuth2/OIDC) — `AUTH_PROVIDER` flag picks the active IdP |
+| Auth0 | Managed SaaS | — | Auth (OAuth2/OIDC) |
 
 ```bash
 docker compose up -d --build
@@ -159,8 +159,8 @@ docker exec -it datapulse-api python -m datapulse.bronze.loader --source /app/da
 - Inline comments: Arabic where helpful for clarity (mixed)
 
 ### Security
-- **Authentication**: dual-provider — `AUTH_PROVIDER=auth0|clerk` (.env) picks the active IdP. Backend JWT verification reads `active_jwks_url` / `active_issuer_url` / `active_audience` from `core/config.py`, so `core/jwt.py` never branches on provider. Frontend uses a bridge (`frontend/src/lib/auth-bridge.tsx`) exposing NextAuth's `useSession`/`signIn`/`signOut` API backed by either `@clerk/nextjs` or `next-auth/react`; the `SessionProvider` mounts whichever is active. Clerk is a **temporary swap while clients are small** — flip `AUTH_PROVIDER=auth0` and `NEXT_PUBLIC_AUTH_PROVIDER=auth0` to return. The Clerk JWT template named `datapulse` must emit `tenant_id` + `roles` claims (see `scripts/clerk_setup.py`).
-- **⚠ Provider swap runbook**: `AUTH_PROVIDER` (backend, runtime) and `NEXT_PUBLIC_AUTH_PROVIDER` (frontend, baked in at build time) **must match** and the frontend must be **rebuilt** whenever you flip either one. A mismatch = backend rejects every frontend-issued token as `Invalid token issuer`. The `_warn_on_auth_provider_mismatch` validator in `core/config.py` logs a startup warning if `CLERK_SECRET_KEY` is set with `AUTH_PROVIDER=auth0` (or vice-versa).
+- **Authentication**: Auth0 is the only supported runtime provider. Backend JWT verification reads `auth0_jwks_url` / `auth0_issuer_url` / `auth0_audience` from `core/config.py`, and the frontend bridge (`frontend/src/lib/auth-bridge.tsx`) is a thin NextAuth/Auth0 wrapper so call sites stay stable.
+- **⚠ Auth config guard**: stale `AUTH_PROVIDER=clerk` or `CLERK_*` runtime vars now fail startup loudly in `core/config.py`, and CI checks the frontend/env contract so auth drift becomes a fast failure instead of a partial rollout.
 - Multi-strategy auth: Bearer JWT (primary) + API Key (service-to-service) + dev mode fallback
 - All credentials via `.env` file (never hardcoded in source)
 - Docker ports bound to `127.0.0.1` only

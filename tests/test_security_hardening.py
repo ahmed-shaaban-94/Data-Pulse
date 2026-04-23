@@ -187,10 +187,9 @@ class TestH2DevModeProductionBlock:
     """H2: Dev mode auth fallback must raise 503 in production."""
 
     def test_blocked_in_production(self):
-        # Dev-fallback gate reads ``_jwt_provider_configured`` so the check
-        # is uniform for Auth0 or Clerk. MagicMock returns truthy for unset
-        # attrs, which would silently skip the gate — set it explicitly to
-        # match an unconfigured provider.
+        # Dev-fallback gate reads ``_jwt_provider_configured``. MagicMock
+        # returns truthy for unset attrs, which would silently skip the gate
+        # — set it explicitly to match an unconfigured Auth0 deployment.
         settings = MagicMock(
             api_key="",
             auth0_domain="",
