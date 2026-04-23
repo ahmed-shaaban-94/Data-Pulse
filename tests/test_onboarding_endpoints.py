@@ -161,6 +161,25 @@ class TestLoadSample:
         assert kwargs["tenant_id"] == 1
         assert kwargs["user_id"] == "test-user"
 
+    def test_load_sample_rejects_non_numeric_tenant_id(
+        self, app, mock_sample_service
+    ):
+        """Route returns 400 when auth provides a non-numeric tenant_id."""
+        bad_user = {
+            "sub": "test-user",
+            "tenant_id": "not-a-number",
+            "roles": ["admin"],
+            "email": "",
+            "preferred_username": "",
+            "raw_claims": {},
+        }
+        app.dependency_overrides[get_current_user] = lambda: bad_user
+        resp = TestClient(app).post("/api/v1/onboarding/load-sample")
+
+        assert resp.status_code == 400
+        assert resp.json()["detail"] == "invalid tenant_id"
+        mock_sample_service.load.assert_not_called()
+
     def test_load_sample_requires_auth(self, client):
         """Sanity: the route is mounted under the auth-required prefix."""
         # Dev-mode fallback returns 200 in the test harness, but calling service
