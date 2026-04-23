@@ -16,9 +16,10 @@ Why HMAC, not plain SHA-256
 ---------------------------
 4–6 digit PINs yield 10k–1M possible values. Unsalted SHA-256 is rainbow-
 tableable in milliseconds, so an attacker who reads a PIN hash column can
-recover the PIN trivially. Peppering with the server secret raises the
-precomputation cost to "attacker must also hold the server secret" — at
-which point the PIN is the least of anyone's problems.
+recover the PIN trivially. Peppering with the ``pipeline_webhook_secret``
+(same key used to sign the pharmacist-verification HMAC tokens) raises
+the precomputation cost to "attacker must also hold the server secret" —
+at which point the PIN is the least of anyone's problems.
 
 For multi-tenant production (customer #2+), migrate to scrypt + per-user
 random salt — tracked as follow-up.
@@ -53,16 +54,34 @@ _DEV_PIN_PEPPER = "dev-pos-pin-pepper-not-for-production"
 def _get_pepper() -> bytes:
     """Return the application-wide PIN-hashing pepper.
 
-    Uses ``settings.secret_key`` in production; falls back to a stable dev
-    string when the settings module cannot be imported (early-boot tests).
+    Uses ``settings.pipeline_webhook_secret`` (the same secret that signs
+    the pharmacist-verification HMAC tokens — one trust root for the whole
+    pharmacist-verify surface). If the secret is empty, the dev fallback
+    is only acceptable in dev/test environments — production with an empty
+    secret must fail loudly, because the dev pepper is a public string
+    committed to the repository and would leave PIN hashes as rainbow-
+    tableable as the unsalted SHA-256 it replaced.
     """
     try:
-        from datapulse.core.config import settings
+        from datapulse.core.config import get_settings, is_non_dev_env
 
-        secret = settings.secret_key or ""
-    except Exception:  # pragma: no cover — settings unavailable during unit tests
-        secret = ""
-    return (secret or _DEV_PIN_PEPPER).encode("utf-8")
+        settings = get_settings()
+    except ImportError:  # pragma: no cover — settings genuinely unavailable
+        return _DEV_PIN_PEPPER.encode("utf-8")
+
+    secret = (settings.pipeline_webhook_secret or "").strip()
+    if secret:
+        return secret.encode("utf-8")
+
+    # Empty secret: acceptable only in dev/test. Production/staging must raise.
+    if is_non_dev_env(settings.app_env, settings.sentry_environment):
+        raise RuntimeError(
+            "settings.pipeline_webhook_secret is empty in a non-dev "
+            "environment — PIN hashing cannot fall back to the public "
+            "dev pepper. Set PIPELINE_WEBHOOK_SECRET in the deployment "
+            "environment.",
+        )
+    return _DEV_PIN_PEPPER.encode("utf-8")
 
 
 def hash_pin(pin: str) -> str:

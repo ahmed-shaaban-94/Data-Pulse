@@ -160,12 +160,15 @@ def idempotency_dependency(endpoint: str):
         session: Session = Depends(get_tenant_session),  # noqa: B008
     ) -> IdempotencyContext:
         body = await request.body()
-        # Fail fast if the auth middleware did not populate the tenant context.
-        # Silently falling back to tenant_id=1 would let one tenant's client
-        # replay another tenant's cached response on a middleware regression.
+        # Fail fast if the auth middleware did not populate a valid tenant
+        # context. Silently falling back to tenant_id=1 would let one tenant's
+        # client replay another tenant's cached response on a middleware
+        # regression. Catches: attribute missing (AttributeError), attribute
+        # is None (TypeError on int(None)), attribute is non-numeric string
+        # (ValueError on int("")).
         try:
             tenant_id = int(request.state.tenant_id)
-        except AttributeError as exc:  # pragma: no cover — guarded by middleware
+        except (AttributeError, TypeError, ValueError) as exc:
             raise HTTPException(
                 status_code=401,
                 detail="request missing tenant context",
