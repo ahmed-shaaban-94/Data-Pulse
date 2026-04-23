@@ -17,12 +17,15 @@ def _fire_webhook(url: str, payload: dict) -> None:
     import json as _json
     import urllib.request
 
+    if not url.startswith(("https://", "http://")):
+        log.warning("lead_webhook_skipped", reason="URL must use http(s) scheme", url=url)
+        return
     try:
         body = _json.dumps(payload).encode()
         req = urllib.request.Request(
             url, data=body, headers={"Content-Type": "application/json"}, method="POST"
         )
-        with urllib.request.urlopen(req, timeout=5):
+        with urllib.request.urlopen(req, timeout=5):  # nosec B310 — scheme validated above
             pass
         log.info("lead_webhook_sent", url=url)
     except Exception as exc:
@@ -49,6 +52,7 @@ class LeadService:
 
     def _notify(self, data: LeadRequest) -> None:
         from datapulse.core.config import get_settings
+
         url = get_settings().lead_notify_url
         if not url:
             return
