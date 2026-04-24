@@ -109,6 +109,15 @@ function startNextServer(): Promise<void> {
         "clerk-deployment-nextauth-unused-placeholder",
       NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || "https://smartdatapulse.tech",
       INTERNAL_API_URL: process.env.INTERNAL_API_URL || "https://smartdatapulse.tech",
+      // Clerk runtime env — pass through from the Electron process env so
+      // server components / middleware in the embedded Next.js server can
+      // validate Clerk sessions. The `NEXT_PUBLIC_*` values are also
+      // inlined at build time (see build.sh), but re-exposing them here
+      // keeps dev-mode (`DEV_RENDERER_URL` pointed at `next dev`) working
+      // when the developer has the keys in their shell env.
+      CLERK_SECRET_KEY: process.env.CLERK_SECRET_KEY || "",
+      NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY || "",
+      NEXT_PUBLIC_CLERK_JWT_TEMPLATE: process.env.NEXT_PUBLIC_CLERK_JWT_TEMPLATE || "datapulse",
     };
 
     // Use spawn('node') instead of fork() — Electron's fork() uses the
