@@ -36,6 +36,7 @@ from datapulse.scheduler.triggers import (
     _make_sync_job_fn,
     _quality_digest,
     _refresh_cross_sell_rules,
+    _retry_webhooks,
     _rls_audit,
 )
 
@@ -308,12 +309,50 @@ async def run_pipeline(
         pipeline_duration_seconds.observe(elapsed)
         log.info("pipeline_complete", run_id=run_id_str, duration=elapsed, rows=total_rows)
 
+        # Fire outbound webhook — best-effort, never raises (#608)
+        try:
+            from datapulse.webhooks.service import fire_event as _fire_webhook_event
+
+            _wh_session = _get_session()
+            try:
+                _fire_webhook_event(
+                    "pipeline.completed",
+                    tenant_id,
+                    {"run_id": run_id_str, "rows_loaded": total_rows, "duration_seconds": elapsed},
+                    _wh_session,
+                )
+                _wh_session.commit()
+            finally:
+                _wh_session.close()
+        except Exception as _wh_exc:
+            log.warning(
+                "webhook_fire_failed", webhook_event="pipeline.completed", error=str(_wh_exc)
+            )
+
     except Exception as exc:
         elapsed = round(time.perf_counter() - t0, 2)
         error_msg = str(exc)[:200]
         _update_status("failed", error_message=error_msg)
         notify_pipeline_failure(run_id_str, "unknown", error_msg)
         pipeline_runs_total.labels(status="failed").inc()
+
+        # Fire outbound webhook — best-effort, never raises (#608)
+        try:
+            from datapulse.webhooks.service import fire_event as _fire_webhook_event
+
+            _wh_session = _get_session()
+            try:
+                _fire_webhook_event(
+                    "pipeline.failed",
+                    tenant_id,
+                    {"run_id": run_id_str, "error": error_msg, "duration_seconds": elapsed},
+                    _wh_session,
+                )
+                _wh_session.commit()
+            finally:
+                _wh_session.close()
+        except Exception as _wh_exc:
+            log.warning("webhook_fire_failed", webhook_event="pipeline.failed", error=str(_wh_exc))
         pipeline_duration_seconds.observe(elapsed)
         log.error("pipeline_crashed", run_id=run_id_str, error=error_msg, duration=elapsed)
     finally:
@@ -451,6 +490,13 @@ def start_scheduler() -> None:
         _refresh_cross_sell_rules,
         CronTrigger(day_of_week="sun", hour=2, minute=0),
         id="mba_cross_sell",
+        replace_existing=True,
+    )
+    # Outbound webhook retry — every 2 minutes; picks up failed deliveries (#608).
+    scheduler.add_job(
+        _retry_webhooks,
+        IntervalTrigger(minutes=2),
+        id="retry_webhooks",
         replace_existing=True,
     )
 

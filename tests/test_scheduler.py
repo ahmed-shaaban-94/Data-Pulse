@@ -201,8 +201,9 @@ def test_start_scheduler_adds_jobs_and_starts():
 
         start_scheduler()
 
-        # 5 static jobs: health_check, quality_digest, ai_digest, rls_audit, mba_cross_sell.
-        assert mock_sched.add_job.call_count == 5
+        # 6 static jobs: health_check, quality_digest, ai_digest, rls_audit,
+        # mba_cross_sell, retry_webhooks (#608).
+        assert mock_sched.add_job.call_count == 6
         registered_ids = {call.kwargs["id"] for call in mock_sched.add_job.call_args_list}
         assert registered_ids == {
             "health_check",
@@ -210,6 +211,7 @@ def test_start_scheduler_adds_jobs_and_starts():
             "ai_digest",
             "rls_audit",
             "mba_cross_sell",
+            "retry_webhooks",
         }
         mock_sched.start.assert_called_once()
 
@@ -362,6 +364,6 @@ def test_start_scheduler_enabled_by_default():
 
         start_scheduler()
 
-        # 5 static jobs incl. rls_audit (#546) + mba_cross_sell.
-        assert mock_sched.add_job.call_count == 5
+        # 6 static jobs incl. rls_audit (#546) + mba_cross_sell + retry_webhooks (#608).
+        assert mock_sched.add_job.call_count == 6
         mock_sched.start.assert_called_once()
