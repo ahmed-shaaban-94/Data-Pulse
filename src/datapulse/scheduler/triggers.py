@@ -11,6 +11,8 @@ from sqlalchemy import text as sa_text
 from datapulse.config import get_settings
 from datapulse.logging import get_logger
 from datapulse.metrics import pipeline_stale_detected, scheduler_jobs_executed
+from datapulse.webhooks.repository import WebhookRepository
+from datapulse.webhooks.service import WebhookService
 
 log = get_logger(__name__)
 
@@ -263,3 +265,24 @@ async def _refresh_cross_sell_rules() -> None:
             session.close()
 
     log.info("mba_run_complete", tenants=len(tenant_ids), total_upserted=total_upserted)
+
+
+async def _retry_webhooks() -> None:
+    """Retry overdue failed webhook deliveries every 2 minutes (#608).
+
+    Uses a system-level (tenant_id=0) session because the delivery log
+    records tenant_id per row — the retry job reads across all tenants.
+    """
+    scheduler_jobs_executed.labels(job="retry_webhooks").inc()
+    from datapulse.core.db_session import open_tenant_session
+
+    session = open_tenant_session("0")
+    try:
+        svc = WebhookService(WebhookRepository(session))
+        count = svc.retry_pending()
+        if count:
+            log.info("webhook_retry_dispatched", count=count)
+    except Exception as exc:
+        log.error("webhook_retry_failed", error=str(exc), exc_info=True)
+    finally:
+        session.close()

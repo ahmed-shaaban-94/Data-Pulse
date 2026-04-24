@@ -43,6 +43,7 @@ from datapulse.api.routes import (
     tenants,
     upload,
     views,
+    webhooks,
 )
 from datapulse.config import Settings
 
@@ -95,6 +96,7 @@ def _register_core_routers(app: FastAPI) -> None:
         branding.public_router,
         reseller.router,
         tenants.router,
+        webhooks.router,
     ):
         app.include_router(router, prefix=_API_PREFIX)
 
