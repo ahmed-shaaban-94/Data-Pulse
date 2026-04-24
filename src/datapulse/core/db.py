@@ -32,6 +32,8 @@ def _validate_database_url(url: str) -> None:
 
 _engine: Engine | None = None
 _session_factory: sessionmaker[Session] | None = None
+_readonly_engine: Engine | None = None
+_readonly_session_factory: sessionmaker[Session] | None = None
 _init_lock = threading.Lock()
 
 
@@ -77,3 +79,47 @@ def get_session_factory() -> sessionmaker[Session]:
             if _session_factory is None:
                 _session_factory = sessionmaker(bind=get_engine())
     return _session_factory
+
+
+def get_readonly_engine() -> Engine:
+    """Return the read-replica engine singleton, or the primary if no replica is configured.
+
+    When ``database_replica_url`` is set, heavy analytics queries route here
+    instead of the primary. Falls back to the primary engine silently if the
+    replica URL is unset — callers treat it as "best-effort read routing"
+    rather than a hard dependency (#608).
+    """
+    global _readonly_engine
+    if _readonly_engine is None:
+        with _init_lock:
+            if _readonly_engine is None:
+                settings = get_settings()
+                replica_url = settings.database_replica_url
+                if not replica_url:
+                    _readonly_engine = get_engine()
+                else:
+                    _validate_database_url(replica_url)
+                    _readonly_engine = create_engine(
+                        replica_url,
+                        pool_pre_ping=True,
+                        pool_size=settings.db_pool_size,
+                        max_overflow=settings.db_pool_max_overflow,
+                        pool_timeout=settings.db_pool_timeout,
+                        pool_recycle=settings.db_pool_recycle,
+                        connect_args={"connect_timeout": 10},
+                    )
+                    logger.info("readonly_engine_initialized", using_replica=True)
+    return _readonly_engine
+
+
+def get_readonly_session_factory() -> sessionmaker[Session]:
+    """Return the read-replica session factory singleton."""
+    global _readonly_session_factory
+    if _readonly_session_factory is None:
+        # Resolve the engine BEFORE acquiring _init_lock — get_readonly_engine
+        # also takes _init_lock, and threading.Lock is not re-entrant.
+        engine = get_readonly_engine()
+        with _init_lock:
+            if _readonly_session_factory is None:
+                _readonly_session_factory = sessionmaker(bind=engine)
+    return _readonly_session_factory

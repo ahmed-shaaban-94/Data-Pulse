@@ -45,6 +45,12 @@ class Settings(BaseSettings):
     # Database — no default; MUST be set via env / .env
     database_url: str
 
+    # Read replica — optional. When set, analytics read-only endpoints route
+    # through ``get_tenant_session_readonly`` to the replica, isolating heavy
+    # dashboard queries from the POS checkout path (#608). Falls back to the
+    # primary engine if unset or if the replica connection fails.
+    database_replica_url: str | None = None
+
     # Database connection pool — sized for multi-worker deployment.
     # With 4 prod workers: 4 x (5 + 10) = 60 max connections, fitting
     # within PostgreSQL max_connections=100 with headroom for admin/migrations.

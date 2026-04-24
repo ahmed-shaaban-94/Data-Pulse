@@ -33,7 +33,7 @@ from sqlalchemy.orm import Session
 from datapulse.cache import current_tenant_id
 from datapulse.config import Settings, get_settings
 from datapulse.core.config import is_non_dev_env
-from datapulse.core.db import get_session_factory
+from datapulse.core.db import get_readonly_session_factory, get_session_factory
 from datapulse.core.jwt import verify_jwt
 from datapulse.core.security import compare_secrets
 
@@ -308,6 +308,77 @@ def get_tenant_session(
         structlog.contextvars.unbind_contextvars("tenant_id")
 
 
+def get_tenant_session_readonly(
+    user: Annotated[UserClaims, Depends(get_current_user)],
+) -> Generator[Session, None, None]:
+    """Tenant session that prefers the read replica; falls back to primary on error.
+
+    Use for idempotent GET endpoints where a < 5 s replication lag is
+    acceptable (dashboards, reports, analytics). Never use for POS
+    checkout or any read-after-write that must see its own writes —
+    those require :func:`get_tenant_session` on the primary (#608).
+
+    Fallback cases (all transparent to the caller):
+      - ``database_replica_url`` unset → get_readonly_engine returns primary.
+      - Replica connection fails at session open → retry on primary.
+    """
+    from datapulse.metrics import db_replica_fallbacks, db_replica_hits
+
+    tenant_id = user.get("tenant_id") or "1"
+    current_tenant_id.set(str(tenant_id))
+    structlog.contextvars.bind_contextvars(tenant_id=str(tenant_id))
+
+    settings = get_settings()
+    replica_configured = bool(settings.database_replica_url)
+
+    session: Session | None = None
+    used_replica = False
+    if replica_configured:
+        try:
+            session = get_readonly_session_factory()()
+            used_replica = True
+            db_replica_hits.inc()
+        except SQLAlchemyError as exc:
+            _db_logger.warning(
+                "replica_unavailable_fallback_to_primary",
+                error=str(exc),
+                tenant_id=str(tenant_id),
+            )
+            db_replica_fallbacks.labels(reason="error").inc()
+            session = None
+    if session is None:
+        if not replica_configured:
+            db_replica_fallbacks.labels(reason="unconfigured").inc()
+        session = get_session_factory()()
+
+    try:
+        session.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": tenant_id})
+        session.execute(text("SET LOCAL statement_timeout = '30s'"))
+        # Replica sessions are read-only by intent — make it explicit so a
+        # stray INSERT/UPDATE fails loudly instead of silently landing on
+        # the primary if a dev accidentally binds write code to this dep.
+        if used_replica:
+            session.execute(text("SET LOCAL default_transaction_read_only = on"))
+        yield session
+        session.commit()
+    except SQLAlchemyError:
+        _db_logger.exception(
+            "db_session_error",
+            session_type="tenant_readonly",
+            tenant_id=str(tenant_id),
+            used_replica=used_replica,
+        )
+        session.rollback()
+        raise
+    except BaseException:
+        session.rollback()
+        raise
+    finally:
+        session.close()
+        structlog.contextvars.unbind_contextvars("tenant_id")
+
+
 # Type aliases for FastAPI dependency injection
 SessionDep = Annotated[Session, Depends(get_tenant_session)]
+SessionDepReadOnly = Annotated[Session, Depends(get_tenant_session_readonly)]
 CurrentUser = Annotated[UserClaims, Depends(get_current_user)]
