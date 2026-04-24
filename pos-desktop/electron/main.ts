@@ -220,8 +220,11 @@ function createWindow(): void {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
-      // Disable devtools shortcuts in packaged builds
-      devTools: !app.isPackaged,
+      // DevTools remain toggleable via Ctrl+Shift+I during the alpha/beta
+      // smoke runs so pilots (also our testers) can surface network +
+      // console errors without requiring a separate dev build. Re-gate
+      // on `app.isPackaged` before GA.
+      devTools: true,
     },
   });
 

@@ -1,4 +1,4 @@
-import { getSession } from "@/lib/auth-bridge";
+import { getSession, getLastClerkAuthError } from "@/lib/auth-bridge";
 import { API_BASE_URL } from "./constants";
 import type { FilterParams } from "@/types/filters";
 
@@ -90,7 +90,22 @@ async function _request<T>(url: string, init?: RequestInit): Promise<T> {
     });
     if (!res.ok) {
       const body = await res.text().catch(() => "Unknown error");
-      throw new ApiError(res.status, `API error ${res.status}: ${body}`);
+      // When the backend returns 401 AND we failed to attach an
+      // Authorization header, the real cause lives in the auth-bridge
+      // error stash. Include it so pilots see "Clerk issued a null
+      // token — template missing" instead of a bare "401
+      // Authentication required". Without this, debugging requires
+      // DevTools on an installed build.
+      let enriched = `API error ${res.status}: ${body}`;
+      if (res.status === 401 && !authHeaders.Authorization) {
+        const reason = getLastClerkAuthError();
+        if (reason) {
+          enriched += ` — ${reason}`;
+        } else {
+          enriched += " — no Authorization header attached (user not signed in?)";
+        }
+      }
+      throw new ApiError(res.status, enriched);
     }
     const json = await res.json();
     return parseDecimals(json) as T;

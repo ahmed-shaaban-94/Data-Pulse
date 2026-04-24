@@ -36,6 +36,41 @@ export const AUTH_PROVIDER: AuthProvider =
 const CLERK_JWT_TEMPLATE =
   process.env.NEXT_PUBLIC_CLERK_JWT_TEMPLATE || "datapulse";
 
+/**
+ * Most recent Clerk ``getToken`` failure, exposed to the rest of the app.
+ *
+ * ``getSession`` used to silently ``catch → return null``, which meant
+ * ``api-client.ts`` would fire requests with no ``Authorization`` header
+ * and the backend would respond ``401 Authentication required`` — giving
+ * no clue *why* the token was missing. Now we stash the underlying reason
+ * so ``api-client.ts`` can surface it in the thrown ``ApiError`` and pilots
+ * see actionable text in the UI instead of a generic 401.
+ *
+ * Also mirrored onto ``window.__clerkAuthError`` for DevTools inspection.
+ */
+let _lastClerkAuthError: string | null = null;
+
+export function getLastClerkAuthError(): string | null {
+  return _lastClerkAuthError;
+}
+
+function recordClerkAuthError(reason: string, err?: unknown): void {
+  const detail = err instanceof Error ? `${reason}: ${err.message}` : reason;
+  _lastClerkAuthError = detail;
+  // eslint-disable-next-line no-console
+  console.error("[auth-bridge] Clerk token fetch failed —", detail, err);
+  if (typeof window !== "undefined") {
+    (window as unknown as { __clerkAuthError?: string }).__clerkAuthError = detail;
+  }
+}
+
+function clearClerkAuthError(): void {
+  _lastClerkAuthError = null;
+  if (typeof window !== "undefined") {
+    (window as unknown as { __clerkAuthError?: string }).__clerkAuthError = undefined;
+  }
+}
+
 // ----------------------------------------------------------------------
 // Session shape (matches NextAuth's Session for call-site compatibility)
 // ----------------------------------------------------------------------
@@ -133,12 +168,26 @@ function useClerkSession(): UseSessionReturn {
     async function pull() {
       if (!isSignedIn) {
         if (!cancelled) setToken(null);
+        clearClerkAuthError();
         return;
       }
       try {
         const t = await getToken({ template: CLERK_JWT_TEMPLATE });
+        if (!t) {
+          recordClerkAuthError(
+            `Clerk issued a null token for template "${CLERK_JWT_TEMPLATE}". ` +
+              `Verify the JWT template exists in the Clerk dashboard and the ` +
+              `signed-in user has public_metadata.tenant_id populated.`,
+          );
+        } else {
+          clearClerkAuthError();
+        }
         if (!cancelled) setToken(t ?? null);
-      } catch {
+      } catch (err) {
+        recordClerkAuthError(
+          `useAuth().getToken({template:"${CLERK_JWT_TEMPLATE}"}) threw`,
+          err,
+        );
         if (!cancelled) setToken(null);
       }
     }
@@ -193,12 +242,39 @@ export async function getSession(): Promise<AuthSession | null> {
   if (typeof window === "undefined") return null;
 
   const clerk = (window as unknown as { Clerk?: ClerkJSWindowShape }).Clerk;
-  if (!clerk?.session || !clerk.user) return null;
+  if (!clerk) {
+    recordClerkAuthError(
+      "window.Clerk is undefined — Clerk JS has not finished booting. " +
+        "Verify NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY is inlined in the build.",
+    );
+    return null;
+  }
+  if (!clerk.session) {
+    recordClerkAuthError("window.Clerk.session is null — user is not signed in.");
+    return null;
+  }
+  if (!clerk.user) {
+    recordClerkAuthError("window.Clerk.user is null — session missing user context.");
+    return null;
+  }
 
   try {
     const token = await clerk.session.getToken({ template: CLERK_JWT_TEMPLATE });
+    if (!token) {
+      recordClerkAuthError(
+        `window.Clerk.session.getToken({template:"${CLERK_JWT_TEMPLATE}"}) returned null. ` +
+          `Likely cause: JWT template "${CLERK_JWT_TEMPLATE}" is missing or the ` +
+          `signed-in Clerk user has no public_metadata.tenant_id.`,
+      );
+    } else {
+      clearClerkAuthError();
+    }
     return clerkToBridgeSession(clerk.user as never, token ?? null);
-  } catch {
+  } catch (err) {
+    recordClerkAuthError(
+      `window.Clerk.session.getToken({template:"${CLERK_JWT_TEMPLATE}"}) threw`,
+      err,
+    );
     return null;
   }
 }
