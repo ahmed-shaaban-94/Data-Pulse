@@ -51,6 +51,17 @@ try:
         "Pipeline runs marked failed due to heartbeat timeout",
     )
 
+    # -- Read replica (#608) --
+    db_replica_hits = Counter(
+        "datapulse_db_replica_hits_total",
+        "Sessions served by the read replica engine",
+    )
+    db_replica_fallbacks = Counter(
+        "datapulse_db_replica_fallbacks_total",
+        "Readonly sessions that fell back to the primary engine",
+        ["reason"],  # "unconfigured", "error"
+    )
+
     METRICS_AVAILABLE = True
 
 except ImportError:
@@ -74,3 +85,5 @@ except ImportError:
     pipeline_runs_total = _NoOp()  # type: ignore[assignment]
     pipeline_duration_seconds = _NoOp()  # type: ignore[assignment]
     pipeline_stale_detected = _NoOp()  # type: ignore[assignment]
+    db_replica_hits = _NoOp()  # type: ignore[assignment]
+    db_replica_fallbacks = _NoOp()  # type: ignore[assignment]
