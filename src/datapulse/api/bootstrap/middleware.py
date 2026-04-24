@@ -30,19 +30,40 @@ from datapulse.config import Settings
 logger = structlog.get_logger()
 
 
+#: Origins that the POS desktop app always uses. The embedded Next.js
+#: server binds a fixed port (see ``pos-desktop/electron/main.ts:17``), so
+#: the origin is constant across every pilot machine. Baking it into the
+#: allow-list means deployments don't have to remember to add it to
+#: ``CORS_ORIGINS`` — one less operator foot-gun.
+POS_DESKTOP_ORIGINS: list[str] = [
+    "http://localhost:3847",
+    "http://127.0.0.1:3847",
+]
+
+
 def install_middleware(app: FastAPI, settings: Settings) -> None:
     """Install the full middleware chain in the canonical order."""
     app.add_middleware(SlowAPIMiddleware)
     app.add_middleware(GZipMiddleware, minimum_size=500)
+    # Merge configured origins with the always-allowed POS desktop origins,
+    # deduping while preserving order.
+    allow_origins = list(dict.fromkeys([*settings.cors_origins, *POS_DESKTOP_ORIGINS]))
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=settings.cors_origins,
+        allow_origins=allow_origins,
         allow_credentials=True,
         allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
         allow_headers=[
             "Content-Type",
             "Authorization",
             "X-API-Key",
+            # POS checkout uses Idempotency-Key to dedupe retries (see
+            # src/datapulse/pos/idempotency.py). Preflight must allow it
+            # or every POST to /pos/*/checkout returns "Failed to fetch".
+            "Idempotency-Key",
+            # Pipeline mutations carry this header for webhook auth
+            # (see CORS guidance in CLAUDE.md).
+            "X-Pipeline-Token",
         ],
     )
 
