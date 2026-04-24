@@ -21,6 +21,8 @@ from datapulse.webhooks.models import DeliveryLogResponse, SubscriptionCreate
 from datapulse.webhooks.repository import WebhookRepository
 from datapulse.webhooks.service import WebhookService, fire_event
 
+_UNSET = object()  # sentinel for "no row provided" in mock builders
+
 # ── helpers ───────────────────────────────────────────────────────────────────
 
 
@@ -418,3 +420,180 @@ class TestWebhookRoutes:
         mock_svc.replay_delivery.return_value = False
         res = client.post("/api/v1/webhooks/deliveries/99/replay")
         assert res.status_code == 404
+
+
+# ── scheduler trigger ─────────────────────────────────────────────────────────
+
+
+@pytest.mark.unit
+class TestRetryWebhooksTrigger:
+    async def _invoke(self):
+        from datapulse.scheduler.triggers import _retry_webhooks
+
+        await _retry_webhooks()
+
+    @pytest.mark.asyncio
+    async def test_retry_webhooks_calls_service(self):
+        from datapulse.scheduler import triggers
+
+        mock_session = MagicMock()
+        mock_svc = MagicMock()
+        mock_svc.retry_pending.return_value = 3
+
+        with (
+            patch("datapulse.core.db_session.open_tenant_session", return_value=mock_session),
+            patch.object(triggers, "WebhookRepository"),
+            patch.object(triggers, "WebhookService", return_value=mock_svc),
+        ):
+            await triggers._retry_webhooks()
+
+        mock_svc.retry_pending.assert_called_once()
+        mock_session.close.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_retry_webhooks_swallows_exceptions(self):
+        from datapulse.scheduler import triggers
+
+        mock_session = MagicMock()
+
+        with (
+            patch("datapulse.core.db_session.open_tenant_session", return_value=mock_session),
+            patch.object(triggers, "WebhookRepository", side_effect=Exception("boom")),
+        ):
+            # Must not raise — job failures should be logged, not crash scheduler
+            await triggers._retry_webhooks()
+
+        mock_session.close.assert_called_once()
+
+
+# ── repository (integration-shaped but with mocked session) ───────────────────
+
+
+@pytest.mark.unit
+class TestWebhookRepository:
+    def _session_with_result(self, row=_UNSET, rows=None, scalar=None, rowcount=1):
+        session = MagicMock()
+        result = MagicMock()
+        if row is not _UNSET:
+            result.mappings.return_value.one.return_value = row
+            result.mappings.return_value.one_or_none.return_value = row
+        if rows is not None:
+            result.mappings.return_value.all.return_value = rows
+        if scalar is not None:
+            result.scalar_one.return_value = scalar
+        result.rowcount = rowcount
+        session.execute.return_value = result
+        return session
+
+    def test_create_subscription_inserts_and_returns_row(self):
+        session = self._session_with_result(row=_sub_row())
+        repo = WebhookRepository(session)
+        result = repo.create_subscription(1, "sale.created", "https://x.com", "sec1234567890123")
+        assert result["event_type"] == "sale.created"
+        session.execute.assert_called_once()
+
+    def test_list_subscriptions_returns_rows(self):
+        session = self._session_with_result(rows=[_sub_row(), _sub_row(id=2)])
+        repo = WebhookRepository(session)
+        result = repo.list_subscriptions(tenant_id=1)
+        assert len(result) == 2
+
+    def test_get_subscription_returns_none_when_missing(self):
+        session = self._session_with_result(row=None)
+        repo = WebhookRepository(session)
+        assert repo.get_subscription(99, 1) is None
+
+    def test_get_subscription_returns_dict_when_found(self):
+        session = self._session_with_result(row=_sub_row())
+        repo = WebhookRepository(session)
+        result = repo.get_subscription(1, 1)
+        assert result is not None
+        assert result["id"] == 1
+
+    def test_delete_subscription_true_when_deleted(self):
+        session = self._session_with_result(rowcount=1)
+        repo = WebhookRepository(session)
+        assert repo.delete_subscription(1, 1) is True
+
+    def test_delete_subscription_false_when_not_found(self):
+        session = self._session_with_result(rowcount=0)
+        repo = WebhookRepository(session)
+        assert repo.delete_subscription(99, 1) is False
+
+    def test_get_active_subscribers(self):
+        session = self._session_with_result(
+            rows=[{"id": 1, "target_url": "https://x.com", "secret": "s"}]
+        )
+        repo = WebhookRepository(session)
+        result = repo.get_active_subscribers(1, "sale.created")
+        assert len(result) == 1
+
+    def test_create_delivery_returns_id(self):
+        session = self._session_with_result(scalar=42)
+        repo = WebhookRepository(session)
+        result = repo.create_delivery(1, 1, "sale.created", {"k": "v"})
+        assert result == 42
+
+    def test_mark_sent_executes_update(self):
+        session = self._session_with_result()
+        repo = WebhookRepository(session)
+        repo.mark_sent(42)
+        session.execute.assert_called_once()
+
+    def test_mark_failed_with_retry(self):
+        session = self._session_with_result()
+        repo = WebhookRepository(session)
+        repo.mark_failed(42, "timeout", attempt_count=1, next_retry_at=None, dead=False)
+        call_params = session.execute.call_args[0][1]
+        assert call_params["st"] == "failed"
+
+    def test_mark_failed_dead(self):
+        session = self._session_with_result()
+        repo = WebhookRepository(session)
+        repo.mark_failed(42, "gone", attempt_count=6, next_retry_at=None, dead=True)
+        call_params = session.execute.call_args[0][1]
+        assert call_params["st"] == "dead"
+
+    def test_list_deliveries_no_filters(self):
+        session = self._session_with_result(rows=[_delivery_row()])
+        repo = WebhookRepository(session)
+        result = repo.list_deliveries(tenant_id=1)
+        assert len(result) == 1
+
+    def test_list_deliveries_with_subscription_and_status(self):
+        session = self._session_with_result(rows=[])
+        repo = WebhookRepository(session)
+        result = repo.list_deliveries(tenant_id=1, subscription_id=5, status="failed", limit=10)
+        assert result == []
+        call_params = session.execute.call_args[0][1]
+        assert call_params["sub"] == 5
+        assert call_params["st"] == "failed"
+        assert call_params["lim"] == 10
+
+    def test_get_delivery_returns_none_when_missing(self):
+        session = self._session_with_result(row=None)
+        repo = WebhookRepository(session)
+        assert repo.get_delivery(99, 1) is None
+
+    def test_get_delivery_returns_dict_when_found(self):
+        session = self._session_with_result(row=_delivery_row())
+        repo = WebhookRepository(session)
+        result = repo.get_delivery(1, 1)
+        assert result is not None
+        assert result["status"] == "sent"
+
+    def test_get_pending_retries(self):
+        session = self._session_with_result(rows=[{"id": 1, "target_url": "x", "secret": "s"}])
+        repo = WebhookRepository(session)
+        result = repo.get_pending_retries(limit=50)
+        assert len(result) == 1
+
+    def test_reset_for_replay_true_when_updated(self):
+        session = self._session_with_result(rowcount=1)
+        repo = WebhookRepository(session)
+        assert repo.reset_for_replay(1, 1) is True
+
+    def test_reset_for_replay_false_when_no_match(self):
+        session = self._session_with_result(rowcount=0)
+        repo = WebhookRepository(session)
+        assert repo.reset_for_replay(99, 1) is False
