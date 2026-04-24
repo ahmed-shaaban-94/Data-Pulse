@@ -34,6 +34,26 @@ export NEXT_PUBLIC_API_URL="https://smartdatapulse.tech"
 export NEXT_PUBLIC_FEATURE_PLATFORM="true"
 export NEXT_PUBLIC_FEATURE_CONTROL_CENTER="true"
 
+# Auth provider — POS desktop targets Clerk (Auth0/NextAuth path is dead
+# post-#668, tracked for deletion in #682). Without this override, the
+# build inlines the default `"auth0"` from `auth-bridge.tsx` and the
+# installed app renders the old Auth0 sign-in page.
+export NEXT_PUBLIC_AUTH_PROVIDER="clerk"
+
+# Clerk publishable key — Next.js inlines NEXT_PUBLIC_* at build time, so
+# CI must forward this from GitHub Secrets. If unset (e.g. a fork PR with
+# no secret access), the build still succeeds but Clerk SDK will throw at
+# runtime when it tries to initialise. That is acceptable for draft PRs.
+export NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY="${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY:-}"
+export NEXT_PUBLIC_CLERK_JWT_TEMPLATE="${NEXT_PUBLIC_CLERK_JWT_TEMPLATE:-datapulse}"
+export NEXT_PUBLIC_CLERK_SIGN_IN_URL="${NEXT_PUBLIC_CLERK_SIGN_IN_URL:-/sign-in}"
+export NEXT_PUBLIC_CLERK_SIGN_UP_URL="${NEXT_PUBLIC_CLERK_SIGN_UP_URL:-/sign-up}"
+
+if [ -z "$NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY" ]; then
+  echo "[WARN] NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY not set — shipped bundle will fail to initialise Clerk at runtime."
+  echo "       Add it as a GitHub Actions secret and forward via the workflow env block."
+fi
+
 npm run build
 
 echo "[OK] Next.js build complete"

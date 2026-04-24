@@ -113,6 +113,12 @@ jobs:
           # electron-builder skips signing silently in that case.
           CSC_LINK: ${{ secrets.CSC_LINK }}
           CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          # Clerk build-time env. Next.js inlines NEXT_PUBLIC_* at build,
+          # so these MUST be set before `next build` runs in build.sh.
+          # Missing keys produce a working installer that fails at runtime
+          # when Clerk initialises (acceptable for draft / fork PRs).
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
+          NEXT_PUBLIC_CLERK_JWT_TEMPLATE: ${{ secrets.NEXT_PUBLIC_CLERK_JWT_TEMPLATE }}
           # Opt-in: upload the .pfx to a hardware token / EV signer in a
           # future iteration. The variable is forwarded so `signtool` can
           # pick it up when #476 upgrades to an EV cert.
