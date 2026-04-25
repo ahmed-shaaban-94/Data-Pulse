@@ -140,7 +140,8 @@ const isProtectedRoute = createRouteMatcher([
 ]);
 
 // --- Clerk path --------------------------------------------------------
-const clerkMw = clerkMiddleware(async (auth, request) => {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const clerkMw = clerkMiddleware(async (auth: any, request: NextRequest) => {
   const tenantDomain = resolveTenantDomain(request);
   if (isProtectedRoute(request)) {
     const { userId } = await auth();
