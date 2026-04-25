@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 import {
   SHORTCUTS,
   TONE_COLOR,
+  type Shortcut,
 } from "@/components/pos/terminal/ShortcutLegend";
 
 /** Additional modal-level shortcuts shown only in the cheat-sheet overlay. */
@@ -127,7 +128,7 @@ export function ShortcutsCheatSheet({ open, onClose }: ShortcutsCheatSheetProps)
             Terminal
           </div>
           <div className="grid grid-cols-2 gap-2">
-            {SHORTCUTS.map(({ key, label, tone = "default" }) => (
+            {SHORTCUTS.map(({ key, label, tone = "default" }: Shortcut) => (
               <div key={key} className="flex items-center gap-2" style={{ fontSize: 12 }}>
                 <kbd
                   className={cn(
@@ -154,7 +155,7 @@ export function ShortcutsCheatSheet({ open, onClose }: ShortcutsCheatSheetProps)
             Inside modals
           </div>
           <div className="grid grid-cols-2 gap-2">
-            {MODAL_SHORTCUTS.map(({ key, label, tone }) => (
+            {MODAL_SHORTCUTS.map(({ key, label, tone }: Shortcut) => (
               <div key={key} className="flex items-center gap-2" style={{ fontSize: 12 }}>
                 <kbd
                   className={cn(
