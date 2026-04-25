@@ -33,7 +33,7 @@ from fastapi import Depends, Header, HTTPException, Request
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from datapulse.core.auth import get_tenant_session
+from datapulse.core.auth import CurrentUser, get_tenant_session
 
 CLOCK_SKEW_TOLERANCE_MINUTES: int = 2
 
@@ -182,6 +182,7 @@ def verify_signature(public_key: bytes, message: bytes, signature: bytes) -> boo
 
 async def device_token_verifier(
     request: Request,
+    user: CurrentUser,
     x_terminal_id: int = Header(..., alias="X-Terminal-Id"),  # noqa: B008
     x_device_fingerprint: str = Header(..., alias="X-Device-Fingerprint"),  # noqa: B008
     x_signed_at: str = Header(..., alias="X-Signed-At"),  # noqa: B008
@@ -204,14 +205,18 @@ async def device_token_verifier(
       * If the tenant has crossed the v1 deprecation cut-off, v1-only
         requests (no v2 header) are rejected.
     """
-    # Fail fast on missing or invalid tenant context. A silent fallback to
+    # Tenant context comes from the JWT claims (CurrentUser), with
+    # ``request.state.tenant_id`` retained as a defensive fallback for any
+    # future middleware that pre-populates it. Silent fallback to
     # tenant_id=1 would let a device-fingerprint-v2 check run against the
-    # wrong tenant's terminal_devices row on a middleware regression.
-    # Catches: attribute missing (AttributeError), attribute is None
-    # (TypeError on int(None)), non-numeric (ValueError on int("")).
+    # wrong tenant's terminal_devices row on a middleware regression, so we
+    # 401 if neither source resolves.
+    raw_tid: object = user.get("tenant_id")  # type: ignore[union-attr]
+    if raw_tid in (None, ""):
+        raw_tid = getattr(request.state, "tenant_id", None)
     try:
-        tenant_id = int(request.state.tenant_id)
-    except (AttributeError, TypeError, ValueError) as exc:
+        tenant_id = int(raw_tid)  # type: ignore[arg-type]
+    except (TypeError, ValueError) as exc:
         raise HTTPException(status_code=401, detail="request missing tenant context") from exc
 
     device = load_active_device(session, x_terminal_id, tenant_id)
