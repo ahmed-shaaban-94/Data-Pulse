@@ -589,7 +589,7 @@ async def test_process_return_empty_items(service: PosService, mock_repo: MagicM
 
 def test_get_return_not_found(service: PosService, mock_repo: MagicMock) -> None:
     mock_repo.get_return.return_value = None
-    assert service.get_return(999) is None
+    assert service.get_return(999, tenant_id=1) is None
 
 
 def test_list_returns_for_transaction(service: PosService, mock_repo: MagicMock) -> None:
@@ -607,7 +607,7 @@ def test_list_returns_for_transaction(service: PosService, mock_repo: MagicMock)
             "created_at": datetime(2026, 4, 15, 12, 0, 0, tzinfo=UTC),
         }
     ]
-    results = service.list_returns_for_transaction(1)
+    results = service.list_returns_for_transaction(1, tenant_id=1)
     assert len(results) == 1
     assert results[0].id == 3
 
