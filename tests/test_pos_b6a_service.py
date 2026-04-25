@@ -171,6 +171,7 @@ async def test_void_transaction_success(
 
     mock_repo.update_transaction_status.assert_called_once_with(
         1,
+        tenant_id=1,
         status=TransactionStatus.voided.value,
         expected_status=TransactionStatus.completed.value,
     )
