@@ -152,23 +152,30 @@ def idempotency_dependency(endpoint: str):
                 return idem.cached_body
             ...
     """
-    from datapulse.core.auth import get_tenant_session
+    from datapulse.core.auth import get_current_user, get_tenant_session
 
     async def _dep(
         request: Request,
+        user: dict = Depends(get_current_user),  # noqa: B008
         idempotency_key: str = Header(..., alias="Idempotency-Key"),  # noqa: B008
         session: Session = Depends(get_tenant_session),  # noqa: B008
     ) -> IdempotencyContext:
         body = await request.body()
-        # Fail fast if the auth middleware did not populate a valid tenant
-        # context. Silently falling back to tenant_id=1 would let one tenant's
-        # client replay another tenant's cached response on a middleware
-        # regression. Catches: attribute missing (AttributeError), attribute
-        # is None (TypeError on int(None)), attribute is non-numeric string
+        # Tenant context comes from the JWT claims via CurrentUser, with
+        # ``request.state.tenant_id`` retained as a defensive fallback for
+        # any future middleware that pre-populates it. Silently falling back
+        # to tenant_id=1 would let one tenant's client replay another
+        # tenant's cached response, so we 401 if neither source resolves.
+        # Catches: missing key (KeyError on user["tenant_id"]), attribute
+        # missing (AttributeError on request.state.tenant_id), attribute is
+        # None (TypeError on int(None)), attribute is non-numeric string
         # (ValueError on int("")).
+        raw_tid: object = user.get("tenant_id")  # type: ignore[union-attr]
+        if raw_tid in (None, ""):
+            raw_tid = getattr(request.state, "tenant_id", None)
         try:
-            tenant_id = int(request.state.tenant_id)
-        except (AttributeError, TypeError, ValueError) as exc:
+            tenant_id = int(raw_tid)  # type: ignore[call-overload]
+        except (TypeError, ValueError) as exc:
             raise HTTPException(
                 status_code=401,
                 detail="request missing tenant context",

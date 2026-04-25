@@ -212,7 +212,7 @@ class CatalogRepoMixin:
         rows = (
             self._session.execute(
                 text("""
-                    WITH primary AS (
+                    WITH primary_drug AS (
                         SELECT
                             m.tenant_id,
                             m.drug_code,
@@ -226,12 +226,12 @@ class CatalogRepoMixin:
                         alt.drug_code,
                         p.drug_name,
                         0::numeric AS unit_price,
-                        primary.unit_price AS primary_unit_price
+                        primary_drug.unit_price AS primary_unit_price
                     FROM   pos.product_catalog_meta alt
-                    JOIN   primary
-                           ON alt.tenant_id        = primary.tenant_id
-                          AND alt.active_ingredient = primary.active_ingredient
-                          AND alt.drug_code         <> primary.drug_code
+                    JOIN   primary_drug
+                           ON alt.tenant_id         = primary_drug.tenant_id
+                          AND alt.active_ingredient = primary_drug.active_ingredient
+                          AND alt.drug_code         <> primary_drug.drug_code
                     JOIN   public_marts.dim_product p
                            ON p.drug_code = alt.drug_code
                           AND p.tenant_id = alt.tenant_id
