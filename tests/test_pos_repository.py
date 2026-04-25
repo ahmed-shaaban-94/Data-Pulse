@@ -410,12 +410,12 @@ class TestUpdateItemQuantity:
             "is_controlled": False,
         }
         mock_session.execute.return_value = _make_execute(expected, mode="first")
-        result = repo.update_item_quantity(10, quantity=Decimal("3"), line_total=Decimal("15.00"))
+        result = repo.update_item_quantity(10, quantity=Decimal("3"), unit_price=Decimal("5.00"))
         assert result["quantity"] == Decimal("3")
 
     def test_returns_none_when_missing(self, repo: PosRepository, mock_session: MagicMock):
         mock_session.execute.return_value = _make_execute(None, mode="first")
-        result = repo.update_item_quantity(999, quantity=Decimal("1"), line_total=Decimal("1"))
+        result = repo.update_item_quantity(999, quantity=Decimal("1"), unit_price=Decimal("1"))
         assert result is None
 
 

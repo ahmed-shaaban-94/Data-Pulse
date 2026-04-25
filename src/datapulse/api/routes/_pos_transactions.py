@@ -148,13 +148,18 @@ def update_item(
     service: ServiceDep,
     user: CurrentUser,
 ) -> PosCartItem:
-    """Update an existing line item's quantity / price / discount."""
+    """Update an existing line item's quantity / price / discount.
+
+    ``override_price=None`` means "leave the persisted unit_price as-is"
+    — passing ``Decimal("0")`` here used to zero the line on innocent
+    quantity-only PATCHes (Codex P1).
+    """
     _ = user
     _ = transaction_id  # routing-only; item_id is unique
     return service.update_item(
         item_id,
         quantity=Decimal(str(body.quantity)),
-        unit_price=Decimal(str(body.override_price)) if body.override_price else Decimal("0"),
+        unit_price=(Decimal(str(body.override_price)) if body.override_price is not None else None),
         discount=Decimal(str(body.discount)) if body.discount is not None else None,
     )
 

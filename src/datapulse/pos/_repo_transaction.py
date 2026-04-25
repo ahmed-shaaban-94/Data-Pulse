@@ -242,17 +242,28 @@ class TransactionRepoMixin:
         item_id: int,
         *,
         quantity: Decimal,
-        line_total: Decimal,
+        unit_price: Decimal | None = None,
         discount: Decimal | None = None,
     ) -> dict[str, Any] | None:
-        """Update quantity and recalculate line_total for an existing item."""
+        """Update quantity (and optionally unit_price + discount).
+
+        ``line_total`` is recomputed in SQL from the resulting persisted
+        ``unit_price`` and ``quantity`` so a quantity-only PATCH cannot
+        zero an existing line by side-effect of an unsupplied override
+        price (Codex P1).
+
+        Pass ``unit_price=None`` for a pure-quantity update; the COALESCE
+        keeps the existing column value. Same for ``discount``.
+        """
         row = (
             self._session.execute(
                 text("""
                     UPDATE pos.transaction_items
                     SET    quantity   = :quantity,
-                           line_total = :line_total,
-                           discount   = COALESCE(:discount, discount)
+                           unit_price = COALESCE(:unit_price, unit_price),
+                           discount   = COALESCE(:discount, discount),
+                           line_total = (COALESCE(:unit_price, unit_price) * :quantity)
+                                        - COALESCE(:discount, discount, 0)
                     WHERE  id = :item_id
                     RETURNING
                         id, transaction_id, drug_code, quantity, unit_price,
@@ -261,7 +272,7 @@ class TransactionRepoMixin:
                 {
                     "item_id": item_id,
                     "quantity": quantity,
-                    "line_total": line_total,
+                    "unit_price": unit_price,
                     "discount": discount,
                 },
             )

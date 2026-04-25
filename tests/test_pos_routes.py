@@ -70,6 +70,7 @@ def _make_app(service: MagicMock) -> FastAPI:
         role_key="admin",
         permissions={
             "pos:terminal:open",
+            "pos:terminal:close",
             "pos:transaction:create",
             "pos:transaction:checkout",
             "pos:transaction:void",

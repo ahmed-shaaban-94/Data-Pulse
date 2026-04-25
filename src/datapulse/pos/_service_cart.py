@@ -203,17 +203,20 @@ class CartOpsMixin:
         item_id: int,
         *,
         quantity: Decimal,
-        unit_price: Decimal,
+        unit_price: Decimal | None = None,
         discount: Decimal | None = None,
     ) -> PosCartItem:
-        """Recalculate ``line_total`` for an existing line item."""
-        line_total = (unit_price * quantity).quantize(Decimal("0.0001"))
-        if discount is not None:
-            line_total = (line_total - to_decimal(discount)).quantize(Decimal("0.0001"))
+        """Update an existing line item's quantity (+ optional price/discount).
+
+        ``unit_price=None`` means "leave the existing price alone" — the
+        SQL UPDATE recomputes ``line_total`` from the persisted price, so
+        a pure quantity change cannot zero the line by passing 0 here
+        (Codex P1).
+        """
         row = self._repo.update_item_quantity(
             item_id,
             quantity=quantity,
-            line_total=line_total,
+            unit_price=unit_price,
             discount=discount,
         )
         if row is None:
@@ -221,10 +224,9 @@ class CartOpsMixin:
                 message=f"Item {item_id} not found",
                 detail=f"item_id={item_id}",
             )
-        # ``unit_price`` is not returned by update_item_quantity; merge it in for the response.
-        return PosCartItem.model_validate(
-            {**row, "unit_price": unit_price, "drug_name": row.get("drug_name", "")}
-        )
+        # The repo SQL returns the resulting unit_price and line_total
+        # straight from the row — no client-side merge needed.
+        return PosCartItem.model_validate({**row, "drug_name": row.get("drug_name", "")})
 
     def remove_item(self, item_id: int) -> bool:
         """Delete a single item from a draft transaction."""
