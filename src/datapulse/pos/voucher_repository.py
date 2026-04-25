@@ -12,12 +12,17 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from decimal import Decimal
 
-from fastapi import HTTPException
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from datapulse.logging import get_logger
+from datapulse.pos.exceptions import (
+    PosConflictError,
+    PosInternalError,
+    PosNotFoundError,
+    PosValidationError,
+)
 from datapulse.pos.models import (
     VoucherCreate,
     VoucherResponse,
@@ -101,12 +106,9 @@ class VoucherRepository:
         except IntegrityError as exc:
             # Unique violation on (tenant_id, code).
             self._session.rollback()
-            raise HTTPException(
-                status_code=409,
-                detail=f"voucher_code_already_exists:{payload.code}",
-            ) from exc
+            raise PosConflictError(f"voucher_code_already_exists:{payload.code}") from exc
         if row is None:  # pragma: no cover — INSERT RETURNING always yields a row
-            raise HTTPException(status_code=500, detail="voucher_insert_no_row")
+            raise PosInternalError("voucher_insert_no_row")
         return _row_to_response(dict(row))
 
     # ------------------------------------------------------------------
@@ -186,15 +188,15 @@ class VoucherRepository:
         attempts for the same (tenant_id, code). Must be called inside an
         existing transaction — the row-lock releases when the caller commits.
 
-        Raises :class:`fastapi.HTTPException(400)` on any validation failure
-        with one of these precise detail strings:
+        Raises a :class:`~datapulse.pos.exceptions.PosError` subclass on any
+        validation failure with one of these precise ``code`` strings:
 
-        * ``voucher_not_found``
-        * ``voucher_inactive``
-        * ``voucher_expired``
-        * ``voucher_not_yet_active``
-        * ``voucher_max_uses_reached``
-        * ``voucher_min_purchase_unmet``
+        * ``voucher_not_found`` (:class:`PosNotFoundError`, HTTP 400 legacy)
+        * ``voucher_inactive`` (:class:`PosValidationError`)
+        * ``voucher_expired`` (:class:`PosValidationError`)
+        * ``voucher_not_yet_active`` (:class:`PosValidationError`)
+        * ``voucher_max_uses_reached`` (:class:`PosValidationError`)
+        * ``voucher_min_purchase_unmet`` (:class:`PosValidationError`)
 
         Returns the updated :class:`VoucherResponse`.
         """
@@ -218,25 +220,26 @@ class VoucherRepository:
             .first()
         )
         if row is None:
-            raise HTTPException(status_code=400, detail="voucher_not_found")
+            # Historically returned 400 (not 404) on the commit path.
+            raise PosNotFoundError("voucher_not_found", http_status=400)
 
         current = _row_to_response(dict(row))
         now_aware = now if now.tzinfo is not None else now.replace(tzinfo=UTC)
 
         if current.status != VoucherStatus.active:
-            raise HTTPException(status_code=400, detail="voucher_inactive")
+            raise PosValidationError("voucher_inactive")
         if current.starts_at is not None and now_aware < current.starts_at:
-            raise HTTPException(status_code=400, detail="voucher_not_yet_active")
+            raise PosValidationError("voucher_not_yet_active")
         if current.ends_at is not None and now_aware > current.ends_at:
-            raise HTTPException(status_code=400, detail="voucher_expired")
+            raise PosValidationError("voucher_expired")
         if current.uses >= current.max_uses:
-            raise HTTPException(status_code=400, detail="voucher_max_uses_reached")
+            raise PosValidationError("voucher_max_uses_reached")
         if (
             current.min_purchase is not None
             and cart_subtotal is not None
             and cart_subtotal < current.min_purchase
         ):
-            raise HTTPException(status_code=400, detail="voucher_min_purchase_unmet")
+            raise PosValidationError("voucher_min_purchase_unmet")
 
         new_uses = current.uses + 1
         new_status = (
@@ -271,5 +274,5 @@ class VoucherRepository:
             .first()
         )
         if updated is None:  # pragma: no cover — UPDATE RETURNING always yields a row
-            raise HTTPException(status_code=500, detail="voucher_redeem_no_row")
+            raise PosInternalError("voucher_redeem_no_row")
         return _row_to_response(dict(updated))

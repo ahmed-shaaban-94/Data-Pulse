@@ -12,9 +12,9 @@ from decimal import Decimal
 from unittest.mock import MagicMock
 
 import pytest
-from fastapi import HTTPException
 from sqlalchemy.exc import IntegrityError
 
+from datapulse.pos.exceptions import PosConflictError, PosNotFoundError, PosValidationError
 from datapulse.pos.models import (
     PromotionCreate,
     PromotionDiscountType,
@@ -130,10 +130,9 @@ def test_create_duplicate_name_raises_409() -> None:
     session = MagicMock()
     session.execute.side_effect = IntegrityError("stmt", {}, Exception("duplicate"))
     repo = PromotionRepository(session)
-    with pytest.raises(HTTPException) as exc:
+    with pytest.raises(PosConflictError) as exc:
         repo.create(1, _create_payload(name="Dupe"))
-    assert exc.value.status_code == 409
-    assert "Dupe" in exc.value.detail
+    assert "Dupe" in exc.value.message
 
 
 # ---------------------------------------------------------------------------
@@ -144,20 +143,19 @@ def test_create_duplicate_name_raises_409() -> None:
 def test_set_status_rejects_expired() -> None:
     session = MagicMock()
     repo = PromotionRepository(session)
-    with pytest.raises(HTTPException) as exc:
+    with pytest.raises(PosValidationError) as exc:
         repo.set_status(1, 7, PromotionStatus.expired)
-    assert exc.value.status_code == 400
-    assert exc.value.detail == "promotion_status_invalid"
+    assert exc.value.message == "promotion_status_invalid"
 
 
 def test_set_status_not_found_raises_404() -> None:
     session = MagicMock()
     session.execute.return_value = _mock_exec(None)
     repo = PromotionRepository(session)
-    with pytest.raises(HTTPException) as exc:
+    with pytest.raises(PosNotFoundError) as exc:
         repo.set_status(1, 7, PromotionStatus.active)
-    assert exc.value.status_code == 404
-    assert exc.value.detail == "promotion_not_found"
+    assert exc.value.http_status == 404
+    assert exc.value.message == "promotion_not_found"
 
 
 def test_set_status_active_runs_update() -> None:
@@ -188,10 +186,10 @@ def test_lock_for_application_raises_on_missing() -> None:
     session = MagicMock()
     session.execute.return_value = _mock_exec(None)
     repo = PromotionRepository(session)
-    with pytest.raises(HTTPException) as exc:
+    with pytest.raises(PosNotFoundError) as exc:
         repo.lock_for_application(1, 7, datetime.now(UTC))
-    assert exc.value.status_code == 400
-    assert exc.value.detail == "promotion_not_found"
+    assert exc.value.message == "promotion_not_found"
+    assert exc.value.http_status == 400
 
 
 def test_lock_for_application_raises_on_paused() -> None:
@@ -204,9 +202,9 @@ def test_lock_for_application_raises_on_paused() -> None:
         _mock_exec([]),  # scope_active_ingredients (migration 106)
     ]
     repo = PromotionRepository(session)
-    with pytest.raises(HTTPException) as exc:
+    with pytest.raises(PosValidationError) as exc:
         repo.lock_for_application(1, 7, datetime.now(UTC))
-    assert exc.value.detail == "promotion_inactive"
+    assert exc.value.message == "promotion_inactive"
 
 
 def test_lock_for_application_raises_on_expired_window() -> None:
@@ -220,9 +218,9 @@ def test_lock_for_application_raises_on_expired_window() -> None:
         _mock_exec([]),  # scope_active_ingredients (migration 106)
     ]
     repo = PromotionRepository(session)
-    with pytest.raises(HTTPException) as exc:
+    with pytest.raises(PosValidationError) as exc:
         repo.lock_for_application(1, 7, datetime.now(UTC))
-    assert exc.value.detail == "promotion_expired"
+    assert exc.value.message == "promotion_expired"
 
 
 def test_lock_for_application_succeeds_for_active_in_window() -> None:
@@ -283,9 +281,9 @@ def test_update_fails_when_promotion_missing() -> None:
     # get() returns None → SELECT yields no row
     session.execute.return_value = _mock_exec(None)
     repo = PromotionRepository(session)
-    with pytest.raises(HTTPException) as exc:
+    with pytest.raises(PosNotFoundError) as exc:
         repo.update(1, 9, PromotionUpdate(name="Renamed"))
-    assert exc.value.status_code == 404
+    assert exc.value.http_status == 404
 
 
 def test_list_for_tenant_passes_status_filter() -> None:

@@ -39,10 +39,10 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from decimal import Decimal
 
-from fastapi import HTTPException
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from datapulse.pos.exceptions import PosInternalError, PosNotFoundError, PosValidationError
 from datapulse.pos.models import (
     AppliedDiscount,
     CommitRequest,
@@ -205,7 +205,7 @@ def _preview_voucher_discount(
     """Read the voucher (no lock) + compute the would-be discount for total-check."""
     preview = voucher_repo.get_by_code(tenant_id, code)
     if preview is None:
-        raise HTTPException(status_code=400, detail="voucher_not_found")
+        raise PosNotFoundError("voucher_not_found", http_status=400)
     discount = VoucherService.compute_discount(
         preview.discount_type,
         preview.value,
@@ -225,7 +225,7 @@ def _preview_promotion_discount(
     """Read the promotion + compute the discount against the eligible slice."""
     promo = promotion_repo.get(tenant_id, promotion_id)
     if promo is None:
-        raise HTTPException(status_code=400, detail="promotion_not_found")
+        raise PosNotFoundError("promotion_not_found", http_status=400)
     eligible_base = PromotionService.eligible_base(
         promo,
         [
@@ -294,7 +294,7 @@ def atomic_commit(
             try:
                 promotion_id = int(discount_source.ref)
             except ValueError as exc:
-                raise HTTPException(status_code=400, detail="promotion_ref_invalid") from exc
+                raise PosValidationError("promotion_ref_invalid") from exc
             promotion_repo = PromotionRepository(session)
             _, discount_amount = _preview_promotion_discount(
                 promotion_repo,
@@ -324,12 +324,9 @@ def atomic_commit(
     )
 
     if abs(computed_pre_discount_grand - Decimal(str(payload.grand_total))) > _TOTAL_EPSILON:
-        raise HTTPException(
-            status_code=400,
-            detail=(
-                f"grand_total mismatch: client={payload.grand_total} "
-                f"server={computed_pre_discount_grand}"
-            ),
+        raise PosValidationError(
+            f"grand_total mismatch: client={payload.grand_total} "
+            f"server={computed_pre_discount_grand}"
         )
 
     # ── Apply voucher / promotion discount → effective grand_total ────────
@@ -344,7 +341,7 @@ def atomic_commit(
     if payload.payment_method.value == "cash":
         tendered = payload.cash_tendered or Decimal("0")
         if tendered < effective_grand:
-            raise HTTPException(status_code=400, detail="cash_tendered < grand_total")
+            raise PosValidationError("cash_tendered < grand_total")
         change_due = tendered - effective_grand
     else:
         change_due = Decimal("0")
@@ -383,7 +380,7 @@ def atomic_commit(
         },
     ).first()
     if txn_row is None:  # pragma: no cover — INSERT RETURNING always yields a row
-        raise HTTPException(status_code=500, detail="commit_insert_no_rowid")
+        raise PosInternalError("commit_insert_no_rowid")
     transaction_id = int(txn_row[0])
 
     # Deterministic receipt number derived from the id we just reserved.
