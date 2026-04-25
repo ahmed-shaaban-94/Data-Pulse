@@ -443,9 +443,9 @@ def test_pin_lookup_returns_none_for_wrong_tenant() -> None:
     """
     verifier = _make_tenant_scoped_verifier(
         pharmacist_id=PHARMACIST_ID,
-        stored_tenant_id=42,       # pharmacist lives in tenant 42
+        stored_tenant_id=42,  # pharmacist lives in tenant 42
         pin_hash=hash_pin(VALID_PIN),
-        request_tenant_id=99,      # caller is from tenant 99
+        request_tenant_id=99,  # caller is from tenant 99
     )
     with pytest.raises(PharmacistVerificationRequiredError):
         verifier.verify_and_issue(PHARMACIST_ID, VALID_PIN, DRUG_CODE)
