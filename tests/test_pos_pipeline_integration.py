@@ -297,8 +297,11 @@ class TestReturnBronzeWrite:
         from datapulse.pos.constants import ReturnReason
         from datapulse.pos.models import PosCartItem
 
-        # Setup: original transaction is completed
-        mock_repo.get_transaction.return_value = {
+        # Setup: original transaction is completed.
+        # ``process_return`` uses ``get_transaction_for_update`` (locks the
+        # row inside the return tx) — same dict, both mocks set so legacy
+        # callers + the new locking lookup both resolve.
+        _completed_txn = {
             "id": 101,
             "tenant_id": 1,
             "terminal_id": 1,
@@ -315,6 +318,8 @@ class TestReturnBronzeWrite:
             "receipt_number": "R20260416-1-101",
             "created_at": datetime.now(tz=UTC),
         }
+        mock_repo.get_transaction.return_value = _completed_txn
+        mock_repo.get_transaction_for_update.return_value = _completed_txn
 
         # Return transaction creation
         mock_repo.create_transaction.return_value = {
