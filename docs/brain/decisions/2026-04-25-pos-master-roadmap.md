@@ -3,6 +3,7 @@
 **Date:** 2026-04-25
 **Author:** Claude (post-audit consolidation, branch `claude/fervent-nash-1ec7af`)
 **Status:** Authoritative for cross-epic POS planning until next quarterly review.
+**GitHub entry-point:** pinned tracking issue [#741](https://github.com/ahmed-shaaban-94/Data-Pulse/issues/741) — link this from the team channel.
 
 Related: [[layers/frontend]] · [[layers/api]] · [[modules/pos]]
 Companion docs:

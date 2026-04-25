@@ -15,6 +15,17 @@ Read `docs/brain/_INDEX.md` for recent session context.
 - `docs/CONVENTIONS/second-brain.md` — brain vault reads + writes
 - `.claude/rules/*.md` — thin pointers to the above
 
+## Active workstream pointers — read when picking up new work
+
+- **POS** — `docs/brain/decisions/2026-04-25-pos-master-roadmap.md` ← single source of truth across all 4 POS epics (Legend / Hardening / V1-readiness / V9). Includes cross-epic dependency graph + wave order + day-1 startable list. Companion: `docs/brain/decisions/2026-04-25-pos-legend-strategy.md` for Q1 strategy detail.
+
+## Pre-flight before scoping new issues
+
+Always run before creating a new GitHub issue:
+- `gh pr list --state merged --limit 30` — catch silently-resolved work
+- `gh issue list --state open --search "<keyword> in:title"` — catch duplicates
+Skipping this caused #735 (POS staged updates) to be created 24 min after the work merged. Don't repeat.
+
 ## Hard rules (always in force)
 
 ### Security
