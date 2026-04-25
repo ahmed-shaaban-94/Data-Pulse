@@ -5,7 +5,8 @@ from __future__ import annotations
 from unittest.mock import MagicMock
 
 import pytest
-from fastapi import HTTPException
+
+from datapulse.pos.exceptions import PosConflictError
 
 pytestmark = pytest.mark.unit
 
@@ -33,7 +34,7 @@ def test_guard_rejects_client_claim_nonzero() -> None:
     from datapulse.pos.shift_close_guard import enforce_close_guard
 
     session = MagicMock()
-    with pytest.raises(HTTPException) as exc:
+    with pytest.raises(PosConflictError) as exc:
         enforce_close_guard(
             session,
             shift_id=1,
@@ -42,8 +43,7 @@ def test_guard_rejects_client_claim_nonzero() -> None:
             claim_count=3,
             claim_digest="sha256:three",
         )
-    assert exc.value.status_code == 409
-    assert exc.value.detail == "provisional_work_pending"
+    assert exc.value.message == "provisional_work_pending"
     # Only the rejection-INSERT call
     assert session.execute.call_count == 1
 
@@ -54,7 +54,7 @@ def test_guard_rejects_server_incomplete_transactions() -> None:
     session = MagicMock()
     session.execute.return_value.scalar.return_value = 2
 
-    with pytest.raises(HTTPException) as exc:
+    with pytest.raises(PosConflictError) as exc:
         enforce_close_guard(
             session,
             shift_id=1,
@@ -63,7 +63,6 @@ def test_guard_rejects_server_incomplete_transactions() -> None:
             claim_count=0,
             claim_digest="sha256:clean",
         )
-    assert exc.value.status_code == 409
-    assert exc.value.detail == "server_side_incomplete_transactions"
+    assert exc.value.message == "server_side_incomplete_transactions"
     # SELECT + rejection-INSERT
     assert session.execute.call_count == 2

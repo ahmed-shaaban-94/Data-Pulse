@@ -13,9 +13,8 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from decimal import ROUND_HALF_UP, Decimal
 
-from fastapi import HTTPException
-
 from datapulse.logging import get_logger
+from datapulse.pos.exceptions import PosNotFoundError, PosValidationError
 from datapulse.pos.models import (
     VoucherCreate,
     VoucherResponse,
@@ -72,7 +71,7 @@ class VoucherService:
         """
         voucher = self._repo.get_by_code(tenant_id, req.code)
         if voucher is None:
-            raise HTTPException(status_code=404, detail="voucher_not_found")
+            raise PosNotFoundError("voucher_not_found")
         now = datetime.now(UTC)
         self._assert_redeemable(voucher, now=now, cart_subtotal=req.cart_subtotal)
         remaining = voucher.max_uses - voucher.uses
@@ -92,21 +91,21 @@ class VoucherService:
         now: datetime,
         cart_subtotal: Decimal | None,
     ) -> None:
-        """Raise HTTPException(400) if the voucher is not currently redeemable."""
+        """Raise :class:`PosValidationError` if the voucher is not currently redeemable."""
         if voucher.status != VoucherStatus.active:
-            raise HTTPException(status_code=400, detail="voucher_inactive")
+            raise PosValidationError("voucher_inactive")
         if voucher.starts_at is not None and now < voucher.starts_at:
-            raise HTTPException(status_code=400, detail="voucher_not_yet_active")
+            raise PosValidationError("voucher_not_yet_active")
         if voucher.ends_at is not None and now > voucher.ends_at:
-            raise HTTPException(status_code=400, detail="voucher_expired")
+            raise PosValidationError("voucher_expired")
         if voucher.uses >= voucher.max_uses:
-            raise HTTPException(status_code=400, detail="voucher_max_uses_reached")
+            raise PosValidationError("voucher_max_uses_reached")
         if (
             voucher.min_purchase is not None
             and cart_subtotal is not None
             and cart_subtotal < voucher.min_purchase
         ):
-            raise HTTPException(status_code=400, detail="voucher_min_purchase_unmet")
+            raise PosValidationError("voucher_min_purchase_unmet")
 
     # ------------------------------------------------------------------
     # Discount computation — pure helper

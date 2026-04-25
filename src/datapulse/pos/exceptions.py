@@ -188,3 +188,66 @@ class WhatsAppDeliveryFailedError(PosError):
             detail=f"whatsapp_provider_error reason={reason}",
         )
         self.reason = reason
+
+
+# ---------------------------------------------------------------------------
+# Layer-boundary domain exceptions (#679)
+# The exceptions below replace ``HTTPException`` raises in repo/service layers.
+# ``api/app.py`` registers handlers that map each class to the correct HTTP
+# status code and preserves the legacy machine-readable ``detail`` strings.
+# ---------------------------------------------------------------------------
+
+
+class PosNotFoundError(PosError):
+    """Raised when a POS resource is not found.
+
+    Maps to HTTP 404 Not Found by default, or HTTP 400 for legacy paths that
+    historically used 400 (e.g. voucher redemption in commit flow).
+
+    ``code`` is the machine-readable detail string clients key off
+    (e.g. ``"voucher_not_found"``, ``"promotion_not_found"``).
+    """
+
+    def __init__(self, code: str, *, http_status: int = 404) -> None:
+        super().__init__(message=code, detail=code)
+        self.code = code
+        self.http_status = http_status
+
+
+class PosConflictError(PosError):
+    """Raised when a POS operation conflicts with current state.
+
+    Maps to HTTP 409 Conflict.
+
+    ``code`` is the machine-readable detail string
+    (e.g. ``"voucher_code_already_exists:X"``, ``"provisional_work_pending"``).
+    """
+
+    def __init__(self, code: str) -> None:
+        super().__init__(message=code, detail=code)
+        self.code = code
+
+
+class PosValidationError(PosError):
+    """Raised when POS input fails business validation.
+
+    Maps to HTTP 400 Bad Request.
+
+    ``code`` is the machine-readable detail string
+    (e.g. ``"voucher_inactive"``, ``"promotion_expired"``).
+    """
+
+    def __init__(self, code: str) -> None:
+        super().__init__(message=code, detail=code)
+        self.code = code
+
+
+class PosInternalError(PosError):
+    """Raised for unexpected DB-level invariant violations (INSERT RETURNING no row, etc.).
+
+    Maps to HTTP 500 Internal Server Error.
+    """
+
+    def __init__(self, code: str) -> None:
+        super().__init__(message=code, detail=code)
+        self.code = code

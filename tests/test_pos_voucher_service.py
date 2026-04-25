@@ -12,8 +12,8 @@ from decimal import Decimal
 from unittest.mock import MagicMock
 
 import pytest
-from fastapi import HTTPException
 
+from datapulse.pos.exceptions import PosNotFoundError, PosValidationError
 from datapulse.pos.models import (
     VoucherResponse,
     VoucherStatus,
@@ -108,10 +108,10 @@ def test_validate_active_voucher_returns_details() -> None:
 
 def test_validate_nonexistent_voucher_raises_404() -> None:
     service = _service(None)
-    with pytest.raises(HTTPException) as exc:
+    with pytest.raises(PosNotFoundError) as exc:
         service.validate(1, VoucherValidateRequest(code="NOPE"))
-    assert exc.value.status_code == 404
-    assert exc.value.detail == "voucher_not_found"
+    assert exc.value.http_status == 404
+    assert exc.value.message == "voucher_not_found"
 
 
 @pytest.mark.parametrize(
@@ -120,47 +120,42 @@ def test_validate_nonexistent_voucher_raises_404() -> None:
 )
 def test_validate_inactive_voucher_raises_400(status: VoucherStatus) -> None:
     service = _service(_voucher(status=status))
-    with pytest.raises(HTTPException) as exc:
+    with pytest.raises(PosValidationError) as exc:
         service.validate(1, VoucherValidateRequest(code="SAVE10"))
-    assert exc.value.status_code == 400
-    assert exc.value.detail == "voucher_inactive"
+    assert exc.value.message == "voucher_inactive"
 
 
 def test_validate_expired_voucher_raises_400() -> None:
     past = datetime.now(UTC) - timedelta(days=1)
     service = _service(_voucher(ends_at=past))
-    with pytest.raises(HTTPException) as exc:
+    with pytest.raises(PosValidationError) as exc:
         service.validate(1, VoucherValidateRequest(code="SAVE10"))
-    assert exc.value.status_code == 400
-    assert exc.value.detail == "voucher_expired"
+    assert exc.value.message == "voucher_expired"
 
 
 def test_validate_not_yet_active_voucher_raises_400() -> None:
     future = datetime.now(UTC) + timedelta(days=7)
     service = _service(_voucher(starts_at=future))
-    with pytest.raises(HTTPException) as exc:
+    with pytest.raises(PosValidationError) as exc:
         service.validate(1, VoucherValidateRequest(code="SAVE10"))
-    assert exc.value.status_code == 400
-    assert exc.value.detail == "voucher_not_yet_active"
+    assert exc.value.message == "voucher_not_yet_active"
 
 
 def test_validate_max_uses_reached_raises_400() -> None:
     service = _service(_voucher(max_uses=3, uses=3))
-    with pytest.raises(HTTPException) as exc:
+    with pytest.raises(PosValidationError) as exc:
         service.validate(1, VoucherValidateRequest(code="SAVE10"))
-    assert exc.value.status_code == 400
-    assert exc.value.detail == "voucher_max_uses_reached"
+    assert exc.value.message == "voucher_max_uses_reached"
 
 
 def test_validate_min_purchase_unmet_when_cart_subtotal_provided() -> None:
     service = _service(_voucher(min_purchase=Decimal("100")))
-    with pytest.raises(HTTPException) as exc:
+    with pytest.raises(PosValidationError) as exc:
         service.validate(
             1,
             VoucherValidateRequest(code="SAVE10", cart_subtotal=Decimal("50")),
         )
-    assert exc.value.status_code == 400
-    assert exc.value.detail == "voucher_min_purchase_unmet"
+    assert exc.value.message == "voucher_min_purchase_unmet"
 
 
 def test_validate_min_purchase_met_when_cart_subtotal_sufficient() -> None:

@@ -11,12 +11,17 @@ from __future__ import annotations
 from datetime import datetime
 from decimal import Decimal
 
-from fastapi import HTTPException
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from datapulse.logging import get_logger
+from datapulse.pos.exceptions import (
+    PosConflictError,
+    PosInternalError,
+    PosNotFoundError,
+    PosValidationError,
+)
 from datapulse.pos.models import (
     PromotionApplicationRow,
     PromotionCreate,
@@ -124,12 +129,9 @@ class PromotionRepository:
             )
         except IntegrityError as exc:
             self._session.rollback()
-            raise HTTPException(
-                status_code=409,
-                detail=f"promotion_name_already_exists:{payload.name}",
-            ) from exc
+            raise PosConflictError(f"promotion_name_already_exists:{payload.name}") from exc
         if row is None:  # pragma: no cover — INSERT RETURNING always yields a row
-            raise HTTPException(status_code=500, detail="promotion_insert_no_row")
+            raise PosInternalError("promotion_insert_no_row")
         promotion_id = int(row["id"])
         self._write_scope_joins(
             promotion_id,
@@ -158,7 +160,7 @@ class PromotionRepository:
         """
         current = self.get(tenant_id, promotion_id)
         if current is None:
-            raise HTTPException(status_code=404, detail="promotion_not_found")
+            raise PosNotFoundError("promotion_not_found")
 
         fields: dict[str, object] = {}
         if payload.name is not None:
@@ -239,7 +241,7 @@ class PromotionRepository:
         managed by the scheduled expiry job, not this endpoint.
         """
         if status not in (PromotionStatus.active, PromotionStatus.paused):
-            raise HTTPException(status_code=400, detail="promotion_status_invalid")
+            raise PosValidationError("promotion_status_invalid")
         updated = (
             self._session.execute(
                 text(
@@ -256,7 +258,7 @@ class PromotionRepository:
             .first()
         )
         if updated is None:
-            raise HTTPException(status_code=404, detail="promotion_not_found")
+            raise PosNotFoundError("promotion_not_found")
         refreshed = self.get(tenant_id, promotion_id)
         assert refreshed is not None
         return refreshed
@@ -677,7 +679,7 @@ class PromotionRepository:
             .first()
         )
         if row is None:
-            raise HTTPException(status_code=400, detail="promotion_not_found")
+            raise PosNotFoundError("promotion_not_found", http_status=400)
         items, cats, brands, ais = self._load_scope_joins(promotion_id)
         promo = _row_to_response(
             dict(row),
@@ -687,11 +689,11 @@ class PromotionRepository:
             scope_active_ingredients=ais,
         )
         if promo.status != PromotionStatus.active:
-            raise HTTPException(status_code=400, detail="promotion_inactive")
+            raise PosValidationError("promotion_inactive")
         if now < promo.starts_at:
-            raise HTTPException(status_code=400, detail="promotion_not_yet_active")
+            raise PosValidationError("promotion_not_yet_active")
         if now > promo.ends_at:
-            raise HTTPException(status_code=400, detail="promotion_expired")
+            raise PosValidationError("promotion_expired")
         return promo
 
     def record_application(
@@ -731,7 +733,7 @@ class PromotionRepository:
             .first()
         )
         if row is None:  # pragma: no cover
-            raise HTTPException(status_code=500, detail="promotion_application_insert_no_row")
+            raise PosInternalError("promotion_application_insert_no_row")
         return PromotionApplicationRow(
             id=int(row["id"]),
             promotion_id=int(row["promotion_id"]),

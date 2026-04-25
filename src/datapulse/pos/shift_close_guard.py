@@ -19,9 +19,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal
 
-from fastapi import HTTPException
 from sqlalchemy import text
 from sqlalchemy.orm import Session
+
+from datapulse.pos.exceptions import PosConflictError
 
 GuardOutcome = Literal["accepted", "rejected_client", "rejected_server"]
 
@@ -43,8 +44,8 @@ def enforce_close_guard(
 ) -> GuardResult:
     """Apply client + server checks. Records a forensic row on every outcome.
 
-    Raises ``HTTPException(409)`` on rejection with detail either
-    ``provisional_work_pending`` or ``server_side_incomplete_transactions``.
+    Raises :class:`~datapulse.pos.exceptions.PosConflictError` on rejection with
+    code either ``provisional_work_pending`` or ``server_side_incomplete_transactions``.
     Returns an accepted ``GuardResult`` on pass.
     """
     # Client claim check
@@ -64,7 +65,7 @@ def enforce_close_guard(
                 "d": claim_digest,
             },
         )
-        raise HTTPException(status_code=409, detail="provisional_work_pending")
+        raise PosConflictError("provisional_work_pending")
 
     # Server-side incomplete-transaction check
     incomplete = (
@@ -98,7 +99,7 @@ def enforce_close_guard(
                 "inc": int(incomplete),
             },
         )
-        raise HTTPException(status_code=409, detail="server_side_incomplete_transactions")
+        raise PosConflictError("server_side_incomplete_transactions")
 
     session.execute(
         text(

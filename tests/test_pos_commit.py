@@ -23,9 +23,9 @@ from decimal import Decimal
 from unittest.mock import MagicMock
 
 import pytest
-from fastapi import HTTPException
 
 from datapulse.pos.constants import PaymentMethod
+from datapulse.pos.exceptions import PosNotFoundError, PosValidationError
 from datapulse.pos.models import CommitRequest, PosCartItem, VoucherStatus, VoucherType
 
 pytestmark = pytest.mark.unit
@@ -107,13 +107,12 @@ def test_atomic_commit_400_when_cash_insufficient() -> None:
     from datapulse.pos.commit import atomic_commit
 
     session = _stub_session(returning_id=42)
-    with pytest.raises(HTTPException) as exc:
+    with pytest.raises(PosValidationError):
         atomic_commit(
             session,
             tenant_id=1,
             payload=_payload(total="50.00", tendered="10.00"),
         )
-    assert exc.value.status_code == 400
 
 
 def test_atomic_commit_non_cash_payment_zero_change() -> None:
@@ -149,10 +148,9 @@ def test_atomic_commit_rejects_inflated_client_grand_total() -> None:
         declared_grand_total="9999.00",
         tendered="10000.00",
     )
-    with pytest.raises(HTTPException) as exc:
+    with pytest.raises(PosValidationError) as exc:
         atomic_commit(session, tenant_id=1, payload=payload)
-    assert exc.value.status_code == 400
-    assert "grand_total mismatch" in str(exc.value.detail)
+    assert "grand_total mismatch" in exc.value.message
 
 
 def test_atomic_commit_rejects_deflated_client_grand_total() -> None:
@@ -166,10 +164,9 @@ def test_atomic_commit_rejects_deflated_client_grand_total() -> None:
         declared_grand_total="1.00",
         tendered="100.00",
     )
-    with pytest.raises(HTTPException) as exc:
+    with pytest.raises(PosValidationError) as exc:
         atomic_commit(session, tenant_id=1, payload=payload)
-    assert exc.value.status_code == 400
-    assert "grand_total mismatch" in str(exc.value.detail)
+    assert "grand_total mismatch" in exc.value.message
 
 
 def test_atomic_commit_writes_server_computed_line_total() -> None:
@@ -425,10 +422,9 @@ def test_commit_with_invalid_voucher_raises_400() -> None:
     session.execute.side_effect = _execute
 
     payload = _payload(voucher_code="NOPE")
-    with pytest.raises(HTTPException) as exc:
+    with pytest.raises(PosNotFoundError) as exc:
         atomic_commit(session, tenant_id=1, payload=payload)
-    assert exc.value.status_code == 400
-    assert exc.value.detail == "voucher_not_found"
+    assert exc.value.message == "voucher_not_found"
 
 
 def test_commit_with_voucher_increments_uses_and_sets_txn_id() -> None:
@@ -472,9 +468,8 @@ def test_commit_cash_insufficient_after_voucher_still_raises_400() -> None:
         tendered="50.00",
         voucher_code="SAVE5",
     )
-    with pytest.raises(HTTPException) as exc:
+    with pytest.raises(PosValidationError):
         atomic_commit(session, tenant_id=1, payload=payload)
-    assert exc.value.status_code == 400
 
 
 # ---------------------------------------------------------------------------
@@ -613,10 +608,9 @@ def test_commit_with_paused_promotion_raises_400() -> None:
     payload = _payload(subtotal="20.00", total="20.00", tendered="20.00").model_copy(
         update={"applied_discount": AppliedDiscount(source="promotion", ref="10")}
     )
-    with pytest.raises(HTTPException) as exc:
+    with pytest.raises(PosValidationError) as exc:
         atomic_commit(session, tenant_id=1, payload=payload)
-    assert exc.value.status_code == 400
-    assert exc.value.detail == "promotion_inactive"
+    assert exc.value.message == "promotion_inactive"
 
 
 def test_commit_rejects_both_voucher_and_applied_discount() -> None:

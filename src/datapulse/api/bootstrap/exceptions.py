@@ -47,12 +47,34 @@ def install_exception_handlers(app: FastAPI) -> None:
     from datapulse.pos.exceptions import (
         InsufficientStockError,
         PharmacistVerificationRequiredError,
+        PosConflictError,
+        PosInternalError,
+        PosNotFoundError,
+        PosValidationError,
         ShiftNotOpenError,
         TerminalNotActiveError,
         VoidNotAllowedError,
         WhatsAppDeliveryFailedError,
         WhatsAppDisabledError,
     )
+
+    # Layer-boundary domain exceptions (#679) — registered before the catch-all.
+    @app.exception_handler(PosNotFoundError)
+    async def pos_not_found_handler(request: Request, exc: PosNotFoundError) -> JSONResponse:
+        return JSONResponse(status_code=exc.http_status, content={"detail": exc.message})
+
+    @app.exception_handler(PosConflictError)
+    async def pos_conflict_handler(request: Request, exc: PosConflictError) -> JSONResponse:
+        return JSONResponse(status_code=409, content={"detail": exc.message})
+
+    @app.exception_handler(PosValidationError)
+    async def pos_validation_handler(request: Request, exc: PosValidationError) -> JSONResponse:
+        return JSONResponse(status_code=400, content={"detail": exc.message})
+
+    @app.exception_handler(PosInternalError)
+    async def pos_internal_error_handler(request: Request, exc: PosInternalError) -> JSONResponse:
+        logger.error("pos.internal_error", detail=exc.detail)
+        return JSONResponse(status_code=500, content={"detail": exc.message})
 
     @app.exception_handler(InsufficientStockError)
     async def pos_insufficient_stock_handler(

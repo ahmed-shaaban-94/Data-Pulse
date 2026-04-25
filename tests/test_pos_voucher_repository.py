@@ -12,9 +12,13 @@ from decimal import Decimal
 from unittest.mock import MagicMock
 
 import pytest
-from fastapi import HTTPException
 from sqlalchemy.exc import IntegrityError
 
+from datapulse.pos.exceptions import (
+    PosConflictError,
+    PosNotFoundError,
+    PosValidationError,
+)
 from datapulse.pos.models import VoucherCreate, VoucherStatus, VoucherType
 from datapulse.pos.voucher_repository import VoucherRepository
 
@@ -95,7 +99,7 @@ def test_create_duplicate_code_same_tenant_raises_integrity() -> None:
     session.execute.side_effect = IntegrityError("stmt", {}, Exception("duplicate"))
     repo = VoucherRepository(session)
 
-    with pytest.raises(HTTPException) as exc:
+    with pytest.raises(PosConflictError) as exc:
         repo.create(
             1,
             VoucherCreate(
@@ -104,8 +108,7 @@ def test_create_duplicate_code_same_tenant_raises_integrity() -> None:
                 value=Decimal("5"),
             ),
         )
-    assert exc.value.status_code == 409
-    assert "DUPE" in exc.value.detail
+    assert "DUPE" in exc.value.message
 
 
 # ---------------------------------------------------------------------------
@@ -152,52 +155,52 @@ def _session_for_lock(first_row: dict | None, updated_row: dict | None) -> Magic
 def test_lock_and_redeem_raises_on_missing() -> None:
     session = _session_for_lock(None, None)
     repo = VoucherRepository(session)
-    with pytest.raises(HTTPException) as exc:
+    with pytest.raises(PosNotFoundError) as exc:
         repo.lock_and_redeem(1, "X", 10, datetime.now(UTC))
-    assert exc.value.status_code == 400
-    assert exc.value.detail == "voucher_not_found"
+    assert exc.value.message == "voucher_not_found"
+    assert exc.value.http_status == 400
 
 
 def test_lock_and_redeem_raises_on_inactive_voucher() -> None:
     session = _session_for_lock(_row(status="void"), None)
     repo = VoucherRepository(session)
-    with pytest.raises(HTTPException) as exc:
+    with pytest.raises(PosValidationError) as exc:
         repo.lock_and_redeem(1, "SAVE10", 10, datetime.now(UTC))
-    assert exc.value.detail == "voucher_inactive"
+    assert exc.value.message == "voucher_inactive"
 
 
 def test_lock_and_redeem_raises_on_expired() -> None:
     past = datetime.now(UTC) - timedelta(days=1)
     session = _session_for_lock(_row(ends_at=past), None)
     repo = VoucherRepository(session)
-    with pytest.raises(HTTPException) as exc:
+    with pytest.raises(PosValidationError) as exc:
         repo.lock_and_redeem(1, "SAVE10", 10, datetime.now(UTC))
-    assert exc.value.detail == "voucher_expired"
+    assert exc.value.message == "voucher_expired"
 
 
 def test_lock_and_redeem_raises_on_not_yet_active() -> None:
     future = datetime.now(UTC) + timedelta(days=1)
     session = _session_for_lock(_row(starts_at=future), None)
     repo = VoucherRepository(session)
-    with pytest.raises(HTTPException) as exc:
+    with pytest.raises(PosValidationError) as exc:
         repo.lock_and_redeem(1, "SAVE10", 10, datetime.now(UTC))
-    assert exc.value.detail == "voucher_not_yet_active"
+    assert exc.value.message == "voucher_not_yet_active"
 
 
 def test_lock_and_redeem_raises_on_max_uses() -> None:
     session = _session_for_lock(_row(max_uses=2, uses=2), None)
     repo = VoucherRepository(session)
-    with pytest.raises(HTTPException) as exc:
+    with pytest.raises(PosValidationError) as exc:
         repo.lock_and_redeem(1, "SAVE10", 10, datetime.now(UTC))
-    assert exc.value.detail == "voucher_max_uses_reached"
+    assert exc.value.message == "voucher_max_uses_reached"
 
 
 def test_lock_and_redeem_raises_on_min_purchase_unmet() -> None:
     session = _session_for_lock(_row(min_purchase=Decimal("100")), None)
     repo = VoucherRepository(session)
-    with pytest.raises(HTTPException) as exc:
+    with pytest.raises(PosValidationError) as exc:
         repo.lock_and_redeem(1, "SAVE10", 10, datetime.now(UTC), cart_subtotal=Decimal("50"))
-    assert exc.value.detail == "voucher_min_purchase_unmet"
+    assert exc.value.message == "voucher_min_purchase_unmet"
 
 
 def test_lock_and_redeem_increments_uses_and_sets_txn_id() -> None:

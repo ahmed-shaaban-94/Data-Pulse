@@ -237,11 +237,11 @@ class CatalogMixin:
 
     def _regenerate_receipt(self, transaction_id: int, tenant_id: int, fmt: str) -> bytes:
         """Regenerate a receipt on demand (fallback when no stored receipt exists)."""
-        from fastapi import HTTPException  # local import avoids circular dependency
+        from datapulse.pos.exceptions import PosNotFoundError
 
         header = self._repo.get_transaction(transaction_id)
         if header is None:
-            raise HTTPException(status_code=404, detail=f"Transaction {transaction_id} not found")
+            raise PosNotFoundError(f"transaction_{transaction_id}_not_found")
         items = self._repo.get_transaction_items(transaction_id)
         payment_info = {
             "method": header.get("payment_method", "cash"),
