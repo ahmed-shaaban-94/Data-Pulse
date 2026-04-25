@@ -72,9 +72,7 @@ def install_exception_handlers(app: FastAPI) -> None:
         return JSONResponse(status_code=400, content={"detail": exc.message})
 
     @app.exception_handler(PosInternalError)
-    async def pos_internal_error_handler(
-        request: Request, exc: PosInternalError
-    ) -> JSONResponse:
+    async def pos_internal_error_handler(request: Request, exc: PosInternalError) -> JSONResponse:
         logger.error("pos.internal_error", detail=exc.detail)
         return JSONResponse(status_code=500, content={"detail": exc.message})
 
