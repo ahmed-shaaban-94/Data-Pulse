@@ -493,6 +493,7 @@ export default function PosTerminalPage() {
             onPhoneChange={setCustomerPhone}
             customer={resolvedCustomer}
             isLoading={isCustomerLoading}
+            onSubmit={() => scanInputRef.current?.focus()}
           />
           {resolvedCustomer?.churn && (
             <ChurnAlertCard churn={resolvedCustomer.churn} />
