@@ -36,6 +36,7 @@ from sqlalchemy.orm import Session
 from datapulse.core.auth import get_tenant_session
 
 CLOCK_SKEW_TOLERANCE_MINUTES: int = 2
+SIGNED_REQUEST_MAX_AGE_MINUTES: int = 5
 
 _FP_V1_PATTERN = re.compile(r"^sha256:[0-9a-f]{64}$")
 _FP_V2_PATTERN = re.compile(r"^sha256v2:[0-9a-f]{64}$")
@@ -239,10 +240,14 @@ async def device_token_verifier(
         signed_at_dt = datetime.fromisoformat(x_signed_at.replace("Z", "+00:00"))
     except ValueError as e:
         raise HTTPException(status_code=400, detail="invalid X-Signed-At") from e
+    if signed_at_dt.tzinfo is None:
+        signed_at_dt = signed_at_dt.replace(tzinfo=UTC)
 
     now = datetime.now(UTC)
     if signed_at_dt > now + timedelta(minutes=CLOCK_SKEW_TOLERANCE_MINUTES):
         raise HTTPException(status_code=401, detail="signed_at in the future")
+    if signed_at_dt < now - timedelta(minutes=SIGNED_REQUEST_MAX_AGE_MINUTES):
+        raise HTTPException(status_code=401, detail="signed_at too old")
 
     body = await request.body()
     body_hash = hashlib.sha256(body).hexdigest()

@@ -14,24 +14,33 @@ from datapulse.api.limiter import limiter
 from datapulse.api.routes._pos_routes_deps import (
     CurrentUser,
     ServiceDep,
+    SessionDep,
+    _shift_close_idempotency_dep,
     _staff_id_of,
     _tenant_id_of,
 )
+from datapulse.pos.idempotency import IdempotencyContext, record_response
 from datapulse.pos.models import (
     CashCountRequest,
     CashDrawerEventResponse,
-    CloseShiftRequest,
+    CloseShiftRequestV2,
     ShiftRecord,
     ShiftSummaryResponse,
     StartShiftRequest,
 )
 from datapulse.pos.models.commission import ActiveShiftResponse
+from datapulse.pos.shift_close_guard import enforce_close_guard
 from datapulse.rbac.dependencies import require_permission
 
 router = APIRouter()
 
 
-@router.post("/shifts", response_model=ShiftRecord, status_code=201)
+@router.post(
+    "/shifts",
+    response_model=ShiftRecord,
+    status_code=201,
+    dependencies=[Depends(require_permission("pos:shift:open"))],
+)
 @limiter.limit("20/minute")
 def start_shift(
     request: Request,
@@ -120,26 +129,67 @@ def get_current_shift(
 def close_shift(
     request: Request,
     shift_id: Annotated[int, Path(ge=1)],
-    body: CloseShiftRequest,
+    body: CloseShiftRequestV2,
     service: ServiceDep,
     user: CurrentUser,
+    db_session: SessionDep,
+    idem: Annotated[IdempotencyContext, Depends(_shift_close_idempotency_dep)],
 ) -> ShiftSummaryResponse:
     """Close a cashier shift and compute cash reconciliation.
 
     Returns ``expected_cash``, ``variance`` (closing - expected), transaction count,
     and total sales for the shift.
     """
-    _ = user
-    return service.close_shift(
+    if idem.replay:
+        if idem.cached_status and idem.cached_status >= 400:
+            detail = (idem.cached_body or {}).get("detail", "idempotent request failed")
+            raise HTTPException(status_code=idem.cached_status, detail=detail)
+        return ShiftSummaryResponse.model_validate(idem.cached_body)
+
+    tenant_id = _tenant_id_of(user)
+    shift = service.get_shift_by_id(shift_id)
+    if shift is None:
+        raise HTTPException(status_code=404, detail=f"Shift {shift_id} not found")
+    try:
+        enforce_close_guard(
+            db_session,
+            shift_id=shift_id,
+            tenant_id=tenant_id,
+            terminal_id=shift.terminal_id,
+            claim_count=body.local_unresolved.count,
+            claim_digest=body.local_unresolved.digest,
+        )
+    except HTTPException as exc:
+        record_response(
+            db_session,
+            idem.key,
+            exc.status_code,
+            {"detail": exc.detail},
+            tenant_id=idem.tenant_id,
+        )
+        db_session.commit()
+        raise
+
+    result = service.close_shift(
         shift_id=shift_id,
         closing_cash=Decimal(str(body.closing_cash)),
     )
+    record_response(
+        db_session,
+        idem.key,
+        200,
+        result.model_dump(mode="json"),
+        tenant_id=idem.tenant_id,
+    )
+    db_session.commit()
+    return result
 
 
 @router.post(
     "/terminals/{terminal_id}/cash-events",
     response_model=CashDrawerEventResponse,
     status_code=201,
+    dependencies=[Depends(require_permission("pos:cash:event:create"))],
 )
 @limiter.limit("30/minute")
 def record_cash_event(

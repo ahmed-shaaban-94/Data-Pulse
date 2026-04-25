@@ -16,7 +16,7 @@ from datapulse.pos._service_helpers import (
     select_fefo_batch,
     to_decimal,
 )
-from datapulse.pos.constants import TerminalStatus
+from datapulse.pos.constants import TerminalStatus, TransactionStatus
 from datapulse.pos.exceptions import (
     InsufficientStockError,
     PharmacistVerificationRequiredError,
@@ -203,29 +203,85 @@ class CartOpsMixin:
         item_id: int,
         *,
         quantity: Decimal,
-        unit_price: Decimal,
+        unit_price: Decimal | None = None,
         discount: Decimal | None = None,
+        transaction_id: int | None = None,
     ) -> PosCartItem:
         """Recalculate ``line_total`` for an existing line item."""
-        line_total = (unit_price * quantity).quantize(Decimal("0.0001"))
-        if discount is not None:
-            line_total = (line_total - to_decimal(discount)).quantize(Decimal("0.0001"))
+        existing = self._repo.get_transaction_item(item_id)
+        if existing is None:
+            raise PosError(
+                message=f"Item {item_id} not found",
+                detail=f"item_id={item_id}",
+            )
+        existing_transaction_id = int(existing["transaction_id"])
+        if transaction_id is not None and existing_transaction_id != transaction_id:
+            raise PosError(
+                message=f"Item {item_id} does not belong to transaction {transaction_id}",
+                detail=f"item_id={item_id} transaction_id={transaction_id}",
+            )
+
+        header = self._repo.get_transaction(existing_transaction_id)
+        if header is None:
+            raise PosError(
+                message=f"Transaction {existing_transaction_id} not found",
+                detail=f"transaction_id={existing_transaction_id}",
+            )
+        if header["status"] != TransactionStatus.draft.value:
+            raise PosError(
+                message=(
+                    f"Only draft transactions can be edited "
+                    f"(current: {header['status']})."
+                ),
+                detail=f"transaction_id={existing_transaction_id} status={header['status']}",
+            )
+
+        effective_unit_price = (
+            to_decimal(unit_price) if unit_price is not None else to_decimal(existing["unit_price"])
+        )
+        effective_discount = (
+            to_decimal(discount)
+            if discount is not None
+            else to_decimal(existing.get("discount", 0))
+        )
+        line_total = (effective_unit_price * quantity - effective_discount).quantize(
+            Decimal("0.0001")
+        )
         row = self._repo.update_item_quantity(
             item_id,
             quantity=quantity,
+            unit_price=effective_unit_price,
             line_total=line_total,
-            discount=discount,
+            discount=effective_discount,
+            transaction_id=existing_transaction_id,
+            expected_status=TransactionStatus.draft.value,
         )
         if row is None:
             raise PosError(
                 message=f"Item {item_id} not found",
                 detail=f"item_id={item_id}",
             )
-        # ``unit_price`` is not returned by update_item_quantity; merge it in for the response.
-        return PosCartItem.model_validate(
-            {**row, "unit_price": unit_price, "drug_name": row.get("drug_name", "")}
-        )
+        return PosCartItem.model_validate(row)
 
-    def remove_item(self, item_id: int) -> bool:
+    def remove_item(self, item_id: int, *, transaction_id: int | None = None) -> bool:
         """Delete a single item from a draft transaction."""
-        return self._repo.remove_item(item_id)
+        existing = self._repo.get_transaction_item(item_id)
+        if existing is None:
+            return False
+        existing_transaction_id = int(existing["transaction_id"])
+        if transaction_id is not None and existing_transaction_id != transaction_id:
+            return False
+        header = self._repo.get_transaction(existing_transaction_id)
+        if header is not None and header["status"] != TransactionStatus.draft.value:
+            raise PosError(
+                message=(
+                    f"Only draft transactions can be edited "
+                    f"(current: {header['status']})."
+                ),
+                detail=f"transaction_id={existing_transaction_id} status={header['status']}",
+            )
+        return self._repo.remove_item(
+            item_id,
+            transaction_id=existing_transaction_id,
+            expected_status=TransactionStatus.draft.value,
+        )

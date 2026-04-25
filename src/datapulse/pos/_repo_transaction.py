@@ -237,32 +237,83 @@ class TransactionRepoMixin:
         )
         return dict(row)
 
+    def get_transaction_item(self, item_id: int) -> dict[str, Any] | None:
+        """Return one line item by ID."""
+        row = (
+            self._session.execute(
+                text("""
+                    SELECT id, transaction_id, tenant_id, drug_code, drug_name,
+                           batch_number, expiry_date, quantity, unit_price,
+                           discount, line_total, is_controlled, pharmacist_id
+                    FROM   pos.transaction_items
+                    WHERE  id = :item_id
+                """),
+                {"item_id": item_id},
+            )
+            .mappings()
+            .first()
+        )
+        return dict(row) if row else None
+
+    def get_transaction_for_update(self, transaction_id: int) -> dict[str, Any] | None:
+        """Return a transaction header and lock it for the current DB transaction."""
+        row = (
+            self._session.execute(
+                text("""
+                    SELECT id, tenant_id, terminal_id, staff_id, pharmacist_id,
+                           customer_id, site_code, subtotal, discount_total,
+                           tax_total, grand_total, payment_method, status,
+                           receipt_number, created_at
+                    FROM   pos.transactions
+                    WHERE  id = :txn_id
+                    FOR UPDATE
+                """),
+                {"txn_id": transaction_id},
+            )
+            .mappings()
+            .first()
+        )
+        return dict(row) if row else None
+
     def update_item_quantity(
         self,
         item_id: int,
         *,
         quantity: Decimal,
         line_total: Decimal,
+        unit_price: Decimal | None = None,
         discount: Decimal | None = None,
+        transaction_id: int | None = None,
+        expected_status: str | None = None,
     ) -> dict[str, Any] | None:
         """Update quantity and recalculate line_total for an existing item."""
         row = (
             self._session.execute(
                 text("""
-                    UPDATE pos.transaction_items
+                    UPDATE pos.transaction_items ti
                     SET    quantity   = :quantity,
+                           unit_price = COALESCE(:unit_price, ti.unit_price),
                            line_total = :line_total,
-                           discount   = COALESCE(:discount, discount)
-                    WHERE  id = :item_id
+                           discount   = COALESCE(:discount, ti.discount)
+                    FROM   pos.transactions t
+                    WHERE  ti.id = :item_id
+                    AND    t.id  = ti.transaction_id
+                    AND    (:transaction_id IS NULL OR ti.transaction_id = :transaction_id)
+                    AND    (:expected_status IS NULL OR t.status = :expected_status)
                     RETURNING
-                        id, transaction_id, drug_code, quantity, unit_price,
-                        discount, line_total, is_controlled
+                        ti.id, ti.transaction_id, ti.tenant_id, ti.drug_code,
+                        ti.drug_name, ti.batch_number, ti.expiry_date,
+                        ti.quantity, ti.unit_price, ti.discount, ti.line_total,
+                        ti.is_controlled, ti.pharmacist_id
                 """),
                 {
                     "item_id": item_id,
                     "quantity": quantity,
+                    "unit_price": unit_price,
                     "line_total": line_total,
                     "discount": discount,
+                    "transaction_id": transaction_id,
+                    "expected_status": expected_status,
                 },
             )
             .mappings()
@@ -270,11 +321,28 @@ class TransactionRepoMixin:
         )
         return dict(row) if row else None
 
-    def remove_item(self, item_id: int) -> bool:
+    def remove_item(
+        self,
+        item_id: int,
+        *,
+        transaction_id: int | None = None,
+        expected_status: str | None = None,
+    ) -> bool:
         """Delete a single transaction item. Returns True if a row was deleted."""
         result = self._session.execute(
-            text("DELETE FROM pos.transaction_items WHERE id = :item_id"),
-            {"item_id": item_id},
+            text("""
+                DELETE FROM pos.transaction_items ti
+                USING pos.transactions t
+                WHERE ti.id = :item_id
+                AND   t.id  = ti.transaction_id
+                AND   (:transaction_id IS NULL OR ti.transaction_id = :transaction_id)
+                AND   (:expected_status IS NULL OR t.status = :expected_status)
+            """),
+            {
+                "item_id": item_id,
+                "transaction_id": transaction_id,
+                "expected_status": expected_status,
+            },
         )
         # SQLAlchemy ``Result`` for DML statements is a ``CursorResult`` exposing
         # ``rowcount``; the generic ``Result`` type doesn't, hence the ignore.

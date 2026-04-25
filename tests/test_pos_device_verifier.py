@@ -267,6 +267,25 @@ def test_verifier_rejects_signed_at_in_future(monkeypatch: pytest.MonkeyPatch) -
     assert r.status_code == 401
 
 
+def test_verifier_rejects_stale_signed_at(monkeypatch: pytest.MonkeyPatch) -> None:
+    sk, device = _fresh_device()
+    app = _make_app(device, monkeypatch=monkeypatch)
+    body = b"{}"
+    stale = (datetime.now(UTC) - timedelta(minutes=10)).isoformat().replace("+00:00", "Z")
+    headers = _build_signed_headers(
+        sk=sk,
+        terminal_id=5,
+        v1=_FP_V1,
+        v2=_FP_V2,
+        body=body,
+        signed_at=stale,
+        idempotency_key="idem-stale",
+    )
+    r = TestClient(app).post("/verify", content=body, headers=headers)
+    assert r.status_code == 401
+    assert r.json()["detail"] == "signed_at too old"
+
+
 def test_verifier_rejects_unknown_device(monkeypatch: pytest.MonkeyPatch) -> None:
     sk, _ = _fresh_device()
     app = _make_app(None, monkeypatch=monkeypatch)
