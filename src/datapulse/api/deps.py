@@ -382,6 +382,7 @@ def get_pos_service(
     verifier = PharmacistVerifier(
         secret_key=signing_secret,
         pin_lookup=repo.get_pharmacist_pin_hash,
+        pin_upgrade=repo.upgrade_pharmacist_pin,
     )
     voucher_repo = VoucherRepository(session)
     promotion_repo = PromotionRepository(session)
