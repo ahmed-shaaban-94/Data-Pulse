@@ -33,7 +33,7 @@ from fastapi import Depends, Header, HTTPException, Request
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from datapulse.core.auth import CurrentUser, get_tenant_session
+from datapulse.core.auth import get_current_user, get_tenant_session
 
 CLOCK_SKEW_TOLERANCE_MINUTES: int = 2
 
@@ -182,7 +182,7 @@ def verify_signature(public_key: bytes, message: bytes, signature: bytes) -> boo
 
 async def device_token_verifier(
     request: Request,
-    user: CurrentUser,
+    user: dict = Depends(get_current_user),  # noqa: B008
     x_terminal_id: int = Header(..., alias="X-Terminal-Id"),  # noqa: B008
     x_device_fingerprint: str = Header(..., alias="X-Device-Fingerprint"),  # noqa: B008
     x_signed_at: str = Header(..., alias="X-Signed-At"),  # noqa: B008

@@ -152,11 +152,11 @@ def idempotency_dependency(endpoint: str):
                 return idem.cached_body
             ...
     """
-    from datapulse.core.auth import CurrentUser, get_tenant_session
+    from datapulse.core.auth import get_current_user, get_tenant_session
 
     async def _dep(
         request: Request,
-        user: CurrentUser,
+        user: dict = Depends(get_current_user),  # noqa: B008
         idempotency_key: str = Header(..., alias="Idempotency-Key"),  # noqa: B008
         session: Session = Depends(get_tenant_session),  # noqa: B008
     ) -> IdempotencyContext:
