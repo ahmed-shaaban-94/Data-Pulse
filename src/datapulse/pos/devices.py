@@ -215,7 +215,7 @@ async def device_token_verifier(
     if raw_tid in (None, ""):
         raw_tid = getattr(request.state, "tenant_id", None)
     try:
-        tenant_id = int(raw_tid)  # type: ignore[arg-type]
+        tenant_id = int(raw_tid)  # type: ignore[call-overload]
     except (TypeError, ValueError) as exc:
         raise HTTPException(status_code=401, detail="request missing tenant context") from exc
 
