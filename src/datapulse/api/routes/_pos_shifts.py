@@ -9,6 +9,7 @@ from decimal import Decimal
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request
+from sqlalchemy.orm import Session
 
 from datapulse.api.limiter import limiter
 from datapulse.api.routes._pos_routes_deps import (
@@ -17,6 +18,7 @@ from datapulse.api.routes._pos_routes_deps import (
     _staff_id_of,
     _tenant_id_of,
 )
+from datapulse.core.auth import get_tenant_session
 from datapulse.pos.models import (
     CashCountRequest,
     CashDrawerEventResponse,
@@ -26,6 +28,7 @@ from datapulse.pos.models import (
     StartShiftRequest,
 )
 from datapulse.pos.models.commission import ActiveShiftResponse
+from datapulse.pos.shift_close_guard import enforce_close_guard
 from datapulse.rbac.dependencies import require_permission
 
 router = APIRouter()
@@ -123,13 +126,33 @@ def close_shift(
     body: CloseShiftRequest,
     service: ServiceDep,
     user: CurrentUser,
+    db_session: Annotated[Session, Depends(get_tenant_session)],
 ) -> ShiftSummaryResponse:
     """Close a cashier shift and compute cash reconciliation.
 
     Returns ``expected_cash``, ``variance`` (closing - expected), transaction count,
     and total sales for the shift.
+
+    Codex P2: enforces ``shift_close_guard.enforce_close_guard`` before
+    delegating to the service. The server-side check rejects close when
+    any ``pos.transactions`` row for this shift still has
+    ``commit_confirmed_at IS NULL`` — i.e. there are still provisional /
+    unreconciled transactions on disk. Web clients that don't carry a
+    ``local_unresolved`` claim pass count=0 / digest='no-claim' so only
+    the server-side check fires.
     """
     _ = user
+    shift_row = service._repo.get_shift_by_id(shift_id)  # type: ignore[attr-defined]
+    if shift_row is None:
+        raise HTTPException(status_code=404, detail=f"Shift {shift_id} not found")
+    enforce_close_guard(
+        db_session,
+        shift_id=shift_id,
+        tenant_id=int(shift_row["tenant_id"]),
+        terminal_id=int(shift_row["terminal_id"]),
+        claim_count=0,
+        claim_digest="no-claim",
+    )
     return service.close_shift(
         shift_id=shift_id,
         closing_cash=Decimal(str(body.closing_cash)),

@@ -187,6 +187,7 @@ def resume_terminal(
 @router.post(
     "/terminals/{terminal_id}/close",
     response_model=TerminalSessionResponse,
+    dependencies=[Depends(require_permission("pos:terminal:close"))],
 )
 @limiter.limit("30/minute")
 def close_terminal(
@@ -196,7 +197,13 @@ def close_terminal(
     service: ServiceDep,
     user: CurrentUser,
 ) -> TerminalSessionResponse:
-    """Close a terminal — records closing cash and seals the shift."""
+    """Close a terminal — records closing cash and seals the shift.
+
+    Requires ``pos:terminal:close`` (Codex P2): prior code had no RBAC
+    on this mutating endpoint, so any authenticated POS user could
+    close another cashier's active terminal. The permission is already
+    seeded — just was never required by the route.
+    """
     _ = user
     session = service.close_terminal(terminal_id, closing_cash=Decimal(str(body.closing_cash)))
     return TerminalSessionResponse.model_validate(session.model_dump())

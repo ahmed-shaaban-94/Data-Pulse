@@ -727,12 +727,14 @@ class TestUpdateRemoveItem:
             quantity=Decimal("4"),
             unit_price=Decimal("12.5"),
         )
-        # Service computes line_total from unit_price × quantity
+        # Service forwards quantity + unit_price; line_total is computed
+        # in SQL by the repo to prevent qty-only updates from zeroing the
+        # line on a missing override (Codex P1).
         assert item.quantity == Decimal("4")
-        # Repo received the recomputed line_total
         mock_repo.update_item_quantity.assert_called_once()
         kwargs = mock_repo.update_item_quantity.call_args.kwargs
-        assert kwargs["line_total"] == Decimal("50.0000")
+        assert kwargs["quantity"] == Decimal("4")
+        assert kwargs["unit_price"] == Decimal("12.5")
 
     def test_update_unknown_item_raises(
         self,

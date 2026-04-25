@@ -36,6 +36,12 @@ from sqlalchemy.orm import Session
 from datapulse.core.auth import get_current_user, get_tenant_session
 
 CLOCK_SKEW_TOLERANCE_MINUTES: int = 2
+# Maximum age of an X-Signed-At header before we reject it as a replay
+# candidate. Codex P1: prior code only rejected future timestamps, so a
+# captured signed commit could be replayed once the idempotency row's TTL
+# elapsed and be processed as a fresh financial write. Window is generous
+# enough to tolerate offline-queue flushes from a fresh-online device.
+SIGNATURE_FRESHNESS_MINUTES: int = 30
 
 _FP_V1_PATTERN = re.compile(r"^sha256:[0-9a-f]{64}$")
 _FP_V2_PATTERN = re.compile(r"^sha256v2:[0-9a-f]{64}$")
@@ -248,6 +254,12 @@ async def device_token_verifier(
     now = datetime.now(UTC)
     if signed_at_dt > now + timedelta(minutes=CLOCK_SKEW_TOLERANCE_MINUTES):
         raise HTTPException(status_code=401, detail="signed_at in the future")
+    # Reject signatures older than the idempotency-key TTL so a captured
+    # signed commit cannot be replayed after the idempotency row expires
+    # (Codex P1). Window is intentionally generous (default 5 min skew +
+    # 5 min freshness) to tolerate slow networks during offline-sync.
+    if signed_at_dt < now - timedelta(minutes=SIGNATURE_FRESHNESS_MINUTES):
+        raise HTTPException(status_code=401, detail="signed_at too old")
 
     body = await request.body()
     body_hash = hashlib.sha256(body).hexdigest()
