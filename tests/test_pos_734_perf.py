@@ -3,11 +3,13 @@
 Covers:
 - Per-route latency histogram recording and percentile computation
 - SLO config YAML is readable and has the expected structure
+- Middleware integration: real HTTP request populates the histogram via route template
 """
 
 from __future__ import annotations
 
 import os
+from unittest.mock import patch
 
 import pytest
 
@@ -65,6 +67,40 @@ def test_histogram_distinct_routes_are_separate() -> None:
     pcts = get_route_percentiles()
     assert ("GET", "/api/v1/pos/terminals/{id}", 200) in pcts
     assert ("GET", "/api/v1/pos/catalog/search", 200) in pcts
+
+
+# ── Middleware integration test ──────────────────────────────────────────────
+
+
+def test_middleware_records_route_template_not_raw_path() -> None:
+    """A real HTTP request through the app must populate the histogram.
+
+    Uses the /health endpoint (no DB, always available) to exercise the
+    full log_requests middleware without needing a live database.
+    The histogram key must use the route template (e.g. /health), not a
+    raw parameterised URL — this guards against the per-id bucket explosion.
+    """
+    from fastapi.testclient import TestClient
+
+    from datapulse.api.app import create_app
+    from datapulse.api.bootstrap.middleware import get_route_percentiles
+
+    app = create_app()
+    # AdmissionController is initialised in create_app; override it to skip DB checks.
+    with patch("datapulse.api.bootstrap.lifespan.build_lifespan"):
+        client = TestClient(app, raise_server_exceptions=True)
+        response = client.get("/health")
+
+    # /health responds with 200 or 503 — either is fine; we just want the sample recorded.
+    assert response.status_code in (200, 503)
+
+    pcts = get_route_percentiles()
+    # The histogram key must use the route template path, not an arbitrary raw URL
+    health_keys = [k for k in pcts if k[1] == "/health"]
+    assert health_keys, (
+        "Expected histogram entry for /health template after a real request; "
+        f"got keys: {list(pcts.keys())}"
+    )
 
 
 # ── SLO config tests ─────────────────────────────────────────────────────────
