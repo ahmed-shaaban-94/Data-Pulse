@@ -25,6 +25,10 @@ interface CustomerBarProps {
   customer: PosCustomerLookup | null;
   isLoading: boolean;
   className?: string;
+  /** Called when the cashier presses Enter while the phone input has focus.
+   *  Lookup is already SWR-driven on each keystroke, so the parent typically
+   *  uses this hook to advance focus to the scan bar. No-op when omitted. */
+  onSubmit?: () => void;
 }
 
 export function CustomerBar({
@@ -33,6 +37,7 @@ export function CustomerBar({
   customer,
   isLoading,
   className,
+  onSubmit,
 }: CustomerBarProps) {
   return (
     <div
@@ -56,6 +61,12 @@ export function CustomerBar({
           dir="ltr"
           value={phone}
           onChange={(e) => onPhoneChange(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              onSubmit?.();
+            }
+          }}
           placeholder="رقم هاتف العميل · 01XXXXXXXXX"
           data-pos-scanner-ignore=""
           data-testid="customer-phone-input"
