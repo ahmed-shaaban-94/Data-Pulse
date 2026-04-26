@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import { cn } from "@/lib/utils";
 import { cleanDrugName } from "@/lib/pos/format-drug-name";
 import { fmtEgp, type QuickPickItem, type QuickPickSignal } from "./types";
@@ -49,7 +50,7 @@ const SIGNAL_LABEL: Record<QuickPickSignal, string | null> = {
   alternative: "بديل",
 };
 
-export function QuickPickGrid({
+function QuickPickGridInner({
   items,
   onPick,
   shiftLabel,
@@ -197,3 +198,17 @@ export function QuickPickGrid({
     </div>
   );
 }
+
+function areQuickPickEqual(
+  prev: QuickPickGridProps,
+  next: QuickPickGridProps,
+): boolean {
+  return (
+    prev.items === next.items &&
+    prev.shiftLabel === next.shiftLabel &&
+    prev.txnCount === next.txnCount &&
+    prev.avgBasket === next.avgBasket
+  );
+}
+
+export const QuickPickGrid = memo(QuickPickGridInner, areQuickPickEqual);
