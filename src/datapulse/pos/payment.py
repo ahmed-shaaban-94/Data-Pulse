@@ -3,8 +3,10 @@
 Design:
 - ``PaymentGateway`` ABC — single method ``process_payment``.
 - ``CashGateway`` — validates tendered >= amount, calculates change.
-- ``CardGateway`` — stub returning "not configured" until card integration.
-- ``InsuranceGateway`` — stub accepting any insurance_no as pending.
+- ``ExternalCardTerminalGateway`` (in ``external_terminal_gateway``) —
+  records a card payment already approved on a physical terminal.
+  Card never enters our software (PCI scope shrinks to SAQ-B).
+- ``InsuranceGateway`` — fails closed until a real insurer API is wired.
 - ``SplitPaymentProcessor`` — orchestrates two gateways for mixed payments.
 
 All financial arithmetic uses ``Decimal`` to prevent floating-point drift.
@@ -109,41 +111,6 @@ class CashGateway(PaymentGateway):
 
 
 # ---------------------------------------------------------------------------
-# Card gateway (stub)
-# ---------------------------------------------------------------------------
-
-
-class CardGateway(PaymentGateway):
-    """Card payment fallback — active only when Paymob credentials are absent.
-
-    When ``PAYMOB_API_KEY`` is configured, ``api/deps.py`` injects a real
-    ``PaymobCardGateway`` in place of this stub via the gateway factory.
-    This class exists solely as a safe fallback so environments without
-    Paymob credentials do not crash — they degrade gracefully with a clear
-    user message.
-    """
-
-    def process_payment(
-        self,
-        amount: Decimal,
-        *,
-        tendered: Decimal | None = None,
-        insurance_no: str | None = None,
-        card_token: str | None = None,
-        **kwargs,
-    ) -> PaymentResult:
-        return PaymentResult(
-            success=False,
-            method="card",
-            amount_charged=Decimal("0"),
-            message=(
-                "Card payments require PaymobCardGateway — "
-                "set PAYMOB_API_KEY to enable card processing."
-            ),
-        )
-
-
-# ---------------------------------------------------------------------------
 # Insurance gateway (stub)
 # ---------------------------------------------------------------------------
 
@@ -211,7 +178,10 @@ class SplitPaymentProcessor:
 
     _GATEWAYS: dict[str, PaymentGateway] = {
         "cash": CashGateway(),
-        "card": CardGateway(),
+        # ``card`` deliberately omitted: card payments via external terminal
+        # require a single approval code per transaction, which doesn't
+        # compose with split semantics. Mixing card with cash should be
+        # done by ringing two separate transactions.
         "insurance": InsuranceGateway(),
     }
 
@@ -278,9 +248,13 @@ class SplitPaymentProcessor:
 
 def get_gateway(method: str) -> PaymentGateway:
     """Return the appropriate gateway for the given payment method string."""
+    # Imported here to avoid a circular import — external_terminal_gateway
+    # imports from this module.
+    from datapulse.pos.external_terminal_gateway import ExternalCardTerminalGateway
+
     gateways: dict[str, PaymentGateway] = {
         "cash": CashGateway(),
-        "card": CardGateway(),
+        "card": ExternalCardTerminalGateway(),
         "insurance": InsuranceGateway(),
     }
     return gateways.get(method, CashGateway())

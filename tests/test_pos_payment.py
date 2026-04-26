@@ -2,10 +2,13 @@
 
 Covers:
 - CashGateway: exact, overpay (change), underpay (error)
-- CardGateway stub: returns not-configured
-- InsuranceGateway stub: requires insurance_no
-- SplitPaymentProcessor: partial cash + partial insurance
+- InsuranceGateway stub: fails closed
+- SplitPaymentProcessor: cash splits and rejected insurance splits
 - get_gateway: correct gateway returned for each method string
+
+Card payments via the external physical terminal have their own test
+module (``test_pos_external_terminal_gateway.py``) since the in-software
+Paymob flow was removed (audit C1 / 2026-04-26).
 """
 
 from __future__ import annotations
@@ -15,7 +18,6 @@ from decimal import Decimal
 import pytest
 
 from datapulse.pos.payment import (
-    CardGateway,
     CashGateway,
     InsuranceGateway,
     PaymentResult,
@@ -75,28 +77,6 @@ class TestCashGateway:
     def test_raise_if_failed_does_nothing_on_success(self):
         result = PaymentResult(success=True, method="cash", amount_charged=Decimal("10"))
         result.raise_if_failed()  # should not raise
-
-
-# ---------------------------------------------------------------------------
-# CardGateway (stub)
-# ---------------------------------------------------------------------------
-
-
-class TestCardGateway:
-    def test_returns_not_configured(self):
-        gw = CardGateway()
-        result = gw.process_payment(Decimal("50"))
-        assert result.success is False
-        assert result.method == "card"
-        # CardGateway is now a documented fallback stub; message directs operator
-        # to set PAYMOB_API_KEY for real card processing (#738).
-        msg = result.message.lower()
-        assert "paymob_api_key" in msg or "paymobcardgateway" in msg
-
-    def test_zero_charged_on_failure(self):
-        gw = CardGateway()
-        result = gw.process_payment(Decimal("999"))
-        assert result.amount_charged == Decimal("0")
 
 
 # ---------------------------------------------------------------------------
@@ -212,9 +192,8 @@ class TestGetGateway:
         gw = get_gateway("cash")
         assert isinstance(gw, CashGateway)
 
-    def test_card(self):
-        gw = get_gateway("card")
-        assert isinstance(gw, CardGateway)
+    # Card method routing is asserted in
+    # tests/test_pos_external_terminal_gateway.py::TestGetGatewayWiresExternalTerminal
 
     def test_insurance(self):
         gw = get_gateway("insurance")

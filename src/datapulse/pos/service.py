@@ -116,7 +116,8 @@ class PosService(
         # WhatsApp receipt delivery (#629). When None, send_receipt_whatsapp
         # raises WhatsAppDisabledError -> 503 so the UI falls back to print.
         self._whatsapp = whatsapp_provider
-        # Card gateway override (#738). When None, checkout falls back to the
-        # CardGateway stub (which returns "not configured" until PAYMOB_API_KEY
-        # is set). When set, card payments route through PaymobCardGateway.
+        # Card gateway override. Reserved for future paths (e.g. e-commerce
+        # gateway). When None, checkout uses get_gateway('card') which returns
+        # ExternalCardTerminalGateway — the in-store path where the cashier
+        # types a printed approval code from a physical terminal.
         self._card_gateway = card_gateway

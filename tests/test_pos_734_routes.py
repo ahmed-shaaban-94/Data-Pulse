@@ -4,7 +4,6 @@ Covers:
 - GET /_metrics returns Prometheus text format
 - GET /_metrics includes samples recorded via _record_latency
 - POST /perf/vitals returns 204 (no body)
-- get_paymob_gateway returns None when PAYMOB_API_KEY is not set
 """
 
 from __future__ import annotations
@@ -80,41 +79,3 @@ def test_receive_vital_accepts_all_web_vital_names() -> None:
         )
         result = receive_vital(payload)
         assert result is None
-
-
-# ---------------------------------------------------------------------------
-# get_paymob_gateway — dependency injection helper
-# ---------------------------------------------------------------------------
-
-
-def test_get_paymob_gateway_returns_none_when_unconfigured() -> None:
-    """When PAYMOB_API_KEY is absent, get_paymob_gateway must return None."""
-    from unittest.mock import patch
-
-    from datapulse.api.deps import get_paymob_gateway
-
-    # Ensure no Paymob key is set
-    with patch("datapulse.api.deps.get_settings") as mock_settings:
-        mock_settings.return_value.paymob_api_key = ""
-        result = get_paymob_gateway()
-
-    assert result is None
-
-
-def test_get_paymob_gateway_returns_gateway_when_configured() -> None:
-    """When PAYMOB_API_KEY is present, get_paymob_gateway returns a PaymobCardGateway."""
-    from unittest.mock import MagicMock, patch
-
-    from datapulse.api.deps import get_paymob_gateway
-    from datapulse.pos.paymob_gateway import PaymobCardGateway
-
-    settings_mock = MagicMock()
-    settings_mock.paymob_api_key = "test-key"
-    settings_mock.paymob_integration_id = "int-1"
-    settings_mock.paymob_iframe_id = "iframe-1"
-    settings_mock.paymob_hmac_secret = "hmac-secret"
-
-    with patch("datapulse.api.deps.get_settings", return_value=settings_mock):
-        result = get_paymob_gateway()
-
-    assert isinstance(result, PaymobCardGateway)

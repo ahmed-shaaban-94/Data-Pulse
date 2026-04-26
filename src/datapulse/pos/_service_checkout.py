@@ -167,9 +167,12 @@ class CheckoutMixin:
 
         grand_total = grand_total.quantize(Decimal("0.0001"))
 
-        # ── Payment (B4: gateway delegation) ───────────────────────
-        # Use the injected card gateway when present (Paymob, #738);
-        # otherwise fall back to get_gateway() which returns CardGateway stub.
+        # ── Payment (gateway delegation) ───────────────────────────
+        # Card payments use the external physical terminal: cashier runs
+        # the card on the terminal and types the printed approval code.
+        # ``_card_gateway`` is reserved for future override (e.g. e-commerce
+        # path); when None, ``get_gateway('card')`` returns the default
+        # ExternalCardTerminalGateway.
         _method = request.payment_method.value
         if _method == "card" and self._card_gateway is not None:
             gateway: PaymentGateway = self._card_gateway
@@ -177,8 +180,16 @@ class CheckoutMixin:
             gateway = get_gateway(_method)
         payment_result = gateway.process_payment(
             grand_total,
-            tendered=to_decimal(request.cash_tendered or 0),
+            # Preserve None semantics for non-cash methods; CashGateway treats
+            # missing ``tendered`` as "exact amount" while a stray Decimal("0")
+            # would be read as "underpaid by amount".
+            tendered=(
+                to_decimal(request.cash_tendered) if request.cash_tendered is not None else None
+            ),
             insurance_no=request.insurance_no,
+            card_approval_code=request.card_approval_code,
+            card_terminal_id=request.card_terminal_id,
+            card_last4=request.card_last4,
         )
         payment_result.raise_if_failed()
         change_due = payment_result.change_due
@@ -304,6 +315,12 @@ class CheckoutMixin:
             receipt_number=receipt_number,
             grand_total=str(grand_total),
             payment_method=request.payment_method.value,
+            # Card-only audit trail until the migration adds a DB column for
+            # external_payment_ref; approval codes are not PCI-sensitive (they
+            # are printed on the customer's terminal slip by design).
+            card_approval_code=request.card_approval_code,
+            card_terminal_id=request.card_terminal_id,
+            card_last4=request.card_last4,
         )
 
         return CheckoutResponse(
