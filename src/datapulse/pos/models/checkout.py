@@ -44,6 +44,12 @@ class CheckoutRequest(BaseModel):
     cash_tendered: JsonDecimal | None = None
     # For insurance payments: insurance/national ID
     insurance_no: str | None = None
+    # For card payments via an external physical terminal — the cashier
+    # runs the card on the terminal and types the printed approval code
+    # back into POS. Card never enters our software (PCI scope shrinks).
+    card_approval_code: str | None = None
+    card_terminal_id: str | None = None
+    card_last4: str | None = None
     # Customer ID (optional — walk-in if absent)
     customer_id: str | None = None
     # Override discount applied to the entire transaction
@@ -61,6 +67,22 @@ class CheckoutRequest(BaseModel):
                 "applied_discount and voucher_code are mutually exclusive — "
                 "send one or the other, not both"
             )
+        return self
+
+    @model_validator(mode="after")
+    def _card_payment_requires_approval_code(self) -> CheckoutRequest:
+        if self.payment_method == PaymentMethod.card and not (
+            self.card_approval_code and self.card_approval_code.strip()
+        ):
+            raise ValueError(
+                "card_approval_code is required for card payments — "
+                "run the card on the terminal first, then enter the "
+                "printed approval code"
+            )
+        if self.card_last4 is not None and not (
+            len(self.card_last4) == 4 and self.card_last4.isdigit()
+        ):
+            raise ValueError("card_last4 must be exactly 4 digits when supplied")
         return self
 
 
@@ -120,6 +142,10 @@ class CommitRequest(BaseModel):
     grand_total: JsonDecimal
     payment_method: PaymentMethod
     cash_tendered: JsonDecimal | None = None
+    # Card payments via external terminal — see CheckoutRequest for rationale.
+    card_approval_code: str | None = None
+    card_terminal_id: str | None = None
+    card_last4: str | None = None
     # Phase 2 — unified cart-level discount (voucher OR promotion). When
     # present, takes precedence over the legacy ``voucher_code`` field.
     applied_discount: AppliedDiscount | None = None
@@ -134,6 +160,18 @@ class CommitRequest(BaseModel):
                 "applied_discount and voucher_code are mutually exclusive — "
                 "send one or the other, not both"
             )
+        return self
+
+    @model_validator(mode="after")
+    def _card_payment_requires_approval_code(self) -> CommitRequest:
+        if self.payment_method == PaymentMethod.card and not (
+            self.card_approval_code and self.card_approval_code.strip()
+        ):
+            raise ValueError("card_approval_code is required for card payments")
+        if self.card_last4 is not None and not (
+            len(self.card_last4) == 4 and self.card_last4.isdigit()
+        ):
+            raise ValueError("card_last4 must be exactly 4 digits when supplied")
         return self
 
 

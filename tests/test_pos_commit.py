@@ -59,6 +59,9 @@ def _payload(
                 line_total=Decimal(sub),
             )
         ]
+    # Card payments require an approval code from the physical terminal —
+    # supply a default so test helpers don't have to spell it out everywhere.
+    card_approval_code = "TEST-APPROVAL-001" if payment_method == PaymentMethod.card else None
     return CommitRequest(
         terminal_id=1,
         shift_id=1,
@@ -69,6 +72,7 @@ def _payload(
         grand_total=Decimal(declared_grand_total if declared_grand_total else total),
         payment_method=payment_method,
         cash_tendered=Decimal(tendered) if tendered is not None else None,
+        card_approval_code=card_approval_code,
         voucher_code=voucher_code,
     )
 
