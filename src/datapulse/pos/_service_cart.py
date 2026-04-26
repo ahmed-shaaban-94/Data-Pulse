@@ -199,9 +199,25 @@ class CartOpsMixin:
         # Falls back to None when the product has no cost data so existing
         # records (pre-migration 119) are never blocked. A follow-up migration
         # can backfill / add NOT NULL after all rows are populated.
-        # TODO: surface cost_price in dim_product/drug_catalog to populate this reliably.
         raw_cost = product.get("cost_price") or product.get("cost_per_unit")
         cost_per_unit: Decimal | None = to_decimal(raw_cost) if raw_cost is not None else None
+
+        # Audit H4 (2026-04-26): make the cost-data gap observable. agg_basket_margin
+        # treats NULL cost as zero (100% margin), which silently inflates margin
+        # KPIs whenever dim_product / drug_catalog hasn't been populated. Surface
+        # the gap so it shows up on log dashboards and forces backfill rather
+        # than waiting for someone to notice the inflated margin.
+        if cost_per_unit is None:
+            log.warning(
+                "cart_cost_price_missing",
+                drug_code=drug_code,
+                tenant_id=tenant_id,
+                detail=(
+                    "Product has no cost_price/cost_per_unit; line will be "
+                    "stored with NULL cost — margin reports will treat it as "
+                    "zero cost. Backfill dim_product or drug_catalog."
+                ),
+            )
 
         t2 = time.perf_counter()
         row = self._repo.add_transaction_item(
