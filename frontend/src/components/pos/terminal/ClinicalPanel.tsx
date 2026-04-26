@@ -1,8 +1,10 @@
 "use client";
 
+import { Suspense } from "react";
 import { HeartPulse, Plus, Zap } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { usePosDrugClinical, type CrossSellItem, type AlternativeItem } from "@/hooks/use-pos-drug-clinical";
+import { ClinicalPanelSkeleton } from "./ClinicalPanelSkeleton";
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -193,7 +195,7 @@ interface ClinicalPanelProps {
   className?: string;
 }
 
-export function ClinicalPanel({ activeDrugCode, onAddToCart, className }: ClinicalPanelProps) {
+function ClinicalPanelInner({ activeDrugCode, onAddToCart, className }: ClinicalPanelProps) {
   const { detail, crossSell, alternatives, isLoading } = usePosDrugClinical(activeDrugCode);
 
   const statusLabel = !activeDrugCode
@@ -282,5 +284,18 @@ export function ClinicalPanel({ activeDrugCode, onAddToCart, className }: Clinic
         </div>
       )}
     </section>
+  );
+}
+
+/**
+ * Public export: wraps ClinicalPanelInner in a Suspense boundary so the rest
+ * of the terminal layout never stalls on the clinical data fetch.
+ * The ClinicalPanelSkeleton is shown while the inner panel's data loads.
+ */
+export function ClinicalPanel(props: ClinicalPanelProps) {
+  return (
+    <Suspense fallback={<ClinicalPanelSkeleton activeDrugCode={props.activeDrugCode} className={props.className} />}>
+      <ClinicalPanelInner {...props} />
+    </Suspense>
   );
 }

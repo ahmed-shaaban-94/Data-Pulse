@@ -7,6 +7,7 @@ protocol for stock checks and FEFO batch selection.
 
 from __future__ import annotations
 
+import time
 from decimal import Decimal
 from typing import TYPE_CHECKING
 
@@ -136,7 +137,11 @@ class CartOpsMixin:
 
         Raises :class:`InsufficientStockError`, :class:`PharmacistVerificationRequiredError`.
         """
+        t0 = time.perf_counter()
+
         product = self._repo.get_product_by_code(drug_code)
+        stock_check_ms = round((time.perf_counter() - t0) * 1000, 2)
+
         if product is None:
             raise PosError(
                 message=f"Drug {drug_code} not found in product catalog",
@@ -164,6 +169,7 @@ class CartOpsMixin:
             resolved_pharmacist_id = self._verifier.validate_token(pharmacist_id, drug_code)
 
         # Inventory: stock check
+        t1 = time.perf_counter()
         stock = await self._inventory.get_stock_level(drug_code, site_code)
         if stock.quantity_available < quantity:
             raise InsufficientStockError(
@@ -176,6 +182,8 @@ class CartOpsMixin:
         # Inventory: FEFO batch selection
         batches = await self._inventory.check_batch_expiry(drug_code, site_code)
         chosen = select_fefo_batch(batches, quantity)
+        batch_select_ms = round((time.perf_counter() - t1) * 1000, 2)
+
         # Fall back to "no batch" so the line is still recorded for traceability.
         batch_number = chosen.batch_number if chosen else None
         expiry_date = chosen.expiry_date if chosen else None
@@ -195,6 +203,7 @@ class CartOpsMixin:
         raw_cost = product.get("cost_price") or product.get("cost_per_unit")
         cost_per_unit: Decimal | None = to_decimal(raw_cost) if raw_cost is not None else None
 
+        t2 = time.perf_counter()
         row = self._repo.add_transaction_item(
             transaction_id=transaction_id,
             tenant_id=tenant_id,
@@ -209,6 +218,26 @@ class CartOpsMixin:
             pharmacist_id=resolved_pharmacist_id,
             cost_per_unit=cost_per_unit,
         )
+        db_write_ms = round((time.perf_counter() - t2) * 1000, 2)
+        total_ms = round((time.perf_counter() - t0) * 1000, 2)
+
+        log.info(
+            "cart_add_item_timing",
+            tenant_id=tenant_id,
+            drug_code=drug_code,
+            stock_check_ms=stock_check_ms,
+            batch_select_ms=batch_select_ms,
+            db_write_ms=db_write_ms,
+            total_ms=total_ms,
+        )
+        if total_ms > 500:
+            log.warning(
+                "cart_slow_op",
+                operation="add_item",
+                total_ms=total_ms,
+                tenant_id=tenant_id,
+            )
+
         return PosCartItem.model_validate(row)
 
     def update_item(
@@ -258,6 +287,7 @@ class CartOpsMixin:
                 detail=f"transaction_id={existing_transaction_id} status={header['status']}",
             )
 
+        t0 = time.perf_counter()
         row = self._repo.update_item_quantity(
             item_id,
             tenant_id=tenant_id,
@@ -267,11 +297,28 @@ class CartOpsMixin:
             transaction_id=existing_transaction_id,
             expected_status=TransactionStatus.draft.value,
         )
+        db_write_ms = round((time.perf_counter() - t0) * 1000, 2)
+
         if row is None:
             raise PosError(
                 message=f"Item {item_id} not found",
                 detail=f"item_id={item_id}",
             )
+
+        log.info(
+            "cart_update_item_timing",
+            tenant_id=tenant_id,
+            item_id=item_id,
+            db_write_ms=db_write_ms,
+        )
+        if db_write_ms > 500:
+            log.warning(
+                "cart_slow_op",
+                operation="update_item",
+                total_ms=db_write_ms,
+                tenant_id=tenant_id,
+            )
+
         # The repo SQL returns the resulting unit_price and line_total
         # straight from the row — no client-side merge needed.
         return PosCartItem.model_validate({**row, "drug_name": row.get("drug_name", "")})
@@ -292,9 +339,27 @@ class CartOpsMixin:
                 message=(f"Only draft transactions can be edited (current: {header['status']})."),
                 detail=f"transaction_id={existing_transaction_id} status={header['status']}",
             )
-        return self._repo.remove_item(
+        t0 = time.perf_counter()
+        result = self._repo.remove_item(
             item_id,
             tenant_id=tenant_id,
             transaction_id=existing_transaction_id,
             expected_status=TransactionStatus.draft.value,
         )
+        db_write_ms = round((time.perf_counter() - t0) * 1000, 2)
+
+        log.info(
+            "cart_remove_item_timing",
+            tenant_id=tenant_id,
+            item_id=item_id,
+            db_write_ms=db_write_ms,
+        )
+        if db_write_ms > 500:
+            log.warning(
+                "cart_slow_op",
+                operation="remove_item",
+                total_ms=db_write_ms,
+                tenant_id=tenant_id,
+            )
+
+        return result

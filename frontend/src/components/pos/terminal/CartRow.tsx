@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import { Minus, Plus, X } from "lucide-react";
 import type { PosCartItem } from "@/types/pos";
 import { cn } from "@/lib/utils";
@@ -22,8 +23,12 @@ interface CartRowProps {
  *
  * Unsynced rows get an amber 3px rail on the leading edge + QUEUED badge,
  * and the whole row fades up 220ms on mount via the dpRowEnter keyframe.
+ *
+ * Memoized: re-renders only when index, synced, or the key cart-item fields
+ * change. Callbacks (onIncrement, onDecrement, onRemove) are expected to be
+ * stable refs from the parent (useCallback).
  */
-export function CartRow({
+function CartRowInner({
   index,
   item,
   synced,
@@ -123,3 +128,16 @@ export function CartRow({
     </div>
   );
 }
+
+function areEqual(prev: CartRowProps, next: CartRowProps): boolean {
+  return (
+    prev.index === next.index &&
+    prev.synced === next.synced &&
+    prev.item.drug_code === next.item.drug_code &&
+    prev.item.quantity === next.item.quantity &&
+    prev.item.unit_price === next.item.unit_price &&
+    prev.item.discount === next.item.discount
+  );
+}
+
+export const CartRow = memo(CartRowInner, areEqual);
