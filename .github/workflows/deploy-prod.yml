@@ -169,6 +169,7 @@ jobs:
           username: ${{ secrets.PROD_USER }}
           key: ${{ secrets.PROD_SSH_KEY }}
           envs: API_KEY,PIPELINE_WEBHOOK_SECRET,NEXTAUTH_SECRET,POSTGRES_PASSWORD,REDIS_PASSWORD,DB_READER_PASSWORD,CLERK_FRONTEND_API,CLERK_JWT_ISSUER,CLERK_JWT_AUDIENCE,CLERK_JWT_TEMPLATE,CLERK_SECRET_KEY
+          command_timeout: 20m
           script: |
             set -e
             cd ${{ secrets.PROD_DEPLOY_PATH }}
