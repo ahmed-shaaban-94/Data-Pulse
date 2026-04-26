@@ -5,6 +5,8 @@ from __future__ import annotations
 import contextlib
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 from datapulse.api.deps import (
     get_ai_light_service,
     get_analytics_service,
@@ -78,19 +80,23 @@ class TestGetTenantSession:
         mock_session.close.assert_called_once()
 
     @patch("datapulse.core.auth.get_session_factory")
-    def test_defaults_tenant_id_to_1(self, mock_factory):
+    def test_missing_tenant_id_is_contract_violation(self, mock_factory):
+        """A user dict reaching ``get_tenant_session`` without ``tenant_id`` is a
+        programming error — ``get_current_user`` is contractually required to
+        populate it (or 401 upstream — see #546). The dead ``or "1"`` fallback
+        was silently routing to tenant 1 when the upstream contract was
+        violated, which is exactly the bug the audit flagged.
+        """
         mock_session = MagicMock()
         mock_factory.return_value = MagicMock(return_value=mock_session)
-        user = {"sub": "test"}  # no tenant_id
+        user = {"sub": "test"}  # no tenant_id — upstream contract violated
 
         gen = get_tenant_session(user=user)
-        next(gen)
-
-        tenant_call = mock_session.execute.call_args_list[0]
-        assert tenant_call.args[1] == {"tid": "1"}
-
-        with contextlib.suppress(StopIteration):
+        with pytest.raises(KeyError, match="tenant_id"):
             next(gen)
+
+        # The session must not be opened when the contract is violated.
+        mock_factory.assert_not_called()
 
     @patch("datapulse.core.auth.get_session_factory")
     def test_rollback_on_exception(self, mock_factory):
