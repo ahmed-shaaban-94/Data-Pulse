@@ -438,27 +438,31 @@ class TestUpdateItemQuantity:
             "is_controlled": False,
         }
         mock_session.execute.return_value = _make_execute(expected, mode="first")
-        result = repo.update_item_quantity(10, quantity=Decimal("3"), unit_price=Decimal("5.00"))
+        result = repo.update_item_quantity(
+            10, tenant_id=1, quantity=Decimal("3"), unit_price=Decimal("5.00")
+        )
         assert result["quantity"] == Decimal("3")
 
     def test_returns_none_when_missing(self, repo: PosRepository, mock_session: MagicMock):
         mock_session.execute.return_value = _make_execute(None, mode="first")
-        result = repo.update_item_quantity(999, quantity=Decimal("1"), unit_price=Decimal("1"))
+        result = repo.update_item_quantity(
+            999, tenant_id=1, quantity=Decimal("1"), unit_price=Decimal("1")
+        )
         assert result is None
 
 
 class TestRemoveItem:
     def test_returns_true_on_delete(self, repo: PosRepository, mock_session: MagicMock):
         mock_session.execute.return_value.rowcount = 1
-        assert repo.remove_item(10) is True
+        assert repo.remove_item(10, tenant_id=1) is True
 
     def test_returns_false_when_not_found(self, repo: PosRepository, mock_session: MagicMock):
         mock_session.execute.return_value.rowcount = 0
-        assert repo.remove_item(999) is False
+        assert repo.remove_item(999, tenant_id=1) is False
 
     def test_sql_is_delete(self, repo: PosRepository, mock_session: MagicMock):
         mock_session.execute.return_value.rowcount = 0
-        repo.remove_item(5)
+        repo.remove_item(5, tenant_id=1)
         sql = str(mock_session.execute.call_args[0][0])
         assert "DELETE FROM pos.transaction_items" in sql
 
@@ -628,6 +632,7 @@ class TestUpdateShiftRecord:
         mock_session.execute.return_value = _make_execute(expected, mode="first")
         result = repo.update_shift_record(
             3,
+            tenant_id=1,
             closing_cash=Decimal("850"),
             expected_cash=Decimal("840"),
             variance=Decimal("10"),
@@ -754,12 +759,12 @@ class TestGetVoidLog:
             "voided_at": datetime.datetime(2026, 4, 15),
         }
         mock_session.execute.return_value = _make_execute(row, mode="first")
-        result = repo.get_void_log(55)
+        result = repo.get_void_log(55, tenant_id=1)
         assert result["id"] == 1
 
     def test_returns_none_when_not_voided(self, repo: PosRepository, mock_session: MagicMock):
         mock_session.execute.return_value = _make_execute(None, mode="first")
-        assert repo.get_void_log(100) is None
+        assert repo.get_void_log(100, tenant_id=1) is None
 
 
 # ---------------------------------------------------------------------------
@@ -837,11 +842,11 @@ class TestGetReturn:
             "created_at": datetime.datetime(2026, 4, 15),
         }
         mock_session.execute.return_value = _make_execute(row, mode="first")
-        assert repo.get_return(1)["reason"] == "expired"
+        assert repo.get_return(1, tenant_id=1)["reason"] == "expired"
 
     def test_returns_none_when_missing(self, repo: PosRepository, mock_session: MagicMock):
         mock_session.execute.return_value = _make_execute(None, mode="first")
-        assert repo.get_return(9999) is None
+        assert repo.get_return(9999, tenant_id=1) is None
 
 
 class TestListReturnsForTransaction:
@@ -873,12 +878,12 @@ class TestListReturnsForTransaction:
             },
         ]
         mock_session.execute.return_value = _make_execute(rows, mode="all")
-        result = repo.list_returns_for_transaction(55)
+        result = repo.list_returns_for_transaction(55, tenant_id=1)
         assert len(result) == 2
 
     def test_sql_filters_by_original_txn(self, repo: PosRepository, mock_session: MagicMock):
         mock_session.execute.return_value = _make_execute([], mode="all")
-        repo.list_returns_for_transaction(55)
+        repo.list_returns_for_transaction(55, tenant_id=1)
         params = mock_session.execute.call_args[0][1]
         assert params["original_txn_id"] == 55
 
