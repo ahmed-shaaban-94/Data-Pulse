@@ -27,7 +27,13 @@ SELECT
     t.id                                                          AS transaction_id,
     DATE_TRUNC('day', t.created_at)                              AS txn_date,
     SUM(ti.unit_price * ti.quantity)::NUMERIC(18, 4)             AS revenue,
-    SUM(ti.cost_per_unit * ti.quantity)::NUMERIC(18, 4)          AS cost,
+    -- M11 (audit 2026-04-26): COALESCE per-item so ``cost`` and
+    -- ``gross_margin`` use the same zero-substitution semantics. Without
+    -- this, a basket with one costed item and one uncosted item would
+    -- have ``cost`` (a SUM that drops NULL items) inconsistent with
+    -- ``gross_margin`` (which COALESCEs each item to zero) — breaking
+    -- the invariant ``gross_margin = revenue - COALESCE(cost, 0)``.
+    SUM(COALESCE(ti.cost_per_unit, 0) * ti.quantity)::NUMERIC(18, 4) AS cost,
     SUM(
         (ti.unit_price - COALESCE(ti.cost_per_unit, 0)) * ti.quantity
     )::NUMERIC(18, 4)                                            AS gross_margin,
