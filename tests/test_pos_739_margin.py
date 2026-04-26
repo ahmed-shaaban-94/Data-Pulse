@@ -229,3 +229,171 @@ class TestGetTransactionCostGating:
         assert item.unit_price == Decimal("10.0000")
         assert item.line_total == Decimal("20.0000")
         assert item.cost_per_unit is None
+
+
+# ---------------------------------------------------------------------------
+# H4 (audit 2026-04-26): cost_price observability — emit a structured warning
+# when a product has neither cost_price nor cost_per_unit so the gap shows
+# up in logs / dashboards instead of silently skewing margin calcs.
+# ---------------------------------------------------------------------------
+
+
+class TestCostPriceMissingWarning:
+    """Add-to-cart must emit ``cart_cost_price_missing`` when the product lacks
+    cost data, so the dim_product / drug_catalog gap is observable.
+    """
+
+    @pytest.mark.asyncio
+    async def test_warns_when_product_has_no_cost(self) -> None:
+        from datetime import date
+        from unittest.mock import AsyncMock, MagicMock, patch
+
+        from datapulse.pos.inventory_contract import (
+            BatchInfo,
+            InventoryServiceProtocol,
+            StockLevel,
+        )
+        from datapulse.pos.service import PosService
+
+        mock_repo = MagicMock()
+        mock_repo.get_product_by_code.return_value = {
+            "drug_code": "DRUG-NOCOST",
+            "drug_name": "No Cost Drug",
+            "drug_category": "OTC",
+            "unit_price": Decimal("25.00"),
+            # cost_price + cost_per_unit intentionally absent
+        }
+        mock_repo.add_transaction_item.return_value = {
+            "id": 1,
+            "transaction_id": 10,
+            "tenant_id": 1,
+            "drug_code": "DRUG-NOCOST",
+            "drug_name": "No Cost Drug",
+            "quantity": Decimal("2"),
+            "unit_price": Decimal("25.00"),
+            "line_total": Decimal("50.00"),
+            "cost_per_unit": None,
+            "batch_number": "BATCH-001",
+            "expiry_date": date(2027, 6, 30),
+        }
+        mock_repo.get_pharmacist_pin_hash.return_value = None  # not controlled
+
+        mock_inventory = AsyncMock(spec=InventoryServiceProtocol)
+        mock_inventory.get_stock_level = AsyncMock(
+            return_value=StockLevel(
+                drug_code="DRUG-NOCOST",
+                site_code="SITE01",
+                quantity_on_hand=Decimal("100"),
+                quantity_reserved=Decimal("0"),
+                quantity_available=Decimal("100"),
+                reorder_point=Decimal("10"),
+            )
+        )
+        mock_inventory.check_batch_expiry = AsyncMock(
+            return_value=[
+                BatchInfo(
+                    batch_number="BATCH-001",
+                    expiry_date=date(2027, 6, 30),
+                    quantity_available=Decimal("100"),
+                )
+            ]
+        )
+
+        service = PosService(mock_repo, mock_inventory)
+
+        with patch("datapulse.pos._service_cart.log") as mock_log:
+            await service.add_item(
+                transaction_id=10,
+                tenant_id=1,
+                site_code="SITE01",
+                drug_code="DRUG-NOCOST",
+                quantity=Decimal("2"),
+            )
+
+        warn_events = [
+            c
+            for c in mock_log.warning.call_args_list
+            if c.args and c.args[0] == "cart_cost_price_missing"
+        ]
+        assert len(warn_events) == 1, (
+            "add_item must emit exactly one cart_cost_price_missing warning when "
+            "the product has no cost data"
+        )
+        kwargs = warn_events[0].kwargs
+        assert kwargs.get("drug_code") == "DRUG-NOCOST"
+        assert kwargs.get("tenant_id") == 1
+
+    @pytest.mark.asyncio
+    async def test_does_not_warn_when_product_has_cost(self) -> None:
+        from datetime import date
+        from unittest.mock import AsyncMock, MagicMock, patch
+
+        from datapulse.pos.inventory_contract import (
+            BatchInfo,
+            InventoryServiceProtocol,
+            StockLevel,
+        )
+        from datapulse.pos.service import PosService
+
+        mock_repo = MagicMock()
+        mock_repo.get_product_by_code.return_value = {
+            "drug_code": "DRUG-OK",
+            "drug_name": "OK Drug",
+            "drug_category": "OTC",
+            "unit_price": Decimal("25.00"),
+            "cost_price": Decimal("15.00"),
+        }
+        mock_repo.add_transaction_item.return_value = {
+            "id": 2,
+            "transaction_id": 11,
+            "tenant_id": 1,
+            "drug_code": "DRUG-OK",
+            "drug_name": "OK Drug",
+            "quantity": Decimal("1"),
+            "unit_price": Decimal("25.00"),
+            "line_total": Decimal("25.00"),
+            "cost_per_unit": Decimal("15.00"),
+            "batch_number": "BATCH-002",
+            "expiry_date": date(2027, 6, 30),
+        }
+
+        mock_inventory = AsyncMock(spec=InventoryServiceProtocol)
+        mock_inventory.get_stock_level = AsyncMock(
+            return_value=StockLevel(
+                drug_code="DRUG-OK",
+                site_code="SITE01",
+                quantity_on_hand=Decimal("50"),
+                quantity_reserved=Decimal("0"),
+                quantity_available=Decimal("50"),
+                reorder_point=Decimal("10"),
+            )
+        )
+        mock_inventory.check_batch_expiry = AsyncMock(
+            return_value=[
+                BatchInfo(
+                    batch_number="BATCH-002",
+                    expiry_date=date(2027, 6, 30),
+                    quantity_available=Decimal("50"),
+                )
+            ]
+        )
+
+        service = PosService(mock_repo, mock_inventory)
+
+        with patch("datapulse.pos._service_cart.log") as mock_log:
+            await service.add_item(
+                transaction_id=11,
+                tenant_id=1,
+                site_code="SITE01",
+                drug_code="DRUG-OK",
+                quantity=Decimal("1"),
+            )
+
+        warn_events = [
+            c
+            for c in mock_log.warning.call_args_list
+            if c.args and c.args[0] == "cart_cost_price_missing"
+        ]
+        assert len(warn_events) == 0, (
+            "No cost_price_missing warning expected when the product has cost data"
+        )

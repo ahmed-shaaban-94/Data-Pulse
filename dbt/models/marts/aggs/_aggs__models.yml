@@ -39,10 +39,27 @@ models:
           - not_null
       - name: margin_pct
         description: "gross_margin / revenue (NULL when revenue = 0)"
+    # M11 invariants (audit 2026-04-26):
+    #   - gross_margin = revenue - COALESCE(cost, 0)
+    #   - margin_pct in [-1, 1] (or NULL)
+    # Implemented as singular tests under dbt/tests/ because dbt_utils
+    # is not in this project's package list (only dbt_expectations is).
 
   # ── agg_margin_analysis ──────────────────────────────────────────────
   - name: agg_margin_analysis
     description: "Margin analysis per product per month. Revenue from fct_sales, COGS from weighted average PO unit prices."
+    tests:
+      # Audit M11 follow-up (2026-04-26): assert the model's grain.
+      # The fanout join through dim_product on drug_code would silently
+      # produce duplicates if a product had multiple drug_code matches —
+      # this is the same uniqueness contract every other agg model in
+      # the file already has.
+      - unique_combination_of_columns:
+          combination_of_columns:
+            - tenant_id
+            - product_key
+            - year
+            - month
     columns:
       - name: tenant_id
         tests:
