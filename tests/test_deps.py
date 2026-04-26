@@ -114,6 +114,33 @@ class TestGetTenantSession:
         mock_session.close.assert_called_once()
 
 
+class TestGetTenantSessionReadonly:
+    """Mirror of TestGetTenantSession — the read-replica session function
+    has the same M1 contract: ``get_current_user`` guarantees ``tenant_id``,
+    so the previous ``or "1"`` fallback was dead and now raises KeyError
+    on programming-error paths.
+    """
+
+    @patch("datapulse.core.auth.get_readonly_session_factory")
+    @patch("datapulse.core.auth.get_session_factory")
+    @patch("datapulse.core.auth.get_settings")
+    def test_missing_tenant_id_is_contract_violation(
+        self, mock_get_settings, mock_factory, mock_readonly_factory
+    ):
+        from datapulse.core.auth import get_tenant_session_readonly
+
+        mock_get_settings.return_value = MagicMock(database_replica_url="")
+        user = {"sub": "test"}  # no tenant_id — upstream contract violated
+
+        gen = get_tenant_session_readonly(user=user)
+        with pytest.raises(KeyError, match="tenant_id"):
+            next(gen)
+
+        # No session opened on a programming-error path.
+        mock_factory.assert_not_called()
+        mock_readonly_factory.assert_not_called()
+
+
 class TestFactoryFunctions:
     def test_get_analytics_service(self):
         mock_session = MagicMock()

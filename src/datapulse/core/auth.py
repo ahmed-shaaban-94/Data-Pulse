@@ -332,7 +332,10 @@ def get_tenant_session_readonly(
     """
     from datapulse.metrics import db_replica_fallbacks, db_replica_hits
 
-    tenant_id = user.get("tenant_id") or "1"
+    # Same M1 contract as get_tenant_session: get_current_user populates
+    # tenant_id or 401s upstream, so the previous ``or "1"`` was dead in
+    # non-dev. Surface KeyError on programming-error paths.
+    tenant_id = user["tenant_id"]
     current_tenant_id.set(str(tenant_id))
     structlog.contextvars.bind_contextvars(tenant_id=str(tenant_id))
 

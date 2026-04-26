@@ -408,7 +408,12 @@ def get_pos_service(
 
     settings = get_settings()
     repo = PosRepository(session)
-    tenant_id: int = int(user.get("tenant_id", "1"))
+    # M1 contract: get_current_user populates tenant_id (or 401s upstream).
+    # The PIN-lookup closure scopes pharmacist verification to this tenant
+    # — silently routing to "1" on a missing claim would let a misrouted
+    # request verify against the wrong tenant's PIN hashes (audit C3
+    # follow-up commentary, #676).
+    tenant_id: int = int(user["tenant_id"])
     inventory = InventoryAdapter(
         inventory_service=InventoryService(InventoryRepository(session)),
         expiry_service=ExpiryService(ExpiryRepository(session)),
