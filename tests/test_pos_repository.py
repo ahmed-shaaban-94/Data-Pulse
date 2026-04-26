@@ -178,12 +178,12 @@ class TestGetTerminalSession:
             "closing_cash": None,
         }
         mock_session.execute.return_value = _make_execute(row, mode="first")
-        result = repo.get_terminal_session(7)
+        result = repo.get_terminal_session(7, tenant_id=3)
         assert result["id"] == 7
 
     def test_returns_none_when_missing(self, repo: PosRepository, mock_session: MagicMock):
         mock_session.execute.return_value = _make_execute(None, mode="first")
-        assert repo.get_terminal_session(9999) is None
+        assert repo.get_terminal_session(9999, tenant_id=1) is None
 
 
 class TestGetActiveTerminals:
