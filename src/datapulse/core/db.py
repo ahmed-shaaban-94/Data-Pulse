@@ -157,6 +157,9 @@ def get_async_engine() -> AsyncEngine:
                 settings = get_settings()
                 _validate_database_url(settings.database_url)
                 async_url = _to_async_url(settings.database_url)
+                # TODO: asyncpg ignores ?sslmode= in the URL; translate
+                # sslmode=require → connect_args={"ssl": True} before shipping
+                # to a TLS-enforced prod cluster.
                 if async_url.startswith("sqlite+aiosqlite://"):
                     _async_engine = create_async_engine(async_url, echo=False)
                 else:
