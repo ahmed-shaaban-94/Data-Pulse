@@ -2,7 +2,7 @@
 
 import { useEffect, useCallback, type ReactNode } from "react";
 import { Fraunces, JetBrains_Mono, Cairo } from "next/font/google";
-import { useSession, signIn, CLERK_KEY_CONFIGURED } from "@/lib/auth-bridge";
+import { useSession, signIn, AUTH_PROVIDER, CLERK_KEY_CONFIGURED } from "@/lib/auth-bridge";
 import { ThemeProvider } from "next-themes";
 import { SWRConfig } from "swr";
 import { swrConfig } from "@/lib/swr-config";
@@ -68,12 +68,17 @@ function isPosDesktopRuntime(): boolean {
   return Boolean((window as unknown as { electronAPI?: unknown }).electronAPI);
 }
 
+function isClerkAuthMissing(): boolean {
+  return AUTH_PROVIDER === "clerk" && !CLERK_KEY_CONFIGURED;
+}
+
 function SessionGuard({ children }: { children: ReactNode }) {
   const { data: session, status } = useSession();
+  const clerkAuthMissing = isClerkAuthMissing();
 
   useEffect(() => {
     // No-op when Clerk was not configured — the render branch below handles it.
-    if (!CLERK_KEY_CONFIGURED) return;
+    if (clerkAuthMissing) return;
     // Refresh-token errors always need a re-auth, regardless of runtime.
     if ((session as { error?: string } | null)?.error === "RefreshAccessTokenError") {
       void signIn(undefined, { callbackUrl: "/terminal" });
@@ -87,13 +92,13 @@ function SessionGuard({ children }: { children: ReactNode }) {
     if (status === "unauthenticated" && isPosDesktopRuntime()) {
       void signIn(undefined, { callbackUrl: "/terminal" });
     }
-  }, [status, session]);
+  }, [status, session, clerkAuthMissing]);
 
   // When Clerk was not configured at build time, show a build-config error.
   // Catches CI smoke builds (PR/branch without the secret) before they
   // redirect to a /sign-in page that would be equally broken. Stable across
   // SSR and hydration — no window access, so no mismatch.
-  if (!CLERK_KEY_CONFIGURED) {
+  if (clerkAuthMissing) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-background p-8 text-center">
         <div className="flex h-16 w-16 items-center justify-center rounded-full bg-destructive/10">
