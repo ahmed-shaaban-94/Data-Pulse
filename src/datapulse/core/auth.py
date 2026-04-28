@@ -444,6 +444,7 @@ async def get_plain_session_async() -> AsyncGenerator[AsyncSession, None]:
         yield session
         await session.commit()
     except SQLAlchemyError:
+        _db_logger.exception("db_session_error", session_type="plain_async")
         await session.rollback()
         raise
     except BaseException:
