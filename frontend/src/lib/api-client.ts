@@ -1,3 +1,4 @@
+import * as Sentry from "@sentry/nextjs";
 import { getSession, getLastClerkAuthError } from "@/lib/auth-bridge";
 import { API_BASE_URL } from "./constants";
 import type { FilterParams } from "@/types/filters";
@@ -83,7 +84,8 @@ async function _request<T>(url: string, init?: RequestInit): Promise<T> {
   const timeout = setTimeout(() => controller.abort(), 15_000);
   try {
     const authHeaders = await getAuthHeaders();
-    const mergedHeaders = { ...authHeaders, ...init?.headers };
+    const traceData = Sentry.getTraceData();
+    const mergedHeaders = { ...authHeaders, ...traceData, ...init?.headers };
     const res = await fetch(url, {
       ...init,
       headers: mergedHeaders,
