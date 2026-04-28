@@ -29,7 +29,7 @@ _check_redis = check_redis
 
 
 def _check_query_executor() -> dict:
-    """Check whether the async query executor (Redis db 2) is reachable."""
+    """Probe the Arq queue Redis (db 2) — the queue is the new bottleneck."""
     try:
         from datapulse.tasks.async_executor import _get_job_client
 
