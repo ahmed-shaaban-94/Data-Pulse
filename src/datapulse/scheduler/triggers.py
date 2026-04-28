@@ -286,3 +286,32 @@ async def _retry_webhooks() -> None:
         log.error("webhook_retry_failed", error=str(exc), exc_info=True)
     finally:
         session.close()
+
+
+async def _cleanup_pos_idempotency() -> None:
+    """Nightly sweep of expired POS idempotency keys.
+
+    Runs at 02:30 UTC — well outside business hours and offset from the
+    03:00 RLS audit so they don't compete for DB connections.
+
+    ``pos.idempotency_keys`` rows have an ``expires_at`` column (TTL 168h
+    by default).  Without this job they accumulate indefinitely; opportunistic
+    deletion inside ``check_and_claim`` only fires when the *same* key is
+    looked up again, which is never for one-off requests.
+
+    The delete is idempotent and safe to run multiple times per day.
+    """
+    scheduler_jobs_executed.labels(job="cleanup_pos_idempotency").inc()
+    from datapulse.core.db import get_session_factory
+    from datapulse.tasks.cleanup_pos_idempotency import run as _run_cleanup
+
+    session = get_session_factory()()
+    try:
+        deleted = _run_cleanup(session)
+        session.commit()
+        log.info("pos_idempotency_cleanup_complete", deleted=deleted)
+    except Exception as exc:
+        session.rollback()
+        log.error("pos_idempotency_cleanup_failed", error=str(exc), exc_info=True)
+    finally:
+        session.close()
