@@ -32,6 +32,7 @@ from datapulse.metrics import (
 )
 from datapulse.scheduler.triggers import (
     _ai_digest,
+    _cleanup_pos_idempotency,
     _health_check,
     _make_sync_job_fn,
     _quality_digest,
@@ -499,6 +500,15 @@ def start_scheduler() -> None:
         id="retry_webhooks",
         replace_existing=True,
     )
+    # Nightly POS idempotency key sweep — 02:30 UTC, offset from rls_audit (03:00).
+    # Removes rows whose expires_at is in the past; without this the table grows
+    # indefinitely (opportunistic deletion in check_and_claim is not sufficient).
+    scheduler.add_job(
+        _cleanup_pos_idempotency,
+        CronTrigger(hour=2, minute=30),
+        id="cleanup_pos_idempotency",
+        replace_existing=True,
+    )
 
     # Load tenant sync schedules from DB
     n_schedules = _register_sync_schedules()
@@ -512,6 +522,7 @@ def start_scheduler() -> None:
             "ai_digest(09:00)",
             "rls_audit(03:00)",
             "mba_cross_sell(Sun 02:00)",
+            "cleanup_pos_idempotency(02:30)",
         ],
         sync_schedules_loaded=n_schedules,
     )

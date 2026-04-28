@@ -190,7 +190,7 @@ async def test_quality_digest_no_runs():
 
 
 def test_start_scheduler_adds_jobs_and_starts():
-    """start_scheduler registers 5 static jobs and starts the scheduler."""
+    """start_scheduler registers 7 static jobs and starts the scheduler."""
     with (
         patch("datapulse.scheduler.scheduler") as mock_sched,
         patch("datapulse.scheduler._register_sync_schedules", return_value=0),
@@ -201,9 +201,9 @@ def test_start_scheduler_adds_jobs_and_starts():
 
         start_scheduler()
 
-        # 6 static jobs: health_check, quality_digest, ai_digest, rls_audit,
-        # mba_cross_sell, retry_webhooks (#608).
-        assert mock_sched.add_job.call_count == 6
+        # 7 static jobs: health_check, quality_digest, ai_digest, rls_audit,
+        # mba_cross_sell, retry_webhooks (#608), cleanup_pos_idempotency.
+        assert mock_sched.add_job.call_count == 7
         registered_ids = {call.kwargs["id"] for call in mock_sched.add_job.call_args_list}
         assert registered_ids == {
             "health_check",
@@ -212,6 +212,7 @@ def test_start_scheduler_adds_jobs_and_starts():
             "rls_audit",
             "mba_cross_sell",
             "retry_webhooks",
+            "cleanup_pos_idempotency",
         }
         mock_sched.start.assert_called_once()
 
@@ -364,6 +365,58 @@ def test_start_scheduler_enabled_by_default():
 
         start_scheduler()
 
-        # 6 static jobs incl. rls_audit (#546) + mba_cross_sell + retry_webhooks (#608).
-        assert mock_sched.add_job.call_count == 6
+        # 7 static jobs: rls_audit (#546) + mba_cross_sell + retry_webhooks (#608)
+        # + cleanup_pos_idempotency (nightly sweep of expired keys).
+        assert mock_sched.add_job.call_count == 7
         mock_sched.start.assert_called_once()
+
+
+# ---------------------------------------------------------------------------
+# _cleanup_pos_idempotency trigger
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_cleanup_pos_idempotency_trigger_logs_deleted_count():
+    """_cleanup_pos_idempotency calls run() and commits on success."""
+    mock_session = MagicMock()
+    with (
+        patch("datapulse.core.db.get_session_factory") as mock_sf,
+        patch("datapulse.tasks.cleanup_pos_idempotency.run", return_value=12) as mock_run,
+        patch("datapulse.metrics.scheduler_jobs_executed"),
+    ):
+        mock_sf.return_value = MagicMock(return_value=mock_session)
+
+        from datapulse.scheduler.triggers import _cleanup_pos_idempotency
+
+        await _cleanup_pos_idempotency()
+
+        mock_run.assert_called_once_with(mock_session)
+        mock_session.commit.assert_called_once()
+        mock_session.close.assert_called_once()
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_cleanup_pos_idempotency_trigger_rollback_on_error():
+    """_cleanup_pos_idempotency rolls back and closes session on DB error."""
+    mock_session = MagicMock()
+    with (
+        patch("datapulse.core.db.get_session_factory") as mock_sf,
+        patch(
+            "datapulse.tasks.cleanup_pos_idempotency.run",
+            side_effect=RuntimeError("DB gone"),
+        ),
+        patch("datapulse.metrics.scheduler_jobs_executed"),
+    ):
+        mock_sf.return_value = MagicMock(return_value=mock_session)
+
+        from datapulse.scheduler.triggers import _cleanup_pos_idempotency
+
+        # Should NOT raise — errors are logged, not propagated
+        await _cleanup_pos_idempotency()
+
+        mock_session.rollback.assert_called_once()
+        mock_session.close.assert_called_once()
+        mock_session.commit.assert_not_called()
