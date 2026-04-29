@@ -11,6 +11,7 @@ import { ErrorBoundary } from "@/components/error-boundary";
 import { ToastProvider } from "@/components/ui/toast";
 import { PosCartProvider } from "@/contexts/pos-cart-context";
 import { useRendererCrashBridge } from "@/hooks/use-renderer-crash-bridge";
+import { useJwtBridge } from "@/hooks/use-jwt-bridge";
 import { BrandProvider } from "@/components/branding/brand-provider";
 
 // Fraunces = italic display on the Totals Hero + invoice.
@@ -225,6 +226,15 @@ function RendererCrashBridge({ children }: { children: ReactNode }) {
   return <>{children}</>;
 }
 
+/** Pipes the Clerk JWT into the local SQLite settings on a 30s cadence so
+ *  the Electron sync workers (`pullProducts`, `pullStock`, push queue)
+ *  can authenticate. No-ops outside Electron. See `use-jwt-bridge.ts`
+ *  for the rationale. */
+function JwtBridge({ children }: { children: ReactNode }) {
+  useJwtBridge();
+  return <>{children}</>;
+}
+
 export default function PosLayout({ children }: { children: ReactNode }) {
   return (
     <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
@@ -233,6 +243,7 @@ export default function PosLayout({ children }: { children: ReactNode }) {
           <ErrorBoundary>
             <ToastProvider>
               <SessionGuard>
+                <JwtBridge>
                 <BrandProvider>
                 <PosCartProvider>
                   <RendererCrashBridge>
@@ -246,6 +257,7 @@ export default function PosLayout({ children }: { children: ReactNode }) {
                   </RendererCrashBridge>
                 </PosCartProvider>
                 </BrandProvider>
+                </JwtBridge>
               </SessionGuard>
             </ToastProvider>
           </ErrorBoundary>

@@ -265,8 +265,64 @@ function createWindow(): void {
     mainWindow?.focus();
   });
 
-  // Load POS terminal page
+  // Load POS terminal page from the remote renderer (pos.smartdatapulse.tech).
   mainWindow.loadURL(`${NEXTJS_URL}${POS_PATH}`);
+
+  // Cold-boot offline fallback (#offline-B).
+  //
+  // When the laptop has no internet at launch time, loadURL(remote) raises
+  // `did-fail-load` with a hard network error code. Without this handler
+  // the renderer is left blank and pilots can't open the till.
+  //
+  // We only fall back on the *hard* network error codes — silent fall-back
+  // on Cloudflare 5xx or slow-network timeouts would mask incidents and
+  // surface confusing UX (the local bundle has different cache state than
+  // the remote). See Chromium net error list for the full table.
+  //
+  // Hard network errors that justify falling back to the bundled local
+  // server:
+  //   -2   ERR_FAILED              (generic catastrophic failure)
+  //   -7   ERR_TIMED_OUT           (no response within timeout)
+  //   -105 ERR_NAME_NOT_RESOLVED   (DNS lookup failed → likely offline)
+  //   -106 ERR_INTERNET_DISCONNECTED
+  //   -109 ERR_ADDRESS_UNREACHABLE
+  //   -118 ERR_CONNECTION_TIMED_OUT
+  //   -130 ERR_PROXY_CONNECTION_FAILED
+  const COLD_BOOT_OFFLINE_CODES = new Set([-2, -7, -105, -106, -109, -118, -130]);
+  let coldBootFallbackTriggered = false;
+  mainWindow.webContents.on(
+    "did-fail-load",
+    async (_event, errorCode, errorDescription, validatedURL, isMainFrame) => {
+      if (!isMainFrame) return;
+      if (coldBootFallbackTriggered) return;
+      if (USE_LOCAL_NEXTJS || DEV_RENDERER_URL) return; // already local — nothing to fall back to
+      if (!COLD_BOOT_OFFLINE_CODES.has(errorCode)) {
+        // Surface, don't switch surfaces. Cloudflare 5xx etc. land here.
+        log.error(
+          { errorCode, errorDescription, validatedURL },
+          "renderer load failed (not a hard network error — staying on remote)",
+        );
+        return;
+      }
+
+      coldBootFallbackTriggered = true;
+      log.warn(
+        { errorCode, errorDescription, validatedURL },
+        "remote renderer unreachable — falling back to bundled local Next.js",
+      );
+
+      try {
+        await startNextServer();
+      } catch (err) {
+        log.fatal({ err }, "cold-boot fallback failed: bundled Next.js did not start");
+        return;
+      }
+
+      const localTarget = `${LOCAL_NEXTJS_URL}${POS_PATH}`;
+      log.info({ url: localTarget }, "cold-boot fallback: loading local renderer");
+      mainWindow?.loadURL(localTarget);
+    },
+  );
 
   // POS navigation guard — after auth callback, redirect back to POS
   // instead of landing on the dashboard or marketing page.
