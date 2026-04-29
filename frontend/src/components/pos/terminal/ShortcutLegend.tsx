@@ -25,8 +25,11 @@ export const SHORTCUTS: Shortcut[] = [
   { key: "F9", label: "Cash", tone: "green" },
   { key: "F10", label: "Card", tone: "cyan" },
   { key: "F11", label: "Insurance", tone: "purple" },
-  { key: "1–9", label: "Quick pick" },
-  { key: "/", label: "Search" },
+  // Quick-pick fires only when no input is focused. The scan bar
+  // auto-focuses on mount, so cashiers press Esc/Tab away from it
+  // first. Wording is explicit so the legend doesn't lie.
+  { key: "1–9", label: "Quick pick (outside scan)" },
+  { key: "/", label: "Focus search" },
   { key: "Enter", label: "Charge", tone: "cyan" },
   { key: "Esc", label: "Cancel" },
 ];

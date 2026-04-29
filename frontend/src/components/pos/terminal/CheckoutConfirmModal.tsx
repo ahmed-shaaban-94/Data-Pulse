@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { FocusTrap } from "focus-trap-react";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { PaymentTiles } from "./PaymentTiles";
@@ -91,25 +92,29 @@ export function CheckoutConfirmModal(props: CheckoutConfirmModalProps) {
   // Modal owns Enter/Escape while it is open. The terminal page's
   // Enter handler is gated on `!checkoutOpen` so it never races with
   // this listener — first Enter opens the modal, second Enter charges.
+  // Deps are narrowed to the specific callbacks/flags the handler reads;
+  // depending on the whole `props` object would re-bind the listener on
+  // every parent render (e.g. each cashTendered keystroke).
+  const { open, chargeDisabled, onCharge, onClose } = props;
   useEffect(() => {
-    if (!props.open) return;
+    if (!open) return;
     function onKey(e: KeyboardEvent) {
       if (e.key === "Escape") {
         e.preventDefault();
-        props.onClose();
+        onClose();
         return;
       }
-      if (e.key === "Enter" && !props.chargeDisabled) {
+      if (e.key === "Enter" && !chargeDisabled) {
         // Allow Enter to charge even when the cash-tendered input is
         // focused. The ChargeButton's aria-label includes "(Enter)"
         // so screen readers know this.
         e.preventDefault();
-        props.onCharge();
+        onCharge();
       }
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [props.open, props]);
+  }, [open, chargeDisabled, onCharge, onClose]);
 
   if (!props.open) return null;
 
@@ -128,6 +133,13 @@ export function CheckoutConfirmModal(props: CheckoutConfirmModalProps) {
         if (e.target === e.currentTarget) props.onClose();
       }}
     >
+      <FocusTrap
+        focusTrapOptions={{
+          escapeDeactivates: false, // Escape handled by the window keydown listener above
+          allowOutsideClick: true, // backdrop click must reach onMouseDown
+          initialFocus: false, // dialogRef.current?.focus() in the effect above handles initial focus
+        }}
+      >
       <div
         ref={dialogRef}
         tabIndex={-1}
@@ -258,6 +270,7 @@ export function CheckoutConfirmModal(props: CheckoutConfirmModalProps) {
           />
         </footer>
       </div>
+      </FocusTrap>
     </div>
   );
 }
