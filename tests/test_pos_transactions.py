@@ -12,10 +12,10 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 from fastapi.testclient import TestClient
 
@@ -30,8 +30,13 @@ from datapulse.pos.constants import TransactionStatus
 from datapulse.pos.exceptions import InsufficientStockError
 from datapulse.pos.idempotency import IdempotencyContext
 from datapulse.pos.models import (
+    CheckoutRequest,
+    CheckoutResponse,
+    CommitRequest,
+    CommitResponse,
     PosCartItem,
     TransactionDetailResponse,
+    UpdateItemRequest,
 )
 from datapulse.rbac.dependencies import get_access_context
 from datapulse.rbac.models import AccessContext
@@ -425,3 +430,223 @@ def test_add_item_replays_cached_failure_without_service_call(mock_service: Magi
     assert resp.status_code == 409
     assert resp.json()["detail"] == "Insufficient stock for DRUG001"
     mock_service.add_item.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_update_item_records_expected_pos_error(mock_service: MagicMock) -> None:
+    from datapulse.api.routes import _pos_transactions as pos_module
+    from datapulse.pos.exceptions import PosConflictError
+
+    idem = IdempotencyContext(
+        key="upd-fails",
+        tenant_id=1,
+        endpoint="PATCH /pos/transactions/{id}/items/{item_id}",
+        request_hash="u" * 64,
+        replay=False,
+    )
+    mock_service.update_item.side_effect = PosConflictError(
+        "transaction_not_draft",
+        message="Only draft transactions can be edited",
+    )
+
+    with (
+        patch("datapulse.api.routes._pos_transactions.record_idempotent_exception") as record,
+        pytest.raises(PosConflictError),
+    ):
+        await pos_module.update_item(
+            request=MagicMock(),
+            transaction_id=100,
+            item_id=1,
+            body=UpdateItemRequest(quantity=Decimal("2"), override_price="9.5", discount="1"),
+            service=mock_service,
+            user=MOCK_USER,
+            db_session=MagicMock(),
+            idem=idem,
+        )
+
+    record.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_checkout_records_success_direct_call(mock_service: MagicMock) -> None:
+    from datapulse.api.routes import _pos_transactions as pos_module
+    from datapulse.pos.constants import PaymentMethod
+
+    idem = IdempotencyContext(
+        key="checkout-ok",
+        tenant_id=1,
+        endpoint="POST /pos/transactions/{id}/checkout",
+        request_hash="c" * 64,
+        replay=False,
+    )
+    mock_service.checkout.return_value = CheckoutResponse(
+        transaction_id=100,
+        receipt_number="R20260430-1-100",
+        grand_total=Decimal("10"),
+        payment_method=PaymentMethod.cash,
+        change_due=Decimal("0"),
+        status=TransactionStatus.completed,
+    )
+
+    with patch("datapulse.api.routes._pos_transactions.record_idempotent_success") as record:
+        result = await pos_module.checkout(
+            request=MagicMock(),
+            transaction_id=100,
+            body=CheckoutRequest(payment_method=PaymentMethod.cash, cash_tendered=Decimal("10")),
+            service=mock_service,
+            user=MOCK_USER,
+            db_session=MagicMock(),
+            idem=idem,
+        )
+
+    assert result.receipt_number == "R20260430-1-100"
+    record.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_checkout_records_http_exception_direct_call(mock_service: MagicMock) -> None:
+    from datapulse.api.routes import _pos_transactions as pos_module
+    from datapulse.pos.constants import PaymentMethod
+
+    idem = IdempotencyContext(
+        key="checkout-fail",
+        tenant_id=1,
+        endpoint="POST /pos/transactions/{id}/checkout",
+        request_hash="h" * 64,
+        replay=False,
+    )
+    mock_service.checkout.side_effect = HTTPException(status_code=409, detail="busy")
+
+    with (
+        patch("datapulse.api.routes._pos_transactions.record_idempotent_exception") as record,
+        pytest.raises(HTTPException),
+    ):
+        await pos_module.checkout(
+            request=MagicMock(),
+            transaction_id=100,
+            body=CheckoutRequest(payment_method=PaymentMethod.cash, cash_tendered=Decimal("10")),
+            service=mock_service,
+            user=MOCK_USER,
+            db_session=MagicMock(),
+            idem=idem,
+        )
+
+    record.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_commit_transaction_records_terminal_mismatch() -> None:
+    from datapulse.api.routes import _pos_transactions as pos_module
+    from datapulse.pos.constants import PaymentMethod
+    from datapulse.pos.devices import DeviceProof, TerminalDevice
+
+    idem = IdempotencyContext(
+        key="commit-mismatch",
+        tenant_id=1,
+        endpoint="POST /pos/transactions/commit",
+        request_hash="m" * 64,
+        replay=False,
+    )
+    payload = CommitRequest(
+        terminal_id=2,
+        shift_id=1,
+        staff_id="staff-1",
+        site_code="SITE01",
+        items=[_cart_item()],
+        subtotal=Decimal("37.5"),
+        grand_total=Decimal("37.5"),
+        payment_method=PaymentMethod.cash,
+        cash_tendered=Decimal("40"),
+    )
+    proof = DeviceProof(
+        terminal_id=1,
+        device=TerminalDevice(
+            id=1,
+            tenant_id=1,
+            terminal_id=1,
+            public_key=b"x" * 32,
+            device_fingerprint="sha256:" + "a" * 64,
+            device_fingerprint_v2=None,
+            revoked_at=None,
+        ),
+        signed_at=datetime.now(UTC),
+        idempotency_key=idem.key,
+    )
+
+    with (
+        patch("datapulse.api.routes._pos_transactions.record_idempotent_exception") as record,
+        pytest.raises(HTTPException) as exc,
+    ):
+        await pos_module.commit_transaction(
+            request=MagicMock(),
+            payload=payload,
+            user=MOCK_USER,
+            db_session=MagicMock(),
+            proof=proof,
+            idem=idem,
+        )
+
+    assert exc.value.status_code == 400
+    record.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_commit_transaction_records_success() -> None:
+    from datapulse.api.routes import _pos_transactions as pos_module
+    from datapulse.pos.constants import PaymentMethod
+    from datapulse.pos.devices import DeviceProof, TerminalDevice
+
+    idem = IdempotencyContext(
+        key="commit-ok",
+        tenant_id=1,
+        endpoint="POST /pos/transactions/commit",
+        request_hash="o" * 64,
+        replay=False,
+    )
+    payload = CommitRequest(
+        terminal_id=1,
+        shift_id=1,
+        staff_id="staff-1",
+        site_code="SITE01",
+        items=[_cart_item()],
+        subtotal=Decimal("37.5"),
+        grand_total=Decimal("37.5"),
+        payment_method=PaymentMethod.cash,
+        cash_tendered=Decimal("40"),
+    )
+    proof = DeviceProof(
+        terminal_id=1,
+        device=TerminalDevice(
+            id=1,
+            tenant_id=1,
+            terminal_id=1,
+            public_key=b"x" * 32,
+            device_fingerprint="sha256:" + "a" * 64,
+            device_fingerprint_v2=None,
+            revoked_at=None,
+        ),
+        signed_at=datetime.now(UTC),
+        idempotency_key=idem.key,
+    )
+    response = CommitResponse(
+        transaction_id=100,
+        receipt_number="R20260430-1-100",
+        commit_confirmed_at=datetime.now(UTC),
+        change_due=Decimal("2.5"),
+    )
+
+    with (
+        patch("datapulse.api.routes._pos_transactions.atomic_commit", return_value=response),
+        patch("datapulse.api.routes._pos_transactions.record_idempotent_success") as record,
+    ):
+        result = await pos_module.commit_transaction(
+            request=MagicMock(),
+            payload=payload,
+            user=MOCK_USER,
+            db_session=MagicMock(),
+            proof=proof,
+            idem=idem,
+        )
+
+    assert result.transaction_id == 100
+    record.assert_called_once()

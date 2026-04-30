@@ -151,6 +151,38 @@ class TestGetCurrentUser:
             )
         assert result["roles"] == ["admin", "cashier"]
 
+    def test_jwt_roles_iterable_is_normalized(self):
+        creds = MagicMock()
+        creds.credentials = "jwt-token-value"
+        fake_claims = {
+            "sub": "user123",
+            "tenant_id": "42",
+            "roles": [" admin ", "", 123],
+        }
+        with patch("datapulse.core.auth.verify_jwt", return_value=fake_claims):
+            result = get_current_user(
+                credentials=creds,
+                api_key=None,
+                settings=_settings(api_key="key"),
+            )
+        assert result["roles"] == ["admin", "123"]
+
+    def test_jwt_invalid_roles_claim_is_ignored(self):
+        creds = MagicMock()
+        creds.credentials = "jwt-token-value"
+        fake_claims = {
+            "sub": "user123",
+            "tenant_id": "42",
+            "roles": {"admin": True},
+        }
+        with patch("datapulse.core.auth.verify_jwt", return_value=fake_claims):
+            result = get_current_user(
+                credentials=creds,
+                api_key=None,
+                settings=_settings(api_key="key"),
+            )
+        assert result["roles"] == []
+
     def test_jwt_missing_tenant_id_falls_back_to_default(self):
         """When tenant_id is missing from JWT claims, falls back to default_tenant_id."""
         creds = MagicMock()

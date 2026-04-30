@@ -34,11 +34,13 @@ from datapulse.pos.exceptions import (
     PharmacistVerificationRequiredError,
     TerminalNotActiveError,
 )
+from datapulse.pos.idempotency import IdempotencyContext
 from datapulse.pos.models import (
     CheckoutResponse,
     PosCartItem,
     PosProductResult,
     PosStockInfo,
+    TerminalCloseRequest,
     TerminalSession,
     TransactionResponse,
 )
@@ -237,6 +239,63 @@ class TestTerminalRoutes:
             headers={"Idempotency-Key": "term-close-1"},
         )
         assert resp.status_code == 200
+
+    def test_close_terminal_replays_cached_success(self, mock_service: MagicMock):
+        from datapulse.api.routes._pos_terminals import close_terminal
+
+        cached = _terminal_session(TerminalStatus.closed).model_dump(mode="json")
+        idem = IdempotencyContext(
+            key="term-close-replay",
+            tenant_id=1,
+            endpoint="pos.close_terminal",
+            request_hash="hash",
+            replay=True,
+            cached_status=200,
+            cached_body=cached,
+        )
+
+        response = close_terminal(
+            request=MagicMock(),
+            terminal_id=1,
+            body=TerminalCloseRequest(closing_cash=Decimal("250")),
+            service=mock_service,
+            user=MOCK_USER,
+            db_session=MagicMock(),
+            idem=idem,
+        )
+
+        assert response.status == TerminalStatus.closed
+        mock_service.close_terminal.assert_not_called()
+
+    def test_close_terminal_records_expected_error(self, mock_service: MagicMock):
+        from datapulse.api.routes._pos_terminals import close_terminal
+
+        idem = IdempotencyContext(
+            key="term-close-error",
+            tenant_id=1,
+            endpoint="pos.close_terminal",
+            request_hash="hash",
+            replay=False,
+        )
+        db_session = MagicMock()
+        error = TerminalNotActiveError(terminal_id=1, current_status="paused")
+        mock_service.close_terminal.side_effect = error
+
+        with (
+            patch("datapulse.api.routes._pos_terminals.record_idempotent_exception") as record,
+            pytest.raises(TerminalNotActiveError),
+        ):
+            close_terminal(
+                request=MagicMock(),
+                terminal_id=1,
+                body=TerminalCloseRequest(closing_cash=Decimal("250")),
+                service=mock_service,
+                user=MOCK_USER,
+                db_session=db_session,
+                idem=idem,
+            )
+
+        record.assert_called_once_with(db_session, idem, error)
 
     def test_list_active_terminals_200(
         self,

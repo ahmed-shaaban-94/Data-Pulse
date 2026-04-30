@@ -99,6 +99,20 @@ def test_get_receipt_pdf_streams_with_read_permission() -> None:
     service.get_receipt_pdf.assert_called_once_with(100, 1)
 
 
+def test_get_receipt_thermal_streams_with_read_permission() -> None:
+    service = MagicMock()
+    service.get_receipt_thermal.return_value = b"thermal bytes"
+    app = _make_app(service, permissions={"pos:receipt:read"})
+
+    with TestClient(app) as client:
+        resp = client.get("/api/v1/pos/receipts/100/thermal")
+
+    assert resp.status_code == 200
+    assert resp.content == b"thermal bytes"
+    assert resp.headers["content-type"] == "application/octet-stream"
+    service.get_receipt_thermal.assert_called_once_with(100, 1)
+
+
 def test_whatsapp_receipt_requires_idempotency_key() -> None:
     service = MagicMock()
     app = _make_app(service, permissions=_send_permissions())
@@ -110,6 +124,37 @@ def test_whatsapp_receipt_requires_idempotency_key() -> None:
         )
 
     assert resp.status_code == 422
+    service.send_receipt_whatsapp.assert_not_called()
+
+
+def test_whatsapp_receipt_replays_success_fallback_without_sending() -> None:
+    from datapulse.api.routes._pos_routes_deps import _receipt_whatsapp_idempotency_dep
+
+    service = MagicMock()
+    app = _make_app(service, permissions=_send_permissions())
+
+    async def _replay_success(_request: Request) -> IdempotencyContext:
+        return IdempotencyContext(
+            key="receipt-wa-replay",
+            tenant_id=1,
+            endpoint="POST /pos/receipts/{id}/whatsapp",
+            request_hash="s" * 64,
+            replay=True,
+            cached_status=200,
+            cached_body=None,
+        )
+
+    app.dependency_overrides[_receipt_whatsapp_idempotency_dep] = _replay_success
+
+    with TestClient(app) as client:
+        resp = client.post(
+            "/api/v1/pos/receipts/100/whatsapp",
+            json={"phone": "01198765432"},
+            headers={"Idempotency-Key": "receipt-wa-replay"},
+        )
+
+    assert resp.status_code == 200
+    assert resp.json() == {"sent": True}
     service.send_receipt_whatsapp.assert_not_called()
 
 
@@ -139,6 +184,26 @@ def test_whatsapp_receipt_records_success_with_tenant_scope() -> None:
     assert args[1].tenant_id == 1
     assert args[2] == 200
     assert args[3]["phone_hash"] == "abc123"
+
+
+def test_whatsapp_receipt_records_delivery_error() -> None:
+    service = MagicMock()
+    service.send_receipt_whatsapp.side_effect = WhatsAppDeliveryFailedError("provider down")
+    app = _make_app(service, permissions=_send_permissions())
+
+    with (
+        patch("datapulse.api.routes._pos_receipts.record_idempotent_exception") as record,
+        TestClient(app) as client,
+    ):
+        resp = client.post(
+            "/api/v1/pos/receipts/100/whatsapp",
+            json={"phone": "01198765432"},
+            headers={"Idempotency-Key": "receipt-wa-fail"},
+        )
+
+    assert resp.status_code == 502
+    assert resp.json()["detail"] == "Failed to send WhatsApp receipt: provider down"
+    record.assert_called_once()
 
 
 def test_whatsapp_receipt_replays_cached_failure_without_sending() -> None:
@@ -184,6 +249,83 @@ def test_email_receipt_requires_idempotency_key() -> None:
 
     assert resp.status_code == 422
     service.get_receipt_pdf.assert_not_called()
+
+
+def test_email_receipt_records_success_with_tenant_scope() -> None:
+    service = MagicMock()
+    service.get_receipt_pdf.return_value = b"%PDF mock"
+    app = _make_app(service, permissions=_send_permissions())
+
+    with (
+        patch("datapulse.api.routes._pos_receipts.record_idempotent_success") as record,
+        TestClient(app) as client,
+    ):
+        resp = client.post(
+            "/api/v1/pos/receipts/100/email",
+            json={"email": "customer@example.com"},
+            headers={"Idempotency-Key": "receipt-email-1"},
+        )
+
+    assert resp.status_code == 200
+    assert resp.json() == {"sent": True, "email": "customer@example.com"}
+    service.get_receipt_pdf.assert_called_once_with(100, 1)
+    args, _kwargs = record.call_args
+    assert args[1].key == "receipt-email-1"
+    assert args[1].tenant_id == 1
+    assert args[2] == 200
+
+
+def test_email_receipt_replays_cached_success_without_lookup() -> None:
+    from datapulse.api.routes._pos_routes_deps import _receipt_email_idempotency_dep
+
+    service = MagicMock()
+    app = _make_app(service, permissions=_send_permissions())
+
+    async def _replay_success(_request: Request) -> IdempotencyContext:
+        return IdempotencyContext(
+            key="receipt-email-replay",
+            tenant_id=1,
+            endpoint="POST /pos/receipts/{id}/email",
+            request_hash="r" * 64,
+            replay=True,
+            cached_status=200,
+            cached_body={"sent": True, "email": "cached@example.com"},
+        )
+
+    app.dependency_overrides[_receipt_email_idempotency_dep] = _replay_success
+
+    with TestClient(app) as client:
+        resp = client.post(
+            "/api/v1/pos/receipts/100/email",
+            json={"email": "customer@example.com"},
+            headers={"Idempotency-Key": "receipt-email-replay"},
+        )
+
+    assert resp.status_code == 200
+    assert resp.json()["email"] == "cached@example.com"
+    service.get_receipt_pdf.assert_not_called()
+
+
+def test_email_receipt_records_lookup_error() -> None:
+    from fastapi import HTTPException
+
+    service = MagicMock()
+    service.get_receipt_pdf.side_effect = HTTPException(status_code=404, detail="missing")
+    app = _make_app(service, permissions=_send_permissions())
+
+    with (
+        patch("datapulse.api.routes._pos_receipts.record_idempotent_exception") as record,
+        TestClient(app) as client,
+    ):
+        resp = client.post(
+            "/api/v1/pos/receipts/100/email",
+            json={"email": "customer@example.com"},
+            headers={"Idempotency-Key": "receipt-email-missing"},
+        )
+
+    assert resp.status_code == 404
+    assert resp.json()["detail"] == "missing"
+    record.assert_called_once()
 
 
 def test_email_receipt_rejects_invalid_email_before_lookup() -> None:

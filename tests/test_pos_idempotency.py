@@ -242,6 +242,57 @@ def test_raise_for_replayed_error_restores_cached_http_status() -> None:
     assert exc.value.detail == "stock_low"
 
 
+@pytest.mark.parametrize(
+    ("exc", "expected_status"),
+    [
+        pytest.param(
+            __import__("datapulse.pos.exceptions", fromlist=["PosNotFoundError"]).PosNotFoundError(
+                "missing", http_status=404
+            ),
+            404,
+            id="not-found",
+        ),
+        pytest.param(
+            __import__(
+                "datapulse.pos.exceptions", fromlist=["PharmacistVerificationRequiredError"]
+            ).PharmacistVerificationRequiredError("MORPHINE", "narcotic"),
+            403,
+            id="pharmacist",
+        ),
+        pytest.param(
+            __import__("datapulse.pos.exceptions", fromlist=["WhatsAppDisabledError"])
+            .WhatsAppDisabledError(),
+            503,
+            id="whatsapp-disabled",
+        ),
+        pytest.param(
+            __import__("datapulse.pos.exceptions", fromlist=["WhatsAppDeliveryFailedError"])
+            .WhatsAppDeliveryFailedError("provider down"),
+            502,
+            id="whatsapp-delivery",
+        ),
+        pytest.param(
+            __import__("datapulse.pos.exceptions", fromlist=["PosValidationError"])
+            .PosValidationError("bad"),
+            400,
+            id="validation",
+        ),
+        pytest.param(
+            __import__("datapulse.pos.exceptions", fromlist=["PosInternalError"])
+            .PosInternalError("broken"),
+            500,
+            id="internal",
+        ),
+    ],
+)
+def test_pos_error_status_maps_expected_exception_types(
+    exc: Exception, expected_status: int
+) -> None:
+    from datapulse.pos.idempotency import pos_error_status
+
+    assert pos_error_status(exc) == expected_status
+
+
 def test_idempotency_dependency_is_a_factory() -> None:
     """The factory returns an awaitable dependency without side effects."""
     from datapulse.pos.idempotency import idempotency_dependency
