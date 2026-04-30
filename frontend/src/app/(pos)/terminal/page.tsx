@@ -99,12 +99,16 @@ export default function PosTerminalPage() {
   // searched a hardcoded "ab" prefetch and would silently "no-match"
   // anything outside that 20-row slice. When the scan bar is idle
   // (empty), we fall back to the seed query so QuickPick stays useful.
-  const { products: catalog } = usePosProducts({
+  const { products: catalog, isLoading: isCatalogLoading } = usePosProducts({
     query: scanQuery.trim().length >= 2 ? scanQuery.trim() : terminal ? "ab" : "",
     siteCode: terminal?.site_code ?? "",
   });
   const quickPick = useMemo(() => catalog.slice(0, 9).map(productToQuickPick), [catalog]);
   const [scanToast, setScanToast] = useState<string | null>(null);
+  // Increments on every successful add — drives the scan-flash overlay.
+  const [scanFlashKey, setScanFlashKey] = useState(0);
+  // Independent counter — drives the red rejection-flash overlay.
+  const [scanErrorFlashKey, setScanErrorFlashKey] = useState(0);
   const [activePayment, setActivePayment] = useState<TilePaymentMethod>("cash");
   const [cashTendered, setCashTendered] = useState("");
   const [cardLast4, setCardLast4] = useState("");
@@ -185,6 +189,7 @@ export default function PosTerminalPage() {
       }
       setActiveDrugCode(item.drug_code);
       setScanToast(`${item.drug_name} added`);
+      setScanFlashKey((k) => k + 1);
       // Refocus scan bar
       scanInputRef.current?.focus();
     },
@@ -214,6 +219,7 @@ export default function PosTerminalPage() {
       );
       if (nameHits.length === 0) {
         setScanToast(`No match for "${q}"`);
+        setScanErrorFlashKey((k) => k + 1);
         return;
       }
       if (nameHits.length === 1) {
@@ -389,9 +395,23 @@ export default function PosTerminalPage() {
         setActivePayment("insurance");
         return;
       }
-      // F12 intentionally unbound — layout previously dispatched a dead
-      // pos:void-transaction event on F12 which collided with this
-      // handler. Voucher stays on F7.
+      // F12 → Start Checkout. Only fires when no modal is open, the
+      // cart is chargeable, and focus isn't trapped in an input.
+      if (e.key === "F12") {
+        const anyModalOpen =
+          checkoutOpen ||
+          voucherOpen ||
+          insuranceOpen ||
+          pharmacistOpen ||
+          cheatSheetOpen;
+        const canCharge =
+          items.length > 0 && grandTotal > 0 && !checkout.isLoading;
+        if (!anyModalOpen && canCharge && !isInput) {
+          e.preventDefault();
+          setCheckoutOpen(true);
+          return;
+        }
+      }
       if (e.key === "Escape" && voucherOpen) {
         // VoucherCodeModal handles its own Escape
         return;
@@ -457,6 +477,9 @@ export default function PosTerminalPage() {
     checkoutOpen,
     cheatSheetOpen,
     setCheatSheetOpen,
+    insuranceOpen,
+    pharmacistOpen,
+    checkout.isLoading,
   ]);
 
   // Hijack the legacy F2 layout shortcut (now = Sync).
@@ -532,6 +555,8 @@ export default function PosTerminalPage() {
             onChange={setScanQuery}
             onSubmit={handleScanSubmit}
             isOnline={!isOffline}
+            flashKey={scanFlashKey}
+            errorFlashKey={scanErrorFlashKey}
           />
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
             <CartTable
@@ -607,7 +632,11 @@ export default function PosTerminalPage() {
           )}
         >
           <ShortcutLegend />
-          <QuickPickGrid items={quickPick} onPick={addQuickPick} />
+          <QuickPickGrid
+            items={quickPick}
+            onPick={addQuickPick}
+            loading={isCatalogLoading && quickPick.length === 0}
+          />
         </section>
 
         {/* COL 3 — Clinical / AI column. D1 renders a skeleton only;

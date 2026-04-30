@@ -75,4 +75,80 @@ describe("ClinicalPanel memo", () => {
     expect(screen.getByTestId("clinical-panel")).toBeInTheDocument();
     expect(screen.getByTestId("clinical-panel-status")).toHaveTextContent("SELECT AN ITEM");
   });
+
+  describe("content meta-badges (Gemini POV follow-up)", () => {
+    it("shows the counseling badge as truthy when counseling_text is present", () => {
+      vi.mocked(usePosDrugClinical).mockReturnValue({
+        detail: {
+          drug_code: "MED-002",
+          drug_name: "Vitamin C",
+          drug_brand: null,
+          drug_cluster: null,
+          drug_category: "vitamins",
+          unit_price: 10,
+          counseling_text: "Take with water",
+          active_ingredient: "ascorbic acid",
+        },
+        crossSell: [],
+        alternatives: [],
+        isLoading: false,
+        error: null,
+      });
+      render(<ClinicalPanel activeDrugCode="MED-002" />);
+      expect(screen.getByTestId("badge-counseling")).toHaveTextContent(/نصيحة/);
+    });
+
+    it("shows the alternatives badge as falsy when alternatives is empty", () => {
+      vi.mocked(usePosDrugClinical).mockReturnValue({
+        detail: {
+          drug_code: "MED-004",
+          drug_name: "Test",
+          drug_brand: null,
+          drug_cluster: null,
+          drug_category: "general",
+          unit_price: 10,
+          counseling_text: null,
+          active_ingredient: null,
+        },
+        crossSell: [],
+        alternatives: [],
+        isLoading: false,
+        error: null,
+      });
+      render(<ClinicalPanel activeDrugCode="MED-004" />);
+      expect(screen.getByTestId("badge-alternatives")).toHaveTextContent(
+        /لا بدائل/,
+      );
+    });
+
+    it("does not display any aggregate 0-100 number, controlled-substance claim, or other invented clinical signal", () => {
+      vi.mocked(usePosDrugClinical).mockReturnValue({
+        detail: {
+          drug_code: "MED-003",
+          drug_name: "Test",
+          drug_brand: null,
+          drug_cluster: null,
+          // Even when category contains the English word "narcotic", the
+          // component must NOT render a regulatory-sounding badge —
+          // substring matching on a free-text Arabic-language category
+          // field would produce false-negatives ("أدوية مراقبة" wouldn't
+          // match) and is unsafe to surface as a regulatory claim.
+          drug_category: "narcotic",
+          unit_price: 10,
+          counseling_text: null,
+          active_ingredient: null,
+        },
+        crossSell: [],
+        alternatives: [],
+        isLoading: false,
+        error: null,
+      });
+      render(<ClinicalPanel activeDrugCode="MED-003" />);
+      // Guardrails — three artifacts that previous versions of this file
+      // rendered. None of them should ever come back without a real
+      // backend-sourced field and an explicit design review.
+      expect(screen.queryByTestId("safety-score-gauge")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("badge-controlled")).not.toBeInTheDocument();
+    });
+  });
 });

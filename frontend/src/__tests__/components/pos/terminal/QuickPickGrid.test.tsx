@@ -54,4 +54,30 @@ describe("QuickPickGrid", () => {
     expect(screen.getByText(/1–8/)).toBeInTheDocument();
     expect(screen.queryByTestId("quick-pick-1")).not.toBeInTheDocument();
   });
+
+  describe("loading state (S1)", () => {
+    it("renders 8 shimmer placeholders when loading=true and items=[]", () => {
+      render(<QuickPickGrid items={[]} onPick={vi.fn()} loading />);
+      for (let i = 1; i <= 8; i++) {
+        expect(
+          screen.getByTestId(`quick-pick-shimmer-${i}`),
+        ).toBeInTheDocument();
+      }
+      // No real tile buttons during loading
+      expect(screen.queryByTestId("quick-pick-1")).not.toBeInTheDocument();
+    });
+
+    it("falls back to dashed placeholders when loading=false", () => {
+      render(<QuickPickGrid items={[]} onPick={vi.fn()} />);
+      expect(
+        screen.queryByTestId("quick-pick-shimmer-1"),
+      ).not.toBeInTheDocument();
+    });
+
+    it("shimmer cells are marked aria-busy for assistive tech", () => {
+      render(<QuickPickGrid items={[]} onPick={vi.fn()} loading />);
+      const shim = screen.getByTestId("quick-pick-shimmer-1");
+      expect(shim.getAttribute("aria-busy")).toBe("true");
+    });
+  });
 });

@@ -3,8 +3,61 @@
 import { memo, Suspense } from "react";
 import { HeartPulse, Plus, Zap } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { usePosDrugClinical, type CrossSellItem, type AlternativeItem } from "@/hooks/use-pos-drug-clinical";
+import {
+  usePosDrugClinical,
+  type CrossSellItem,
+  type AlternativeItem,
+} from "@/hooks/use-pos-drug-clinical";
 import { ClinicalPanelSkeleton } from "./ClinicalPanelSkeleton";
+
+// ── Panel content meta-badges ────────────────────────────────────────────────
+// Honest, discrete indicators about the *panel content*, not the drug:
+//   - hasCounseling: was a counseling tip available for this SKU?
+//   - hasAlternatives: did the alternatives endpoint return anything?
+// A previous version of this file also rendered an "is controlled" badge
+// derived from substring-matching English keywords against drug_category.
+// That was removed because false-negatives on Arabic categories
+// ("أدوية مراقبة", "مخدرات") would silently hide a regulatory-sounding
+// claim. If a real controlled-substance signal is needed, surface it from
+// the backend (e.g. `DrugDetail.is_controlled: boolean`) and re-introduce
+// the badge keyed off that field.
+
+interface ContentBadgesProps {
+  hasCounseling: boolean;
+  hasAlternatives: boolean;
+}
+
+function ContentBadges({ hasCounseling, hasAlternatives }: ContentBadgesProps) {
+  return (
+    <div
+      className="flex shrink-0 flex-col items-end gap-1"
+      data-testid="clinical-content-badges"
+    >
+      <span
+        data-testid="badge-counseling"
+        className={cn(
+          "rounded-full border px-1.5 py-0.5 font-mono text-[8.5px] uppercase tracking-[0.15em]",
+          hasCounseling
+            ? "border-cyan-400/30 bg-cyan-400/10 text-cyan-300"
+            : "border-white/10 bg-white/[0.04] text-[var(--pos-ink-3)]",
+        )}
+      >
+        {hasCounseling ? "✓ نصيحة" : "— لا نصيحة"}
+      </span>
+      <span
+        data-testid="badge-alternatives"
+        className={cn(
+          "rounded-full border px-1.5 py-0.5 font-mono text-[8.5px] uppercase tracking-[0.15em]",
+          hasAlternatives
+            ? "border-violet-400/30 bg-violet-400/10 text-violet-300"
+            : "border-white/10 bg-white/[0.04] text-[var(--pos-ink-3)]",
+        )}
+      >
+        {hasAlternatives ? "✓ بدائل" : "— لا بدائل"}
+      </span>
+    </div>
+  );
+}
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -21,30 +74,39 @@ interface SelectedSkuHeaderProps {
   drugName: string;
   activeIngredient: string | null;
   drugCategory: string | null;
+  badges?: ContentBadgesProps;
 }
 
-function SelectedSkuHeader({ drugName, activeIngredient, drugCategory }: SelectedSkuHeaderProps) {
+function SelectedSkuHeader({
+  drugName,
+  activeIngredient,
+  drugCategory,
+  badges,
+}: SelectedSkuHeaderProps) {
   return (
-    <div className="flex flex-col gap-1 border-b border-[var(--pos-line)] px-4 py-3">
-      <p
-        dir="rtl"
-        className="truncate text-sm font-bold leading-snug text-[var(--pos-ink)]"
-        title={drugName}
-      >
-        {drugName}
-      </p>
-      <div className="flex flex-wrap items-center gap-1.5">
-        {activeIngredient && (
-          <span className="rounded bg-[var(--pos-accent)]/10 px-1.5 py-0.5 font-mono text-[8.5px] font-bold uppercase tracking-[0.15em] text-[var(--pos-accent)]">
-            {activeIngredient}
-          </span>
-        )}
-        {drugCategory && (
-          <span className="rounded bg-white/[0.06] px-1.5 py-0.5 font-mono text-[8.5px] uppercase tracking-[0.15em] text-[var(--pos-ink-3)]">
-            {drugCategory}
-          </span>
-        )}
+    <div className="flex items-start gap-3 border-b border-[var(--pos-line)] px-4 py-3">
+      <div className="flex min-w-0 flex-1 flex-col gap-1">
+        <p
+          dir="rtl"
+          className="truncate text-sm font-bold leading-snug text-[var(--pos-ink)]"
+          title={drugName}
+        >
+          {drugName}
+        </p>
+        <div className="flex flex-wrap items-center gap-1.5">
+          {activeIngredient && (
+            <span className="rounded bg-[var(--pos-accent)]/10 px-1.5 py-0.5 font-mono text-[8.5px] font-bold uppercase tracking-[0.15em] text-[var(--pos-accent)]">
+              {activeIngredient}
+            </span>
+          )}
+          {drugCategory && (
+            <span className="rounded bg-white/[0.06] px-1.5 py-0.5 font-mono text-[8.5px] uppercase tracking-[0.15em] text-[var(--pos-ink-3)]">
+              {drugCategory}
+            </span>
+          )}
+        </div>
       </div>
+      {badges && <ContentBadges {...badges} />}
     </div>
   );
 }
@@ -258,6 +320,10 @@ function ClinicalPanelInner({ activeDrugCode, onAddToCart, className }: Clinical
             drugName={detail.drug_name}
             activeIngredient={detail.active_ingredient}
             drugCategory={detail.drug_category}
+            badges={{
+              hasCounseling: !!detail.counseling_text,
+              hasAlternatives: alternatives.length > 0,
+            }}
           />
 
           {detail.counseling_text ? (

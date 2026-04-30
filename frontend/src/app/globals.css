@@ -1131,6 +1131,48 @@ html {
   }
 }
 
+/* Scan-bar flash — quick white pulse on successful scan (Gemini POV upgrade) */
+@keyframes dpScanFlash {
+  0% {
+    opacity: 0;
+  }
+  20% {
+    opacity: 0.55;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+.pos-scan-flash {
+  animation: dpScanFlash 220ms ease-out forwards;
+}
+
+/* Scan-bar error flash — red pulse on rejected scan */
+@keyframes dpScanFlashError {
+  0% {
+    opacity: 0;
+  }
+  20% {
+    opacity: 0.6;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+.pos-scan-flash-error {
+  animation: dpScanFlashError 320ms ease-out forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pos-scan-flash,
+  .pos-scan-flash-error {
+    animation: none;
+    opacity: 0;
+  }
+}
+
 /* Cart row fade-up — newly scanned item enters */
 @keyframes dpRowEnter {
   from {

@@ -1,6 +1,7 @@
 "use client";
 
 import { memo } from "react";
+import { PlusCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { cleanDrugName } from "@/lib/pos/format-drug-name";
 import { fmtEgp, type QuickPickItem, type QuickPickSignal } from "./types";
@@ -11,6 +12,11 @@ interface QuickPickGridProps {
   shiftLabel?: string;
   txnCount?: number;
   avgBasket?: number;
+  /**
+   * When true, render 8 shimmer placeholders instead of the catalog
+   * tiles. Use while the catalog SWR is in flight on first paint.
+   */
+  loading?: boolean;
 }
 
 // ── Signal palette ─────────────────────────────────────────────────────────────
@@ -56,10 +62,16 @@ function QuickPickGridInner({
   shiftLabel,
   txnCount,
   avgBasket,
+  loading = false,
 }: QuickPickGridProps) {
   // Pad to 8 (2-col × 4 rows) so the grid keeps its shape.
-  const tiles: (QuickPickItem | null)[] = [...items.slice(0, 8)];
-  while (tiles.length < 8) tiles.push(null);
+  const tiles: (QuickPickItem | null)[] = loading
+    ? Array.from({ length: 8 }, () => null)
+    : (() => {
+        const t: (QuickPickItem | null)[] = [...items.slice(0, 8)];
+        while (t.length < 8) t.push(null);
+        return t;
+      })();
 
   const showStripe = shiftLabel || txnCount !== undefined || avgBasket !== undefined;
 
@@ -81,6 +93,33 @@ function QuickPickGridInner({
           {tiles.map((tile, idx) => {
             const n = idx + 1;
             if (!tile) {
+              if (loading) {
+                return (
+                  <div
+                    key={`shim-${n}`}
+                    role="gridcell"
+                    aria-busy="true"
+                    data-testid={`quick-pick-shimmer-${n}`}
+                    style={{ height: 120 }}
+                    className={cn(
+                      "relative flex flex-col gap-2 overflow-hidden rounded-lg p-2.5",
+                      "border border-[var(--pos-line)] bg-[rgba(8,24,38,0.45)]",
+                    )}
+                  >
+                    <span
+                      aria-hidden="true"
+                      className={cn(
+                        "pointer-events-none absolute inset-0",
+                        "bg-gradient-to-r from-transparent via-cyan-400/10 to-transparent",
+                        "bg-[length:200%_100%] motion-safe:animate-[shimmer_1.6s_linear_infinite]",
+                      )}
+                    />
+                    <span className="h-3 w-1/3 rounded bg-white/[0.08]" />
+                    <span className="h-4 w-3/4 rounded bg-white/[0.06]" />
+                    <span className="mt-auto h-2.5 w-1/2 rounded bg-white/[0.05]" />
+                  </div>
+                );
+              }
               return (
                 <div
                   key={`empty-${n}`}
@@ -116,8 +155,10 @@ function QuickPickGridInner({
                 className={cn(
                   "group relative flex flex-col overflow-hidden rounded-lg p-2.5 text-start",
                   "border border-b-2 border-[var(--pos-line)] bg-[rgba(8,24,38,0.7)]",
-                  "transition-colors duration-150",
+                  "transition-[background-color,border-color,transform,box-shadow] duration-150",
                   "hover:border-cyan-400/50 hover:bg-cyan-400/5",
+                  // Lift + soft glow on hover (Gemini POV upgrade); no layout shift
+                  "motion-safe:hover:-translate-y-[1px] motion-safe:hover:shadow-[0_6px_18px_-8px_rgba(0,199,242,0.45)]",
                   "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-cyan-400/40",
                   // Tactile press animation — respects prefers-reduced-motion via CSS
                   "active-tactile",
@@ -174,6 +215,19 @@ function QuickPickGridInner({
                     </span>
                   )}
                 </div>
+
+                {/* Add-to-cart overlay — only visible while button is pressed.
+                    CSS-only, no extra state. */}
+                <span
+                  aria-hidden="true"
+                  className={cn(
+                    "pointer-events-none absolute inset-0 z-10",
+                    "grid place-items-center bg-cyan-500/85 backdrop-blur-[2px]",
+                    "opacity-0 group-active:opacity-100 transition-opacity duration-75",
+                  )}
+                >
+                  <PlusCircle className="h-7 w-7 text-white drop-shadow" />
+                </span>
               </button>
             );
           })}
@@ -207,7 +261,8 @@ function areQuickPickEqual(
     prev.items === next.items &&
     prev.shiftLabel === next.shiftLabel &&
     prev.txnCount === next.txnCount &&
-    prev.avgBasket === next.avgBasket
+    prev.avgBasket === next.avgBasket &&
+    prev.loading === next.loading
   );
 }
 

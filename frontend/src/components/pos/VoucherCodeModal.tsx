@@ -124,7 +124,18 @@ export function VoucherCodeModal({
         <label className="sr-only" htmlFor="pos-voucher-code-input">
           Voucher code
         </label>
-        <div className="flex gap-2">
+        <div className="group relative flex gap-2">
+          {/* Gradient-blur focus halo (Gemini POV upgrade). Sits behind the
+              input + button row; intensifies on focus-within. Decorative only. */}
+          <span
+            aria-hidden="true"
+            className={cn(
+              "pointer-events-none absolute -inset-1 rounded-xl blur-md",
+              "bg-gradient-to-r from-amber-400/30 via-amber-300/20 to-amber-400/30",
+              "opacity-0 transition-opacity duration-300",
+              "group-focus-within:opacity-100",
+            )}
+          />
           <input
             id="pos-voucher-code-input"
             ref={inputRef}
@@ -149,7 +160,7 @@ export function VoucherCodeModal({
             aria-label="Voucher code"
             autoComplete="off"
             inputMode="text"
-            className="font-mono"
+            className="relative font-mono"
             style={{
               flex: 1,
               fontSize: 18,
@@ -173,7 +184,7 @@ export function VoucherCodeModal({
             type="button"
             onClick={handleValidate}
             disabled={validator.isLoading || code.trim().length === 0}
-            className="font-semibold"
+            className="relative font-semibold"
             data-testid="pos-voucher-validate-button"
             style={{
               padding: "0 18px",
