@@ -43,13 +43,3 @@ SET active        = EXCLUDED.active,
     rollout_scope = EXCLUDED.rollout_scope,
     release_notes = EXCLUDED.release_notes,
     updated_at    = now();
-
--- Optional: pause any prior v1.0.x rows so the policy resolver doesn't
--- accidentally suggest a downgrade. Idempotent — UPDATE on no rows is a no-op.
-UPDATE pos.desktop_update_releases
-SET active = false,
-    updated_at = now()
-WHERE channel = 'stable'
-  AND platform = 'win32'
-  AND version LIKE '1.%'
-  AND active = true;
