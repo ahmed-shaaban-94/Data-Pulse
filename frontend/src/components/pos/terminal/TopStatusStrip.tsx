@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Star, Trophy, X } from "lucide-react";
+import { Activity, Star, Trophy, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useOfflineState } from "@/hooks/use-offline-state";
 import type { ActiveShift } from "@/hooks/use-active-shift";
@@ -168,21 +168,82 @@ function DigitalClock() {
 
 // ── TopStatusStrip ────────────────────────────────────────────────────────────
 
+// ── Wordmark ──────────────────────────────────────────────────────────────────
+// Compact "Data Pulse · Pharma OS" lockup inspired by the Gemini POV header.
+// Purely decorative — accessibility tree leaves it as a single label.
+
+function Wordmark() {
+  return (
+    <div className="flex items-center gap-2.5" aria-label="Data Pulse Pharma OS">
+      <div
+        aria-hidden="true"
+        className={cn(
+          "grid h-8 w-8 place-items-center rounded-lg",
+          "bg-gradient-to-br from-cyan-400 to-indigo-500",
+          "shadow-[0_0_12px_rgba(0,199,242,0.35)]",
+        )}
+      >
+        <Activity className="h-4 w-4 text-white motion-safe:animate-pulse" />
+      </div>
+      <div className="flex flex-col leading-tight">
+        <span className="text-[13px] font-black tracking-wider text-text-primary">
+          Data Pulse
+        </span>
+        <span
+          className={cn(
+            "font-mono text-[8.5px] font-semibold uppercase tracking-[0.22em]",
+            "text-cyan-300/80",
+          )}
+        >
+          Pharma OS
+        </span>
+      </div>
+    </div>
+  );
+}
+
 interface TopStatusStripProps {
   shift: ActiveShift | null;
   terminalName?: string;
   onClose: () => void;
+  /**
+   * Show the "Data Pulse · Pharma OS" wordmark on the left of the strip.
+   * Defaults to true. Set false to keep the legacy lean layout.
+   */
+  showWordmark?: boolean;
 }
 
-export function TopStatusStrip({ shift, terminalName, onClose }: TopStatusStripProps) {
+export function TopStatusStrip({
+  shift,
+  terminalName,
+  onClose,
+  showWordmark = true,
+}: TopStatusStripProps) {
   return (
     <header
       data-testid="top-status-strip"
       data-no-print="true"
-      className="flex h-14 items-center justify-between border-b border-[var(--pos-line)] bg-[var(--pos-card)] px-4"
+      className={cn(
+        "relative flex h-14 items-center justify-between",
+        "border-b border-[var(--pos-line)] bg-[var(--pos-card)] px-4",
+      )}
     >
-      {/* Left: sync pill */}
+      {/* Top hairline gradient — visual separator from the page chrome */}
+      <span
+        aria-hidden="true"
+        className={cn(
+          "pointer-events-none absolute inset-x-0 top-0 h-px",
+          "bg-gradient-to-r from-transparent via-cyan-400/60 to-transparent",
+        )}
+      />
+      {/* Left: optional wordmark + sync pill + terminal name */}
       <div className="flex items-center gap-3">
+        {showWordmark && (
+          <>
+            <Wordmark />
+            <span aria-hidden="true" className="h-6 w-px bg-[var(--pos-line)]" />
+          </>
+        )}
         <SyncPill />
         {terminalName && (
           <span className={cn(STRIP_MONO, "text-text-secondary/70")}>{terminalName}</span>

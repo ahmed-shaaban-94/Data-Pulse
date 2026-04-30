@@ -11,6 +11,18 @@ interface ScanBarProps {
   isOnline: boolean;
   placeholder?: string;
   disabled?: boolean;
+  /**
+   * Bumping this number plays a 220ms white flash overlay (visual
+   * confirmation of a successful scan). Use the same key for every
+   * cart-add commit point. Inspired by the Gemini POV mockup.
+   */
+  flashKey?: number;
+  /**
+   * Bumping this number plays a 320ms red flash overlay (rejected
+   * scan / no match). Independent counter from {@link flashKey} so
+   * either can fire without affecting the other.
+   */
+  errorFlashKey?: number;
 }
 
 /**
@@ -19,7 +31,7 @@ interface ScanBarProps {
  * after every cart addition or when '/' is pressed.
  */
 export const ScanBar = forwardRef<HTMLInputElement, ScanBarProps>(function ScanBar(
-  { value, onChange, onSubmit, isOnline, placeholder, disabled },
+  { value, onChange, onSubmit, isOnline, placeholder, disabled, flashKey, errorFlashKey },
   ref,
 ) {
   function handleSubmit(e: React.FormEvent) {
@@ -48,6 +60,30 @@ export const ScanBar = forwardRef<HTMLInputElement, ScanBarProps>(function ScanB
           animation: isOnline ? "dpScan 2.6s linear infinite" : "none",
         }}
       />
+      {/* Scan-success flash — re-mounts on flashKey change */}
+      {flashKey !== undefined && flashKey > 0 && (
+        <div
+          key={`ok-${flashKey}`}
+          aria-hidden="true"
+          data-testid="scan-flash"
+          className={cn(
+            "pointer-events-none absolute inset-0 z-[1] bg-white",
+            "pos-scan-flash",
+          )}
+        />
+      )}
+      {/* Scan-error flash — re-mounts on errorFlashKey change */}
+      {errorFlashKey !== undefined && errorFlashKey > 0 && (
+        <div
+          key={`err-${errorFlashKey}`}
+          aria-hidden="true"
+          data-testid="scan-flash-error"
+          className={cn(
+            "pointer-events-none absolute inset-0 z-[1] bg-red-500/70",
+            "pos-scan-flash-error",
+          )}
+        />
+      )}
       <Barcode className="relative h-5 w-5 shrink-0 text-cyan-300" aria-hidden="true" />
       <input
         ref={ref}

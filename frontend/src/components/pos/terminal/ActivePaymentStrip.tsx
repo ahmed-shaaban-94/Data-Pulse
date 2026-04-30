@@ -335,7 +335,7 @@ function VoucherStrip({
   if (!code) {
     return (
       <div className="flex items-center justify-between text-[12.5px] text-text-secondary">
-        <span>Press F12 or tap Voucher to enter a code</span>
+        <span>Press F7 or tap Voucher to enter a code</span>
         <button
           type="button"
           onClick={onOpen}

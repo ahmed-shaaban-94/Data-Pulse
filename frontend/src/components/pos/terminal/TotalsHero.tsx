@@ -83,9 +83,15 @@ export function TotalsHero({
       </div>
 
       <div className="relative mt-1 flex items-baseline gap-2">
+        {/* key={grandTotal} re-mounts the span on every value change so
+            the existing `countUp` keyframe replays (motion-safe only). */}
         <span
+          key={grandTotal}
           data-testid="totals-hero-grand"
-          className="pos-display tabular-nums text-5xl text-text-primary"
+          className={cn(
+            "pos-display tabular-nums text-5xl text-text-primary",
+            "motion-safe:animate-count-up",
+          )}
         >
           {fmtEgp(grandTotal)}
         </span>
