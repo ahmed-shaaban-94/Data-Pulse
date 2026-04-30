@@ -199,6 +199,40 @@ jobs:
             exit 1
           }
 
+      # ── Auto-register the rollout in the staged-update table ──────────
+      # Replaces the per-release SQL migration pattern (#802 used migration
+      # 123). Calls POST /api/v1/pos/admin/desktop-releases — gated by
+      # pos:update:manage permission and idempotent on (version, channel,
+      # platform), so re-running on the same tag is safe.
+      #
+      # When POS_ADMIN_TOKEN is unset (e.g. before the operator provisions
+      # the secret) the step degrades to a no-op with a notice so existing
+      # tag pushes continue to publish artifacts. Once provisioned, every
+      # subsequent release auto-registers.
+      - name: Register rollout in DB
+        if: success() && startsWith(github.ref, 'refs/tags/pos-desktop-v')
+        env:
+          POS_ADMIN_TOKEN: ${{ secrets.POS_ADMIN_TOKEN }}
+        shell: bash
+        run: |
+          if [ -z "${POS_ADMIN_TOKEN:-}" ]; then
+            echo "::warning::POS_ADMIN_TOKEN secret not set — skipping rollout registration. Add a service-account Bearer with the pos:update:manage permission under repo Settings → Secrets to enable auto-register."
+            exit 0
+          fi
+          VERSION="${GITHUB_REF#refs/tags/pos-desktop-v}"
+          BODY=$(jq -nc \
+            --arg v "$VERSION" \
+            '{version:$v,channel:"stable",platform:"win32",rollout_scope:"all",active:true,release_notes:("Auto-registered by pos-desktop-release workflow for tag pos-desktop-v" + $v)}')
+          echo "Registering: $BODY"
+          curl -fsSL --retry 3 --retry-delay 5 \
+            -X POST https://smartdatapulse.tech/api/v1/pos/admin/desktop-releases \
+            -H "Authorization: Bearer $POS_ADMIN_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "$BODY" \
+            -o /tmp/register-response.json \
+            -w "Registered: HTTP %{http_code}\n"
+          cat /tmp/register-response.json
+
       # ── Sentry source-map upload (follow-up to #481 / PR #495) ────────
       # Runs only on tag pushes AND only when SENTRY_AUTH_TOKEN is set.
       # Without this step, crashes reach Sentry but stacks are NOT
