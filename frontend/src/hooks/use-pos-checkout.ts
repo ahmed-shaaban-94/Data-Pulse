@@ -55,9 +55,27 @@ export function usePosCheckout() {
   ): Promise<PosCartItem> {
     setLoading(true);
     try {
+      // Backend requires Idempotency-Key on POST /transactions/{id}/items
+      // since #799. Without it the request 422s with
+      // {"loc":["header","Idempotency-Key"],"msg":"Field required"}.
+      // Mint a fresh UUID per call so a retried add at the network layer
+      // (e.g. flaky offline-online transition) doesn't duplicate the line.
+      const idempotencyKey =
+        typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+          ? crypto.randomUUID()
+          : `ai-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      // Defensive String() on drug_code: the AddItemRequest type says string,
+      // but a numeric SKU coming from a search response or a stale offline
+      // cart can leak through as a JS number — backend pydantic rejects
+      // {"input": 3210570, "msg": "Input should be a valid string"}.
+      const safeReq: AddItemRequest = {
+        ...req,
+        drug_code: String(req.drug_code),
+      };
       const item = await postAPI<PosCartItem>(
         `/api/v1/pos/transactions/${transactionId}/items`,
-        req,
+        safeReq,
+        { headers: { "Idempotency-Key": idempotencyKey } },
       );
       setState((s) => ({ ...s, isLoading: false }));
       return item;
