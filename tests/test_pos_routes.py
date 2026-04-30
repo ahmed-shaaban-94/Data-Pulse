@@ -10,7 +10,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from fastapi import FastAPI, Request
@@ -34,11 +34,13 @@ from datapulse.pos.exceptions import (
     PharmacistVerificationRequiredError,
     TerminalNotActiveError,
 )
+from datapulse.pos.idempotency import IdempotencyContext
 from datapulse.pos.models import (
     CheckoutResponse,
     PosCartItem,
     PosProductResult,
     PosStockInfo,
+    TerminalCloseRequest,
     TerminalSession,
     TransactionResponse,
 )
@@ -238,6 +240,63 @@ class TestTerminalRoutes:
         )
         assert resp.status_code == 200
 
+    def test_close_terminal_replays_cached_success(self, mock_service: MagicMock):
+        from datapulse.api.routes._pos_terminals import close_terminal
+
+        cached = _terminal_session(TerminalStatus.closed).model_dump(mode="json")
+        idem = IdempotencyContext(
+            key="term-close-replay",
+            tenant_id=1,
+            endpoint="pos.close_terminal",
+            request_hash="hash",
+            replay=True,
+            cached_status=200,
+            cached_body=cached,
+        )
+
+        response = close_terminal(
+            request=MagicMock(),
+            terminal_id=1,
+            body=TerminalCloseRequest(closing_cash=Decimal("250")),
+            service=mock_service,
+            user=MOCK_USER,
+            db_session=MagicMock(),
+            idem=idem,
+        )
+
+        assert response.status == TerminalStatus.closed
+        mock_service.close_terminal.assert_not_called()
+
+    def test_close_terminal_records_expected_error(self, mock_service: MagicMock):
+        from datapulse.api.routes._pos_terminals import close_terminal
+
+        idem = IdempotencyContext(
+            key="term-close-error",
+            tenant_id=1,
+            endpoint="pos.close_terminal",
+            request_hash="hash",
+            replay=False,
+        )
+        db_session = MagicMock()
+        error = TerminalNotActiveError(terminal_id=1, current_status="paused")
+        mock_service.close_terminal.side_effect = error
+
+        with (
+            patch("datapulse.api.routes._pos_terminals.record_idempotent_exception") as record,
+            pytest.raises(TerminalNotActiveError),
+        ):
+            close_terminal(
+                request=MagicMock(),
+                terminal_id=1,
+                body=TerminalCloseRequest(closing_cash=Decimal("250")),
+                service=mock_service,
+                user=MOCK_USER,
+                db_session=db_session,
+                idem=idem,
+            )
+
+        record.assert_called_once_with(db_session, idem, error)
+
     def test_list_active_terminals_200(
         self,
         client: TestClient,
@@ -321,14 +380,19 @@ class TestTransactionRoutes:
             items=[],
         )
         mock_service.add_item.return_value = _cart_item()
-        resp = client.post(
-            "/api/v1/pos/transactions/100/items",
-            json={"drug_code": "DRUG001", "quantity": "3"},
-            headers={"Idempotency-Key": "test-key-add-1"},
-        )
+        with patch("datapulse.api.routes._pos_transactions.record_idempotent_success") as record:
+            resp = client.post(
+                "/api/v1/pos/transactions/100/items",
+                json={"drug_code": "DRUG001", "quantity": "3"},
+                headers={"Idempotency-Key": "test-key-add-1"},
+            )
         assert resp.status_code == 201
         body = resp.json()
         assert body["drug_code"] == "DRUG001"
+        args, _kwargs = record.call_args
+        assert args[1].key == "test-key-add-1"
+        assert args[1].tenant_id == 1
+        assert args[2] == 201
 
     def test_add_item_409_insufficient_stock(
         self,
@@ -395,12 +459,17 @@ class TestTransactionRoutes:
 
     def test_remove_item_204(self, client: TestClient, mock_service: MagicMock):
         mock_service.remove_item.return_value = True
-        resp = client.delete(
-            "/api/v1/pos/transactions/100/items/1",
-            headers={"Idempotency-Key": "test-key-remove-1"},
-        )
+        with patch("datapulse.api.routes._pos_transactions.record_idempotent_success") as record:
+            resp = client.delete(
+                "/api/v1/pos/transactions/100/items/1",
+                headers={"Idempotency-Key": "test-key-remove-1"},
+            )
         assert resp.status_code == 204
         mock_service.remove_item.assert_called_once_with(1, transaction_id=100, tenant_id=1)
+        args, _kwargs = record.call_args
+        assert args[1].key == "test-key-remove-1"
+        assert args[1].tenant_id == 1
+        assert args[2] == 204
 
     def test_remove_item_404(self, client: TestClient, mock_service: MagicMock):
         mock_service.remove_item.return_value = False
@@ -416,16 +485,21 @@ class TestTransactionRoutes:
         mock_service: MagicMock,
     ):
         mock_service.update_item.return_value = _cart_item()
-        resp = client.patch(
-            "/api/v1/pos/transactions/100/items/1",
-            json={"quantity": "4"},
-            headers={"Idempotency-Key": "test-key-update-1"},
-        )
+        with patch("datapulse.api.routes._pos_transactions.record_idempotent_success") as record:
+            resp = client.patch(
+                "/api/v1/pos/transactions/100/items/1",
+                json={"quantity": "4"},
+                headers={"Idempotency-Key": "test-key-update-1"},
+            )
         assert resp.status_code == 200
         mock_service.update_item.assert_called_once()
         kwargs = mock_service.update_item.call_args.kwargs
         assert kwargs["transaction_id"] == 100
         assert kwargs["unit_price"] is None
+        args, _idem_kwargs = record.call_args
+        assert args[1].key == "test-key-update-1"
+        assert args[1].tenant_id == 1
+        assert args[2] == 200
 
     def test_add_item_rejects_completed_transaction(
         self,
