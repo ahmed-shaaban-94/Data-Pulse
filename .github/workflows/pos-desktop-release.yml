@@ -309,6 +309,50 @@ jobs:
           finalize: true
           set_commits: skip
 
+      # Phase 2 of pipeline standardization (spec §4.2): register the
+      # rollout in pos.desktop_update_releases via the admin API instead
+      # of writing a per-release SQL migration. Runs only on tag pushes
+      # AND only when POS_ADMIN_TOKEN is configured — keeps existing tag
+      # pushes working while the secret is being provisioned the first
+      # time. Retries 3× on transient network errors.
+      - name: Register rollout in DB
+        if: ${{ success() && startsWith(github.ref, 'refs/tags/pos-desktop-v') }}
+        env:
+          POS_ADMIN_TOKEN: ${{ secrets.POS_ADMIN_TOKEN }}
+        shell: bash
+        run: |
+          if [ -z "${POS_ADMIN_TOKEN:-}" ]; then
+            echo "::warning::POS_ADMIN_TOKEN secret not set — skipping rollout registration. Add it under repo Settings → Secrets to enable auto-register. The release is still published; you'll just need to register it manually via POST /api/v1/pos/admin/desktop-releases or the operator dashboard."
+            exit 0
+          fi
+          VERSION="${GITHUB_REF#refs/tags/pos-desktop-v}"
+          BODY=$(jq -nc \
+            --arg v "$VERSION" \
+            '{
+              version: $v,
+              channel: "stable",
+              platform: "win32",
+              rollout_scope: "all",
+              active: true,
+              release_notes: ("Auto-registered by pos-desktop-release workflow for tag pos-desktop-v" + $v)
+            }')
+          echo "Registering: $BODY"
+          HTTP_CODE=$(curl -fsSL --retry 3 --retry-delay 5 \
+            -X POST https://smartdatapulse.tech/api/v1/pos/admin/desktop-releases \
+            -H "Authorization: Bearer $POS_ADMIN_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "$BODY" \
+            -o /tmp/register-response.json \
+            -w "%{http_code}")
+          echo "Registered: HTTP $HTTP_CODE"
+          cat /tmp/register-response.json
+          # curl -f already exits non-zero on >=400 so this is a defence-in-depth
+          # check; mostly for clarity in the workflow log.
+          if [ "$HTTP_CODE" != "201" ] && [ "$HTTP_CODE" != "200" ]; then
+            echo "::error::Rollout registration returned unexpected HTTP $HTTP_CODE — check response body above."
+            exit 1
+          fi
+
       # Keep the artifact around for manual download even on non-release
       # runs. Retention is limited to save storage; tag builds also get
       # the file attached to the Release.
