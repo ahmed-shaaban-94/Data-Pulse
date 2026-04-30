@@ -59,6 +59,33 @@ jobs:
           cache: "npm"
           cache-dependency-path: frontend/package-lock.json
 
+      # Fail loudly when the git tag and pos-desktop/package.json disagree.
+      # Tonight (#802) a tag was pushed without bumping package.json; every
+      # downstream artifact silently skipped publish. The error message
+      # below is the recovery runbook so the operator who hits this knows
+      # exactly what to do without grepping for docs.
+      - name: Assert tag matches package.json version
+        if: startsWith(github.ref, 'refs/tags/pos-desktop-v')
+        shell: bash
+        run: |
+          TAG_VERSION="${GITHUB_REF#refs/tags/pos-desktop-v}"
+          PKG_VERSION=$(node -p "require('./pos-desktop/package.json').version")
+          if [ "$TAG_VERSION" != "$PKG_VERSION" ]; then
+            cat <<EOF
+          ::error::Tag version mismatch
+            Tag:           pos-desktop-v$TAG_VERSION
+            package.json:  $PKG_VERSION
+
+          Recovery:
+            1. Bump pos-desktop/package.json + package-lock.json to $TAG_VERSION
+            2. Commit + push to main
+            3. Delete bad tag: git push origin :refs/tags/pos-desktop-v$TAG_VERSION
+            4. Re-tag from new HEAD: git tag pos-desktop-v$TAG_VERSION && git push origin pos-desktop-v$TAG_VERSION
+          EOF
+            exit 1
+          fi
+          echo "::notice::Tag and package.json both at $TAG_VERSION"
+
       - name: Install frontend dependencies
         working-directory: frontend
         run: npm ci --no-audit --no-fund
