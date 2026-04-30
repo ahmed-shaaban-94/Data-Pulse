@@ -34,7 +34,11 @@ const PRODUCTS: PosProductResult[] = Array.from({ length: 9 }, (_, i) => ({
 
 // Module-level spy so individual tests can assert addItem invocations.
 // Reset in beforeEach via `addItemCalls.length = 0`.
-const addItemCalls: Array<{ txnId: string; body: unknown }> = [];
+const addItemCalls: Array<{
+  txnId: string;
+  body: unknown;
+  idempotencyKey: string | null;
+}> = [];
 
 function primeHandlers() {
   server.use(
@@ -62,7 +66,11 @@ function primeHandlers() {
     // redirecting to /checkout. See docs/brain/incidents/2026-04-30-charge-empty-transaction.md.
     http.post("*/api/v1/pos/transactions/:txnId/items", async ({ params, request }) => {
       const body = await request.json();
-      addItemCalls.push({ txnId: String(params.txnId), body });
+      addItemCalls.push({
+        txnId: String(params.txnId),
+        body,
+        idempotencyKey: request.headers.get("Idempotency-Key"),
+      });
       return HttpResponse.json({
         drug_code: (body as { drug_code: string }).drug_code,
         drug_name: (body as { drug_name: string }).drug_name,
@@ -383,9 +391,20 @@ describe("Terminal v2 integration", () => {
     // All three POSTs target the freshly minted draft (id 1001).
     expect(addItemCalls.every((c) => c.txnId === "1001")).toBe(true);
 
+    // Backend now requires Idempotency-Key on /items (#799). Every call
+    // must carry one, and they must be unique per line so that a
+    // network-layer retry of one /items POST cannot duplicate a
+    // different line.
+    const keys = addItemCalls
+      .map((c) => c.idempotencyKey)
+      .filter((k): k is string => k !== null);
+    expect(keys).toHaveLength(3);
+    expect(new Set(keys).size).toBe(3);
+
     // Pending checkout payload still hands off the same txn id.
     const stored = localStorage.getItem("pos:pending_checkout");
     expect(stored).toBeTruthy();
     expect(JSON.parse(stored as string).transactionId).toBe(1001);
   });
+
 });
