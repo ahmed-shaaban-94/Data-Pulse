@@ -17,6 +17,8 @@
     "baseUrl": ".",
     "paths": {
       "@pos/*": ["./src/*"],
+      "@/*": ["../frontend/src/*"],
+      "@shared/lib/*": ["../frontend/src/lib/*"],
       "@shared/utils": ["../frontend/src/lib/utils.ts"],
       "@shared/components/*": ["../frontend/src/components/*"],
       "@shared/hooks/*": ["../frontend/src/hooks/*"]

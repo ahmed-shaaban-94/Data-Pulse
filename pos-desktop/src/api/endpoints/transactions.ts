@@ -1,25 +1,38 @@
-// Typed POS transaction endpoints. Wraps ApiClient with OpenAPI-generated
-// request/response types. Phase 1 Sub-PR 4 of POS extraction.
+// Typed POS transaction endpoints. Wraps ApiClient with placeholder
+// request/response types until Sub-PR 5 regenerates the OpenAPI contract
+// to include POS routes. Until then these types are intentionally loose
+// so consumers can adopt the typed surface incrementally.
 
 import type { ApiClient } from "@pos/api/client";
-import type { paths } from "@pos/api/types";
 
-type CreateTransactionResponse =
-  paths["/api/v1/pos/transactions"]["post"]["responses"]["200"]["content"]["application/json"];
-type AddItemRequest =
-  paths["/api/v1/pos/transactions/{transaction_id}/items"]["post"]["requestBody"] extends
-    { content: { "application/json": infer B } }
-    ? B
-    : never;
-type AddItemResponse =
-  paths["/api/v1/pos/transactions/{transaction_id}/items"]["post"]["responses"]["200"]["content"]["application/json"];
-type CommitRequest =
-  paths["/api/v1/pos/transactions/commit"]["post"]["requestBody"] extends
-    { content: { "application/json": infer B } }
-    ? B
-    : never;
-type CommitResponse =
-  paths["/api/v1/pos/transactions/commit"]["post"]["responses"]["200"]["content"]["application/json"];
+export interface CreateTransactionResponse {
+  transaction_id: number;
+  status: string;
+}
+
+export interface AddItemRequest {
+  drug_code: string;
+  quantity: number;
+  unit_price?: number;
+}
+
+export interface AddItemResponse {
+  transaction_id: number;
+  item_id: number;
+  line_total: number;
+}
+
+export interface CommitRequest {
+  transaction_id: number;
+  payment_method: string;
+  amount_received: number;
+}
+
+export interface CommitResponse {
+  transaction_id: number;
+  receipt_number: string;
+  change_due: number;
+}
 
 export interface TransactionEndpoints {
   create: () => Promise<CreateTransactionResponse>;

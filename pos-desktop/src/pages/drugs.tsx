@@ -10,7 +10,7 @@ import { CartGoTo } from "@pos/components/drugs/CartGoTo";
 import { StocktakingModal } from "@pos/components/StocktakingModal";
 import { toDrugRow, type RxFilter, type SortKey, type SortState, type StockFilter } from "@pos/components/drugs/types";
 import { usePosCart } from "@pos/hooks/use-pos-cart";
-import { useDrugSearch } from "@shared/hooks/use-drug-search";
+import { useDrugSearch } from "@pos/hooks/use-drug-search";
 import { useToast } from "@shared/components/ui/toast";
 import { cn } from "@shared/lib/utils";
 import type { TerminalSessionResponse } from "@pos/types/pos";

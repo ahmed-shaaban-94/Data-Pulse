@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Activity, Star, Trophy, X } from "lucide-react";
 import { cn } from "@shared/lib/utils";
-import { useOfflineState } from "@shared/hooks/use-offline-state";
+import { useOfflineState } from "@pos/hooks/use-offline-state";
 import type { ActiveShift } from "@shared/hooks/use-active-shift";
 
 // ── helpers ───────────────────────────────────────────────────────────────────

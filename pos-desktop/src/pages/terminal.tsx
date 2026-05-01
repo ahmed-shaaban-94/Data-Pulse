@@ -35,7 +35,7 @@ import { useManagerOverride } from "@shared/hooks/use-manager-override";
 import { usePosCart } from "@pos/hooks/use-pos-cart";
 import { usePosCheckout } from "@pos/hooks/use-pos-checkout";
 import { usePosProducts } from "@pos/hooks/use-pos-products";
-import { useOfflineState } from "@shared/hooks/use-offline-state";
+import { useOfflineState } from "@pos/hooks/use-offline-state";
 import { cn } from "@shared/lib/utils";
 import type { PosProductResult, TerminalSessionResponse } from "@pos/types/pos";
 import { computeVoucherDiscount, type CartVoucher } from "@pos/lib/voucher";
