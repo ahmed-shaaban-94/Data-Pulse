@@ -85,6 +85,10 @@ jobs:
           DATABASE_URL: "sqlite:///:memory:"
           REDIS_URL: ""
           SENTRY_ENVIRONMENT: test
+          # POS routes (51 paths) are gated behind feature_platform — without
+          # this, the dump diffs against a 175-path schema instead of 253 and
+          # flags the committed openapi.json as drifted on every PR.
+          FEATURE_PLATFORM: "true"
         run: python scripts/dump_openapi.py --check
 
   test-unit:

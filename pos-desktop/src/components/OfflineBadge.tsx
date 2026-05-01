@@ -1,6 +1,6 @@
 import { WifiOff } from "lucide-react";
 import { cn } from "@shared/lib/utils";
-import { useOfflineState } from "@shared/hooks/use-offline-state";
+import { useOfflineState } from "@pos/hooks/use-offline-state";
 
 export function OfflineBadge() {
   const { isOnline, unresolved } = useOfflineState();

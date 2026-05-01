@@ -25,7 +25,7 @@
 
 import { useEffect, useRef } from "react";
 
-import { useSession } from "@/lib/auth-bridge";
+import { useSession } from "@shared/lib/auth-bridge";
 import { db as posDb, hasElectron } from "@pos/lib/ipc";
 
 const POLL_INTERVAL_MS = 30_000;

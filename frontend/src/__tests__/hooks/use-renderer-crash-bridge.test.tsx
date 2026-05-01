@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { renderHook } from "@testing-library/react";
 import { act } from "react";
 
-import { useRendererCrashBridge } from "@/hooks/use-renderer-crash-bridge";
+import { useRendererCrashBridge } from "@pos/hooks/use-renderer-crash-bridge";
 
 describe("useRendererCrashBridge", () => {
   const captureError = vi.fn();

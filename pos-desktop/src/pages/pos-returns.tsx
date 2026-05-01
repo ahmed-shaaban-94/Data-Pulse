@@ -12,7 +12,7 @@ function fmt(n: number): string {
 
 export default function ReturnsPage() {
   const navigate = useNavigate();
-  const searchParams = useSearchParams();
+  const [searchParams] = useSearchParams();
   const txnParam = searchParams.get("txn");
 
   const [txnId, setTxnId] = useState(txnParam ?? "");

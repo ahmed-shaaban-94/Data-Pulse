@@ -14,8 +14,8 @@ import { swrConfig } from "@shared/lib/swr-config";
 import { AuthProvider } from "@shared/components/auth-provider";
 import { ErrorBoundary } from "@shared/components/error-boundary";
 import { ToastProvider } from "@shared/components/ui/toast";
-import { useRendererCrashBridge } from "@shared/hooks/use-renderer-crash-bridge";
-import { useJwtBridge } from "@shared/hooks/use-jwt-bridge";
+import { useRendererCrashBridge } from "@pos/hooks/use-renderer-crash-bridge";
+import { useJwtBridge } from "@pos/hooks/use-jwt-bridge";
 import { BrandProvider } from "@shared/components/branding/brand-provider";
 
 /** Block children until the user is authenticated; redirect anonymous
