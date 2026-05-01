@@ -37,6 +37,11 @@ export default defineConfig({
       "zustand",
       "next-themes",
       "sonner",
+      // Mocked by tests; the dedupe ensures vi.mock("focus-trap-react") in
+      // frontend test files reaches the same module instance the moved POS
+      // components import from pos-desktop/node_modules.
+      "focus-trap-react",
+      "qrcode.react",
     ],
   },
 });
