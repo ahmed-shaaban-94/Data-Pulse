@@ -27,6 +27,8 @@
 | `POS_ADMIN_TOKEN` (workflow → `/api/v1/pos/admin/desktop-releases`) | 180 days | Tech lead | Any team departure with `pos:update:manage` |
 | Windows code-signing cert (`CSC_LINK` + `CSC_KEY_PASSWORD`) | At expiry (typically 1y from CA) | Tech lead | CA breach notice; private key suspected leaked |
 | Backup encryption passphrase | Never (rotating invalidates old backups) | — | Only if confirmed compromised — then re-encrypt all retained backups |
+| Windows code-signing cert (`CSC_LINK` + `CSC_KEY_PASSWORD`) | 365 days (cert lifetime) | Tech lead | Cert revocation; signer compromise; team departure |
+| `POS_ADMIN_TOKEN` (CI bearer for `/api/v1/pos/admin/desktop-releases`) | 180 days | Tech lead | Workflow secret leak; service-account compromise |
 
 ## General rotation pattern
 
@@ -99,6 +101,30 @@ If a route is wired to accept either, flip `<NAME>_NEXT` → `<NAME>` and drop t
 4. Trigger a manual deploy (`Actions → Deploy Production → Run workflow`). Confirm success.
 5. Remove the old public key from `authorized_keys` on the target.
 6. Delete the old private key from 1Password.
+
+### Windows code-signing cert (`CSC_LINK` + `CSC_KEY_PASSWORD`)
+
+Used by `.github/workflows/pos-desktop-release.yml` to sign the POS desktop NSIS installer (#476). Expiry-driven, not schedule-driven — the rotation cadence here matches the cert's validity window (typically 1y for OV, up to 3y for EV). Rotate **before** expiry, otherwise tag pushes fall back to unsigned builds and SmartScreen reputation resets.
+
+1. Procure the renewed `.pfx` from the signing CA (DigiCert / Sectigo / etc.).
+2. `base64 -w 0 cert.pfx > cert.pfx.b64` (no line wrapping — GitHub Actions strips them).
+3. Update repo Settings → Secrets:
+   - `CSC_LINK` ← contents of `cert.pfx.b64`
+   - `CSC_KEY_PASSWORD` ← cert password
+4. Trigger a tag push (or `workflow_dispatch` with `publish=false`) and confirm the workflow's `Verify installer signature` step reports `Status: Valid` with the new issuer/subject.
+5. Revoke the old cert with the CA only after step 4 succeeds — old installers in the field continue to verify against the cert chain even after revocation as long as the timestamp counter-sig was applied at signing time.
+6. Record in `docs/brain/decisions/YYYY-MM-DD-rotate-pos-codesign.md`.
+
+### `POS_ADMIN_TOKEN` (CI rollout-registration bearer)
+
+Used by `.github/workflows/pos-desktop-release.yml` to call `POST /api/v1/pos/admin/desktop-releases` after a successful publish. Backed by a service-account user that holds the `pos:update:manage` permission and nothing else (least privilege).
+
+1. Mint a new bearer for the service account via the operator dashboard (or `core/auth.py` token issuer).
+2. Stage as `POS_ADMIN_TOKEN_NEXT` in GitHub Actions secrets.
+3. Re-run the latest tag's workflow (or push a no-op tag like `pos-desktop-v0.0.0-rotate`) with both secrets present — the step `Register rollout in DB` reads `POS_ADMIN_TOKEN` only, so a successful run confirms the *current* token is still good while the new one waits in the wings.
+4. Rename `POS_ADMIN_TOKEN_NEXT` → `POS_ADMIN_TOKEN` (overwrite). Delete the old secret value from any environment that cached it.
+5. Revoke the old bearer in the auth provider.
+6. Record.
 
 ### DigitalOcean API token
 
