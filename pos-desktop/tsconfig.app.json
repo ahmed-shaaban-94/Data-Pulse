@@ -1,0 +1,28 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["DOM", "DOM.Iterable", "ES2022"],
+    "jsx": "preserve",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "allowImportingTsExtensions": false,
+    "useDefineForClassFields": true,
+    "baseUrl": ".",
+    "paths": {
+      "@pos/*": ["./src/*"],
+      "@shared/utils": ["../frontend/src/lib/utils.ts"],
+      "@shared/components/*": ["../frontend/src/components/*"],
+      "@shared/hooks/*": ["../frontend/src/hooks/*"]
+    },
+    "types": ["vite/client", "node"]
+  },
+  "include": ["src/**/*", "__tests__/**/*"],
+  "exclude": ["node_modules", "dist", "electron"]
+}
