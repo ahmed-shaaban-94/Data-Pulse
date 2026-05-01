@@ -1,5 +1,8 @@
 // bwip-js exposes toSVG at runtime but @types/bwip-js omits it.
 // The cast is intentional and tested against the installed package version.
+// @ts-expect-error — bwip-js uses conditional exports that the cross-package
+// TS resolver doesn't match when this file is compiled from frontend/. The
+// runtime resolution and pos-desktop's own tsc both pick the right entry.
 import bwipjsLib from "bwip-js";
 
 const bwipjs = bwipjsLib as typeof bwipjsLib & {

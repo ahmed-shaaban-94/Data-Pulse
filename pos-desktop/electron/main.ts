@@ -118,11 +118,11 @@ function createWindow(): void {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
-      // DevTools remain toggleable via Ctrl+Shift+I during the alpha/beta
-      // smoke runs so pilots (also our testers) can surface network +
-      // console errors without requiring a separate dev build. Re-gate
-      // on `app.isPackaged` before GA.
-      devTools: true,
+      // DevTools enabled only in dev / packaged builds with explicit env
+      // override. Production installs ship with DevTools disabled to keep
+      // pharmacy cashiers from inadvertently surfacing internal state via
+      // Ctrl+Shift+I (Sub-PR 2 review §MEDIUM: gate before GA).
+      devTools: !app.isPackaged || process.env.DATAPULSE_POS_DEVTOOLS === "1",
     },
   });
 
