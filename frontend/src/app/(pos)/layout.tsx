@@ -1,5 +1,10 @@
 "use client";
 
+// POS-only design tokens, animations, and receipt surface — extracted from
+// app/globals.css in Phase 1 Task 2.6 so the dashboard bundle no longer
+// carries POS noise. Moves to pos-desktop/src/styles/globals.css in Sub-PR 2.
+import "@/styles/pos-globals.css";
+
 import { useEffect, useCallback, useRef, useState, type ReactNode } from "react";
 import { Fraunces, JetBrains_Mono, Cairo } from "next/font/google";
 import { useSession, signIn, AUTH_PROVIDER, CLERK_KEY_CONFIGURED } from "@/lib/auth-bridge";
